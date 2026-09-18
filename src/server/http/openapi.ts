@@ -1,0 +1,381 @@
+import { z } from 'zod';
+import {
+  createAccountSchema,
+  createEntrySchema,
+  createTransferSchema,
+  paginationSchema,
+} from './schemas';
+
+/**
+ * The OpenAPI document, built from the same zod schemas the routes validate
+ * with.
+ *
+ * Hand-written API documentation is wrong the moment someone adds a field.
+ * Deriving the request schemas from the validators means the published contract
+ * cannot describe a body the server would reject — the two are the same object.
+ * OpenAPI 3.1 is a superset of JSON Schema 2020-12, which is exactly what
+ * `z.toJSONSchema` emits, so no translation layer is needed.
+ */
+function jsonSchema(schema: z.ZodType): Record<string, unknown> {
+  return z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'input' }) as Record<
+    string,
+    unknown
+  >;
+}
+
+const moneySchema = {
+  type: 'object',
+  required: ['amount', 'minorUnits', 'currency'],
+  properties: {
+    amount: {
+      type: 'string',
+      description: 'Exact decimal, e.g. "1234.56".',
+      examples: ['1234.56'],
+    },
+    minorUnits: {
+      type: 'string',
+      description:
+        'The same value as an integer count of minor units, sent as a string so that values beyond 2^53 survive JSON.',
+      examples: ['123456'],
+    },
+    currency: { type: 'string', examples: ['USD'] },
+  },
+} as const;
+
+const problemSchema = {
+  type: 'object',
+  description: 'RFC 9457 Problem Details. Extension members carry the specifics of the failure.',
+  required: ['type', 'title', 'status', 'detail'],
+  properties: {
+    type: { type: 'string', format: 'uri' },
+    title: { type: 'string' },
+    status: { type: 'integer' },
+    detail: { type: 'string' },
+    code: { type: 'string' },
+    requestId: { type: 'string' },
+  },
+} as const;
+
+const accountSchema = {
+  type: 'object',
+  required: ['id', 'name', 'type', 'status', 'overdraftAllowed', 'balance', 'createdAt'],
+  properties: {
+    id: { type: 'string', examples: ['acct_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'] },
+    name: { type: 'string' },
+    type: { enum: ['asset', 'liability', 'equity', 'revenue', 'expense'] },
+    status: { enum: ['open', 'closed'] },
+    overdraftAllowed: { type: 'boolean' },
+    balance: { $ref: '#/components/schemas/Money' },
+    createdAt: { type: 'string', format: 'date-time' },
+  },
+} as const;
+
+const transactionSchema = {
+  type: 'object',
+  required: ['id', 'description', 'currency', 'occurredAt', 'createdAt', 'postings'],
+  properties: {
+    id: { type: 'string', examples: ['txn_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'] },
+    description: { type: 'string' },
+    currency: { type: 'string' },
+    occurredAt: { type: 'string', format: 'date-time' },
+    createdAt: { type: 'string', format: 'date-time' },
+    postings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'accountId', 'accountName', 'direction', 'amount', 'sequence'],
+        properties: {
+          id: { type: 'string' },
+          accountId: { type: 'string' },
+          accountName: { type: 'string' },
+          direction: { enum: ['debit', 'credit'] },
+          amount: { $ref: '#/components/schemas/Money' },
+          sequence: { type: 'integer' },
+        },
+      },
+    },
+  },
+} as const;
+
+function envelope(schema: unknown, withCursor = false): Record<string, unknown> {
+  return {
+    type: 'object',
+    required: ['data'],
+    properties: {
+      data: schema,
+      ...(withCursor
+        ? {
+            meta: {
+              type: 'object',
+              properties: { nextCursor: { type: ['string', 'null'] } },
+            },
+          }
+        : {}),
+    },
+  };
+}
+
+function problemResponses(...statuses: number[]): Record<string, unknown> {
+  const titles: Record<number, string> = {
+    400: 'Validation failed',
+    401: 'Authentication required',
+    404: 'Not found',
+    409: 'Conflict',
+    422: 'The request was understood but cannot be applied to the ledger',
+    429: 'Rate limited',
+    503: 'Dependency unavailable',
+  };
+  return Object.fromEntries(
+    statuses.map((status) => [
+      String(status),
+      {
+        description: titles[status] ?? 'Error',
+        content: {
+          'application/problem+json': { schema: { $ref: '#/components/schemas/Problem' } },
+        },
+      },
+    ]),
+  );
+}
+
+const paginationParameters = [
+  {
+    name: 'limit',
+    in: 'query',
+    required: false,
+    schema: { type: 'integer', minimum: 1, maximum: 100, default: 25 },
+  },
+  {
+    name: 'cursor',
+    in: 'query',
+    required: false,
+    description: 'Opaque keyset cursor taken from a previous response’s meta.nextCursor.',
+    schema: { type: 'string' },
+  },
+];
+
+const idempotencyHeader = {
+  name: 'Idempotency-Key',
+  in: 'header',
+  required: false,
+  description:
+    'Replays a previous response instead of posting twice. Reusing a key with a different body is a 409.',
+  schema: { type: 'string', maxLength: 255 },
+};
+
+export function openApiDocument(): Record<string, unknown> {
+  return {
+    openapi: '3.1.0',
+    info: {
+      title: 'Obol Ledger API',
+      version: '1.0.0',
+      description:
+        'A double-entry ledger. Every entry is balanced, append-only, and enforced by the database as well as the application. Amounts are exchanged as exact decimal strings, never as JSON numbers.',
+      license: { name: 'MIT', identifier: 'MIT' },
+    },
+    servers: [{ url: '/api/v1' }],
+    tags: [{ name: 'Accounts' }, { name: 'Journal' }, { name: 'Reports' }, { name: 'Operations' }],
+    components: {
+      securitySchemes: {
+        bearerAuth: { type: 'http', scheme: 'bearer', description: 'Required for all writes.' },
+      },
+      schemas: {
+        Money: moneySchema,
+        Problem: problemSchema,
+        Account: accountSchema,
+        Transaction: transactionSchema,
+        CreateAccount: jsonSchema(createAccountSchema),
+        CreateEntry: jsonSchema(createEntrySchema),
+        CreateTransfer: jsonSchema(createTransferSchema),
+        Pagination: jsonSchema(paginationSchema),
+      },
+    },
+    paths: {
+      '/health': {
+        get: {
+          tags: ['Operations'],
+          summary: 'Liveness and database readiness',
+          responses: {
+            '200': { description: 'Healthy' },
+            '503': { description: 'The database is unreachable' },
+          },
+        },
+      },
+      '/accounts': {
+        get: {
+          tags: ['Accounts'],
+          summary: 'List every account with its current balance',
+          responses: {
+            '200': {
+              description: 'Accounts, ordered by name',
+              content: {
+                'application/json': {
+                  schema: envelope({
+                    type: 'array',
+                    items: { $ref: '#/components/schemas/Account' },
+                  }),
+                },
+              },
+            },
+            ...problemResponses(429),
+          },
+        },
+        post: {
+          tags: ['Accounts'],
+          summary: 'Open an account',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/CreateAccount' } },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Created',
+              content: {
+                'application/json': { schema: envelope({ $ref: '#/components/schemas/Account' }) },
+              },
+            },
+            ...problemResponses(400, 401, 409, 429),
+          },
+        },
+      },
+      '/accounts/{accountId}': {
+        get: {
+          tags: ['Accounts'],
+          summary: 'Fetch one account',
+          parameters: [
+            { name: 'accountId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': {
+              description: 'The account',
+              content: {
+                'application/json': { schema: envelope({ $ref: '#/components/schemas/Account' }) },
+              },
+            },
+            ...problemResponses(404, 429),
+          },
+        },
+      },
+      '/accounts/{accountId}/statement': {
+        get: {
+          tags: ['Accounts'],
+          summary: 'Paginated statement with a running balance',
+          parameters: [
+            { name: 'accountId', in: 'path', required: true, schema: { type: 'string' } },
+            ...paginationParameters,
+          ],
+          responses: {
+            '200': { description: 'Statement lines, newest first' },
+            ...problemResponses(400, 404, 429),
+          },
+        },
+      },
+      '/entries': {
+        get: {
+          tags: ['Journal'],
+          summary: 'List journal entries, newest first',
+          parameters: paginationParameters,
+          responses: {
+            '200': {
+              description: 'A page of entries',
+              content: {
+                'application/json': {
+                  schema: envelope(
+                    { type: 'array', items: { $ref: '#/components/schemas/Transaction' } },
+                    true,
+                  ),
+                },
+              },
+            },
+            ...problemResponses(400, 429),
+          },
+        },
+        post: {
+          tags: ['Journal'],
+          summary: 'Record a balanced journal entry',
+          description:
+            'Postings must sum to zero. The entry is written in a single database transaction and a deferred constraint verifies the balance at COMMIT.',
+          security: [{ bearerAuth: [] }],
+          parameters: [idempotencyHeader],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/CreateEntry' } },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Recorded',
+              content: {
+                'application/json': {
+                  schema: envelope({ $ref: '#/components/schemas/Transaction' }),
+                },
+              },
+            },
+            '200': { description: 'Idempotent replay of an earlier request' },
+            ...problemResponses(400, 401, 409, 422, 429),
+          },
+        },
+      },
+      '/entries/{entryId}': {
+        get: {
+          tags: ['Journal'],
+          summary: 'Fetch one entry with its postings',
+          parameters: [{ name: 'entryId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': {
+              description: 'The entry',
+              content: {
+                'application/json': {
+                  schema: envelope({ $ref: '#/components/schemas/Transaction' }),
+                },
+              },
+            },
+            ...problemResponses(404, 429),
+          },
+        },
+      },
+      '/transfers': {
+        post: {
+          tags: ['Journal'],
+          summary: 'Move money between two accounts',
+          description: 'Sugar for a two-legged journal entry; identical guarantees.',
+          security: [{ bearerAuth: [] }],
+          parameters: [idempotencyHeader],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/CreateTransfer' } },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Recorded',
+              content: {
+                'application/json': {
+                  schema: envelope({ $ref: '#/components/schemas/Transaction' }),
+                },
+              },
+            },
+            '200': { description: 'Idempotent replay of an earlier request' },
+            ...problemResponses(400, 401, 409, 422, 429),
+          },
+        },
+      },
+      '/reports/trial-balance': {
+        get: {
+          tags: ['Reports'],
+          summary: 'Debits, credits and residual per currency',
+          description: 'A residual other than zero means the ledger is inconsistent.',
+          responses: {
+            '200': { description: 'One row per currency' },
+            ...problemResponses(429),
+          },
+        },
+      },
+    },
+  };
+}

@@ -1,0 +1,190 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens.
+ *
+ * Components never name a raw colour. They name a *role* — surface, ink,
+ * border, positive — and the role resolves differently per theme. That is what
+ * makes dark mode a change to this file rather than a `dark:` variant sprinkled
+ * across every component, and it is what stops a one-off hex from quietly
+ * becoming a sixth shade of grey.
+ *
+ * Dark mode is designed, not inverted: the steps below were chosen against the
+ * dark surface, because algorithmically flipping a light palette produces
+ * glaring whites and muddy mid-tones.
+ */
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces, from furthest back to nearest front. */
+  --canvas: oklch(0.985 0.002 250);
+  --surface: oklch(1 0 0);
+  --surface-sunken: oklch(0.972 0.003 250);
+  --surface-hover: oklch(0.965 0.004 250);
+
+  /* Ink, in descending prominence. All clear 4.5:1 on --surface. */
+  --ink: oklch(0.21 0.02 258);
+  --ink-secondary: oklch(0.44 0.02 257);
+  --ink-muted: oklch(0.55 0.02 257);
+
+  --line: oklch(0.922 0.005 255);
+  --line-strong: oklch(0.86 0.008 255);
+
+  /* Inverted surface for primary actions — Swiss, not branded. */
+  --action: oklch(0.21 0.02 258);
+  --action-ink: oklch(0.99 0 0);
+  --action-hover: oklch(0.29 0.02 258);
+
+  /* Status. Always shipped with a label or icon, never colour alone. */
+  --positive: oklch(0.52 0.13 162);
+  --positive-soft: oklch(0.95 0.04 162);
+  --negative: oklch(0.52 0.19 18);
+  --negative-soft: oklch(0.955 0.03 18);
+  --caution: oklch(0.56 0.13 65);
+  --caution-soft: oklch(0.96 0.05 80);
+
+  /* The single chart hue. One series, so no categorical palette is needed. */
+  --series: oklch(0.55 0.2 264);
+  --series-wash: oklch(0.55 0.2 264 / 0.12);
+
+  --focus: oklch(0.55 0.2 264);
+
+  --radius: 0.625rem;
+  --shadow-card: 0 1px 2px oklch(0.21 0.02 258 / 0.05);
+  --shadow-raised:
+    0 1px 2px oklch(0.21 0.02 258 / 0.06), 0 8px 24px -8px oklch(0.21 0.02 258 / 0.12);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --canvas: oklch(0.16 0.012 258);
+  --surface: oklch(0.203 0.014 258);
+  --surface-sunken: oklch(0.178 0.013 258);
+  --surface-hover: oklch(0.245 0.015 258);
+
+  --ink: oklch(0.975 0.003 250);
+  --ink-secondary: oklch(0.79 0.014 253);
+  --ink-muted: oklch(0.66 0.016 255);
+
+  --line: oklch(0.28 0.016 258);
+  --line-strong: oklch(0.36 0.018 258);
+
+  --action: oklch(0.96 0.003 250);
+  --action-ink: oklch(0.2 0.02 258);
+  --action-hover: oklch(0.87 0.005 250);
+
+  --positive: oklch(0.78 0.16 162);
+  --positive-soft: oklch(0.3 0.06 162);
+  --negative: oklch(0.72 0.16 18);
+  --negative-soft: oklch(0.31 0.07 18);
+  --caution: oklch(0.81 0.14 78);
+  --caution-soft: oklch(0.32 0.06 70);
+
+  --series: oklch(0.72 0.15 264);
+  --series-wash: oklch(0.72 0.15 264 / 0.18);
+
+  --focus: oklch(0.78 0.13 264);
+
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-raised: 0 1px 2px oklch(0 0 0 / 0.35), 0 8px 24px -8px oklch(0 0 0 / 0.55);
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), ui-monospace, SFMono-Regular, monospace;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-hover: var(--surface-hover);
+
+  --color-ink: var(--ink);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-muted: var(--ink-muted);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-action: var(--action);
+  --color-action-ink: var(--action-ink);
+  --color-action-hover: var(--action-hover);
+
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-negative: var(--negative);
+  --color-negative-soft: var(--negative-soft);
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+
+  --color-series: var(--series);
+  --color-series-wash: var(--series-wash);
+  --color-focus: var(--focus);
+
+  --radius-card: var(--radius);
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    /* The scrollbar appearing between routes would shift the whole layout. */
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * One visible focus ring for every interactive element. Removing it is the
+   * single most common accessibility regression, so it is defined centrally and
+   * uses `:focus-visible` — pointer users never see it, keyboard users always do.
+   */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /*
+   * Figures in a column must align on the decimal point, or the eye cannot
+   * compare magnitudes by length. Applied by the `.numeric` utility rather than
+   * globally: `tabular-nums` makes large standalone numbers look gappy.
+   */
+  .numeric {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Reveals content to screen readers only — used for chart table fallbacks. */
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

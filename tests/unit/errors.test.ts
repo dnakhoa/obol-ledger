@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest';
+import { describe as describeError, titleOf, type LedgerError } from '@/server/domain/errors';
+import { statusFor } from '@/server/http/problem';
+
+/**
+ * One representative of every variant. Adding a `LedgerError` without adding it
+ * here is a type error, which is the point: a new failure mode must arrive with
+ * a title, a description and a status, not with `undefined` in an API response.
+ */
+const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
+  account_not_found: { code: 'account_not_found', accountId: 'acct_x' },
+  account_closed: { code: 'account_closed', accountId: 'acct_x' },
+  currency_mismatch: { code: 'currency_mismatch', expected: 'EUR', received: 'USD' },
+  unbalanced_transaction: {
+    code: 'unbalanced_transaction',
+    residual: '0.01',
+    currency: 'USD',
+  },
+  too_few_postings: { code: 'too_few_postings', count: 1 },
+  zero_amount_posting: { code: 'zero_amount_posting', index: 2 },
+  duplicate_account_in_transaction: {
+    code: 'duplicate_account_in_transaction',
+    accountId: 'acct_x',
+  },
+  insufficient_funds: {
+    code: 'insufficient_funds',
+    accountId: 'acct_x',
+    available: '10.00',
+    requested: '25.00',
+    currency: 'USD',
+  },
+  idempotency_key_reused: { code: 'idempotency_key_reused', key: 'k' },
+};
+
+const variants = Object.values(EVERY_VARIANT);
+
+describe('ledger errors', () => {
+  it.each(variants)('describes $code with something actionable', (error) => {
+    const title = titleOf(error);
+    const detail = describeError(error);
+
+    expect(title).toBeTruthy();
+    expect(title).not.toContain('undefined');
+    expect(detail.length).toBeGreaterThan(20);
+    expect(detail).not.toContain('undefined');
+    expect(detail.endsWith('.')).toBe(true);
+  });
+
+  it.each(variants)('maps $code to a 4xx status', (error) => {
+    const status = statusFor(error);
+    expect(status).toBeGreaterThanOrEqual(400);
+    expect(status).toBeLessThan(500);
+  });
+
+  it('names the account when a currency mismatch has one', () => {
+    const withAccount = describeError({
+      code: 'currency_mismatch',
+      expected: 'EUR',
+      received: 'USD',
+      accountId: 'acct_euro',
+    });
+    expect(withAccount).toContain('acct_euro');
+
+    const withoutAccount = describeError({
+      code: 'currency_mismatch',
+      expected: 'EUR',
+      received: 'USD',
+    });
+    expect(withoutAccount).not.toContain('acct_');
+  });
+
+  it('quotes the figures a caller needs to correct the request', () => {
+    expect(describeError(EVERY_VARIANT.insufficient_funds)).toContain('10.00');
+    expect(describeError(EVERY_VARIANT.insufficient_funds)).toContain('25.00');
+    expect(describeError(EVERY_VARIANT.unbalanced_transaction)).toContain('0.01');
+  });
+});

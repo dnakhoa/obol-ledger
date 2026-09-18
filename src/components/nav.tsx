@@ -1,0 +1,90 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/cn';
+import { AccountsIcon, ApiIcon, GaugeIcon, JournalIcon, TransferIcon } from './icons';
+
+/**
+ * The navigation is the only part of the shell that needs to know the current
+ * route, so it is the only part that is a Client Component. Keeping the
+ * `'use client'` boundary here rather than on the layout means the sidebar
+ * chrome, the header and every page body stay on the server.
+ */
+const LINKS = [
+  { href: '/', label: 'Overview', Icon: GaugeIcon, exact: true },
+  { href: '/accounts', label: 'Accounts', Icon: AccountsIcon, exact: false },
+  { href: '/journal', label: 'Journal', Icon: JournalIcon, exact: false },
+  { href: '/transfer', label: 'New entry', Icon: TransferIcon, exact: false },
+  { href: '/api-reference', label: 'API', Icon: ApiIcon, exact: false },
+] as const;
+
+function isActive(pathname: string, href: string, exact: boolean): boolean {
+  return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function SidebarNav() {
+  const pathname = usePathname();
+
+  return (
+    <nav aria-label="Primary" className="flex flex-col gap-0.5">
+      {LINKS.map(({ href, label, Icon, exact }) => {
+        const active = isActive(pathname, href, exact);
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active ? 'page' : undefined}
+            className={cn(
+              'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors duration-150',
+              active
+                ? 'bg-surface-hover text-ink font-medium'
+                : 'text-ink-secondary hover:bg-surface-hover hover:text-ink',
+            )}
+          >
+            <Icon className="text-ink-muted shrink-0" />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+/**
+ * The same destinations as a bottom bar on small screens.
+ *
+ * Five items is the practical ceiling for a bottom bar — beyond that the
+ * targets fall below a comfortable 44px — and the list is capped accordingly.
+ */
+export function MobileNav() {
+  const pathname = usePathname();
+
+  return (
+    <nav
+      aria-label="Primary"
+      className="border-line bg-surface/95 fixed inset-x-0 bottom-0 z-40 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
+    >
+      <ul className="mx-auto flex max-w-2xl">
+        {LINKS.map(({ href, label, Icon, exact }) => {
+          const active = isActive(pathname, href, exact);
+          return (
+            <li key={href} className="flex-1">
+              <Link
+                href={href}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'flex min-h-[3.25rem] flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] transition-colors duration-150',
+                  active ? 'text-ink' : 'text-ink-muted',
+                )}
+              >
+                <Icon className={cn(active && 'text-ink')} />
+                {label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
