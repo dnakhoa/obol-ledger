@@ -188,6 +188,10 @@ export function createJournalService(database: Database, orgId: string) {
     // *inserted* in account-id order so that concurrent entries touching the
     // same pair of accounts always take row locks in the same order and cannot
     // deadlock against each other.
+    //
+    // This is not a hopeful comment: `tests/concurrency/transfers.test.ts`
+    // fires transfers in both directions at once over real connections, and
+    // deleting this `.sort` makes Postgres report `40P01 deadlock detected`.
     const rows = input.postings
       .map((posting, sequence) => ({
         id: newId('posting'),

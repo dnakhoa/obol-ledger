@@ -14,13 +14,14 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --exclude \"tests/concurrency/**\"",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test"
+    "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test",
+    "test:concurrency": "vitest run tests/concurrency"
   },
   "dependencies": {
     "clsx": "2.1.1",

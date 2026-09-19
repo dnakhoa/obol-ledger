@@ -91,6 +91,19 @@ the mock; the schema _is_ the subject.
 - Property tests (`fast-check`) cover the parts where an example-based test would
   only prove the examples: money round-tripping, the balance rule under arbitrary
   perturbation, sign round-trips for every account class, and axis scaling.
+- `tests/concurrency/` runs against a **real** Postgres over a pool of real
+  connections, because PGlite is a single connection and cannot express two
+  transactions racing. It covers the three claims that need genuine
+  concurrency: that lock ordering prevents deadlocks, that trigger-maintained
+  balances lose no update under contention, and that a duplicate idempotency
+  key serialises rather than racing. These skip without
+  `CONCURRENCY_DATABASE_URL` so `pnpm test` stays green without Postgres; CI
+  always provides one.
+
+Each of those three has been checked by deliberately breaking the thing it
+tests. Removing the `.sort` that orders posting inserts by account id makes the
+first fail with `40P01 deadlock detected` — which is the only way to know a
+test has teeth rather than merely passing.
 
 ## Frontend
 

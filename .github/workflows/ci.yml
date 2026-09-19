@@ -61,14 +61,15 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  migrations:
-    name: Migrations apply cleanly
+  postgres:
+    name: 'Postgres: migrations and concurrency'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    # The invariants live in hand-written SQL, so "does it still apply from
-    # empty?" is a question worth asking on every change — against a real
-    # Postgres, not the embedded one the tests use.
+    # Two things need a real server rather than the embedded Postgres the main
+    # suite runs on: that the hand-written invariant SQL still applies from
+    # empty, and every claim this codebase makes about *concurrency* — lock
+    # ordering, lost updates, idempotent retries under a genuine race.
     services:
       postgres:
         image: postgres:18-alpine
@@ -106,3 +107,12 @@ jobs:
 
       - name: Re-running migrations is a no-op
         run: pnpm run db:migrate
+
+      # PGlite is one connection, so it cannot express two transactions racing.
+      # These suites open real ones. Without CONCURRENCY_DATABASE_URL they skip,
+      # which keeps `pnpm test` green for a contributor with no Postgres — so CI
+      # is the thing that guarantees the claims are actually checked.
+      - name: Concurrency
+        run: pnpm run test:concurrency
+        env:
+          CONCURRENCY_DATABASE_URL: postgresql://obol:obol@localhost:5432/obol_ledger?sslmode=disable
