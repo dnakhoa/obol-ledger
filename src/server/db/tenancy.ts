@@ -95,3 +95,54 @@ export async function checkTenantIsolation(database: Database): Promise<Isolatio
     enforced: visibleWithoutTenant === 0 && !privilegedRole,
   };
 }
+
+export type PolicyStatus = {
+  readonly tablesWithRls: number;
+  readonly tablesForced: number;
+  readonly policies: number;
+  /** True when all four ledger tables are protected. */
+  readonly configured: boolean;
+};
+
+const TENANT_TABLES = ['accounts', 'transactions', 'postings', 'idempotency_keys'];
+
+/**
+ * Checks that the *schema* carries the isolation policies.
+ *
+ * Distinct from `checkTenantIsolation`, and the difference matters. This asks
+ * "are the policies defined and forced?" — a property of the database, true or
+ * false regardless of who is connected. `checkTenantIsolation` asks "is *this
+ * connection* subject to them?", which additionally depends on the role.
+ *
+ * An administrative task such as the seed legitimately runs as a privileged
+ * role, so it can only meaningfully assert the first. The application's own
+ * connection must satisfy both, which is why the health probe uses the other.
+ */
+export async function checkTenantPolicies(database: Database): Promise<PolicyStatus> {
+  const [row] = await database
+    .select({
+      withRls: sql<string>`count(*) filter (where c.relrowsecurity)::text`,
+      forced: sql<string>`count(*) filter (where c.relforcerowsecurity)::text`,
+      policies: sql<string>`(
+        select count(*)::text from pg_policy p
+        join pg_class pc on pc.oid = p.polrelid
+        where pc.relname = any(${TENANT_TABLES})
+      )`,
+    })
+    .from(sql`pg_class c join pg_namespace n on n.oid = c.relnamespace`)
+    .where(sql`c.relname = any(${TENANT_TABLES}) and n.nspname = current_schema()`);
+
+  const tablesWithRls = Number(row?.withRls ?? 0);
+  const tablesForced = Number(row?.forced ?? 0);
+  const policies = Number(row?.policies ?? 0);
+
+  return {
+    tablesWithRls,
+    tablesForced,
+    policies,
+    configured:
+      tablesWithRls === TENANT_TABLES.length &&
+      tablesForced === TENANT_TABLES.length &&
+      policies >= TENANT_TABLES.length,
+  };
+}

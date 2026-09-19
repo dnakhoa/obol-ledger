@@ -8,7 +8,7 @@ import { newId } from '../src/lib/id';
 import { createJournalService } from '../src/server/services/journal';
 import { minorUnits, type MinorUnits } from '../src/lib/money';
 import type { Database } from '../src/server/db/types';
-import { withTenant } from '../src/server/db/tenancy';
+import { checkTenantPolicies, withTenant } from '../src/server/db/tenancy';
 import type { AccountType } from '../src/server/domain/account';
 import { describeTarget, schemaConnectionString, sslFor } from './connection';
 

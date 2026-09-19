@@ -37,7 +37,7 @@ equivalent, and `is_local => true` scopes it to the transaction. That scoping
 matters with a pooled connection: a session-level setting would outlive the
 request and hand one tenant's identity to whoever inherited the backend.
 
-**`USING` *and* `WITH CHECK`.** `USING` filters reads. Without `WITH CHECK` a
+**`USING` _and_ `WITH CHECK`.** `USING` filters reads. Without `WITH CHECK` a
 tenant could insert rows stamped with another tenant's id — invisible to itself
 afterwards, and corrupting books it does not own.
 
@@ -79,7 +79,7 @@ prove about the connection using it, so it is checked at runtime instead.
   one. That is a real cost, and it is the right scope anyway: tenancy and
   atomicity cover the same work.
 - `organizations` and `api_keys` carry no policy. Resolving a request's tenant
-  reads them *before* a tenant is known, so a policy keyed on the tenant would
+  reads them _before_ a tenant is known, so a policy keyed on the tenant would
   be circular. Neither is reachable from a tenant-facing endpoint.
 - The application must not connect as a superuser. That is now a documented
   deployment requirement, a health-check assertion, and a test.

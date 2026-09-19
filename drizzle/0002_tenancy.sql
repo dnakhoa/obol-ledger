@@ -47,6 +47,19 @@ ALTER TABLE postings          ADD COLUMN org_id text;
 ALTER TABLE idempotency_keys  ADD COLUMN org_id text;
 
 --> statement-breakpoint
+-- The append-only triggers from 0001 refuse an UPDATE on postings and
+-- transactions, which is exactly what they are for — and exactly what a
+-- backfill has to do. They come off for the duration and go straight back on.
+--
+-- Worth stating because it is invisible on a fresh database: a row-level
+-- trigger never fires when there are no rows, so a migration that omits this
+-- passes CI against an empty schema and fails against every database that has
+-- ever been used.
+ALTER TABLE postings     DISABLE TRIGGER postings_append_only;
+--> statement-breakpoint
+ALTER TABLE transactions DISABLE TRIGGER transactions_append_only;
+
+--> statement-breakpoint
 UPDATE accounts         SET org_id = 'org_00000000000000000000000000' WHERE org_id IS NULL;
 --> statement-breakpoint
 UPDATE transactions     SET org_id = 'org_00000000000000000000000000' WHERE org_id IS NULL;
@@ -54,6 +67,11 @@ UPDATE transactions     SET org_id = 'org_00000000000000000000000000' WHERE org_
 UPDATE postings         SET org_id = 'org_00000000000000000000000000' WHERE org_id IS NULL;
 --> statement-breakpoint
 UPDATE idempotency_keys SET org_id = 'org_00000000000000000000000000' WHERE org_id IS NULL;
+
+--> statement-breakpoint
+ALTER TABLE postings     ENABLE TRIGGER postings_append_only;
+--> statement-breakpoint
+ALTER TABLE transactions ENABLE TRIGGER transactions_append_only;
 
 --> statement-breakpoint
 ALTER TABLE accounts         ALTER COLUMN org_id SET NOT NULL;
