@@ -1,29 +1,44 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { authentication, demoOrgSlug } from '@/server/container';
+import type { Principal } from '@/server/services/authentication';
 import { problem, type Problem } from './problem';
 
 /**
- * Bearer-token authentication for the write endpoints.
+ * Who a request is acting as.
  *
- * Reads are open because this is a public demonstration ledger; writes are not,
- * because anyone could otherwise fill it with noise. Comparison is
- * constant-time: `a === b` on secrets leaks their length and a prefix of their
- * content through timing, and the fix costs nothing.
+ * Writes carry a bearer token, which resolves through the `api_keys` table to
+ * exactly one tenant. Reads are public on this deployment and act as the demo
+ * tenant — deliberately through the *same* path, so the published ledger is one
+ * tenant of a real multi-tenant system rather than a single-tenant app with
+ * tenancy bolted on the side.
+ *
+ * Either way the request ends up with an `orgId`, and every query it makes runs
+ * under the row-level security policy keyed on it. There is no code path that
+ * reaches the ledger without a tenant.
  */
-export function authorize(request: Request): Problem | undefined {
-  const expected = process.env['LEDGER_API_TOKEN'];
-  if (!expected) {
-    return problem(
-      503,
-      'not-configured',
-      'Service not configured',
-      'LEDGER_API_TOKEN is not set, so write endpoints are disabled.',
-    );
-  }
+export type Authenticated = { readonly orgId: string; readonly principal?: Principal };
 
+export async function authenticate(
+  request: Request,
+  required: boolean,
+): Promise<Authenticated | Problem> {
   const header = request.headers.get('authorization') ?? '';
   const [scheme, presented] = header.split(' ');
+  const bearer = scheme?.toLowerCase() === 'bearer' && presented ? presented : undefined;
 
-  if (scheme?.toLowerCase() !== 'bearer' || !presented) {
+  if (bearer) {
+    const principal = await authentication().resolve(bearer);
+    if (!principal) {
+      return problem(
+        401,
+        'unauthorized',
+        'Authentication required',
+        'The bearer token is not valid, or has been revoked.',
+      );
+    }
+    return { orgId: principal.orgId, principal };
+  }
+
+  if (required) {
     return problem(
       401,
       'unauthorized',
@@ -32,29 +47,14 @@ export function authorize(request: Request): Problem | undefined {
     );
   }
 
-  if (!constantTimeEquals(presented, expected)) {
+  const demo = await authentication().organizationBySlug(demoOrgSlug());
+  if (!demo) {
     return problem(
-      401,
-      'unauthorized',
-      'Authentication required',
-      'The bearer token is not valid.',
+      503,
+      'not-configured',
+      'Service not configured',
+      `No organization with slug "${demoOrgSlug()}" exists, so there is no ledger to read. Run pnpm db:seed.`,
     );
   }
-
-  return undefined;
-}
-
-/**
- * Compares two secrets without leaking anything through timing.
- *
- * `timingSafeEqual` throws on a length mismatch, so comparing the raw strings
- * would require a length check first — and that check is itself a timing signal
- * that tells an attacker how long the token is. Hashing both to a fixed 32
- * bytes removes the branch entirely: every comparison does the same work
- * regardless of what was presented.
- */
-function constantTimeEquals(left: string, right: string): boolean {
-  const a = createHash('sha256').update(left, 'utf8').digest();
-  const b = createHash('sha256').update(right, 'utf8').digest();
-  return timingSafeEqual(a, b);
+  return { orgId: demo.id };
 }

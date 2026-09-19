@@ -1,20 +1,22 @@
-import { services } from '@/server/container';
 import { defineRoute, json, parseQuery, readJson, unprocessable } from '@/server/http/route';
 import { createEntrySchema, paginationSchema } from '@/server/http/schemas';
 import { toDraftPostings } from '@/server/http/entries';
 import { fingerprintOf } from '@/server/services/idempotency';
 import { problemFor, problemResponse } from '@/server/http/problem';
 
-export const GET = defineRoute({ name: 'entries.list' }, async ({ request, requestId }) => {
-  const query = parseQuery(request, paginationSchema, requestId);
-  if (!query.ok) return query.response;
+export const GET = defineRoute(
+  { name: 'entries.list' },
+  async ({ request, requestId, services }) => {
+    const query = parseQuery(request, paginationSchema, requestId);
+    if (!query.ok) return query.response;
 
-  const page = await services().journal.list(query.data);
-  return json({
-    data: page.items,
-    meta: { nextCursor: page.nextCursor, previousCursor: page.previousCursor },
-  });
-});
+    const page = await services.journal.list(query.data);
+    return json({
+      data: page.items,
+      meta: { nextCursor: page.nextCursor, previousCursor: page.previousCursor },
+    });
+  },
+);
 
 /**
  * Records a journal entry of arbitrary shape.
@@ -27,7 +29,7 @@ export const GET = defineRoute({ name: 'entries.list' }, async ({ request, reque
  */
 export const POST = defineRoute(
   { name: 'entries.create', auth: true },
-  async ({ request, requestId }) => {
+  async ({ request, requestId, services }) => {
     const body = await readJson(request, createEntrySchema, requestId);
     if (!body.ok) return body.response;
 
@@ -41,7 +43,7 @@ export const POST = defineRoute(
     }
 
     const key = request.headers.get('idempotency-key');
-    const result = await services().journal.postEntry({
+    const result = await services.journal.postEntry({
       description: body.data.description,
       currency: body.data.currency,
       ...(body.data.occurredAt ? { occurredAt: new Date(body.data.occurredAt) } : {}),

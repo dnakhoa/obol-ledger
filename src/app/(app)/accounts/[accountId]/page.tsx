@@ -9,7 +9,7 @@ import { StatTile } from '@/components/stat-tile';
 import { CompactAmount, DirectionalAmount, Money } from '@/components/money';
 import { CursorPagination } from '@/components/pagination';
 import { ArrowLeftIcon } from '@/components/icons';
-import { services } from '@/server/container';
+import { demoServices } from '@/server/container';
 import { normalBalanceOf, type AccountType } from '@/server/domain/account';
 
 type PageProps = {
@@ -28,7 +28,7 @@ const LINE_DATE = new Intl.DateTimeFormat('en-US', {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { accountId } = await params;
-  const account = await services().accounts.byId(accountId);
+  const account = await (await demoServices()).accounts.byId(accountId);
   return { title: account.ok ? account.value.name : 'Account' };
 }
 
@@ -37,7 +37,9 @@ export const dynamic = 'force-dynamic';
 export default async function AccountStatementPage({ params, searchParams }: PageProps) {
   const [{ accountId }, query] = await Promise.all([params, searchParams]);
 
-  const statement = await services().reporting.statement(accountId, {
+  const statement = await (
+    await demoServices()
+  ).reporting.statement(accountId, {
     limit: PAGE_SIZE,
     cursor: query.cursor,
     direction: query.direction === 'backward' ? 'backward' : 'forward',

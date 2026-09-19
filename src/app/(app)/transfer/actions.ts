@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { headers } from 'next/headers';
-import { services } from '@/server/container';
+import { demoServices } from '@/server/container';
 import { createEntrySchema } from '@/server/http/schemas';
 import { toDraftPostings } from '@/server/http/entries';
 import { describe as describeError } from '@/server/domain/errors';
@@ -91,7 +91,9 @@ export async function postEntryAction(
     };
   }
 
-  const result = await services().journal.postEntry({
+  const result = await (
+    await demoServices()
+  ).journal.postEntry({
     description: parsed.data.description,
     currency: parsed.data.currency,
     postings: converted.postings,

@@ -1,4 +1,3 @@
-import { services } from '@/server/container';
 import { defineRoute, json, readJson, unprocessable } from '@/server/http/route';
 import { createTransferSchema } from '@/server/http/schemas';
 import { signedAmount } from '@/server/http/entries';
@@ -16,7 +15,7 @@ import type { MinorUnits } from '@/lib/money';
  */
 export const POST = defineRoute(
   { name: 'transfers.create', auth: true },
-  async ({ request, requestId }) => {
+  async ({ request, requestId, services }) => {
     const body = await readJson(request, createTransferSchema, requestId);
     if (!body.ok) return body.response;
 
@@ -30,7 +29,7 @@ export const POST = defineRoute(
     }
 
     const key = request.headers.get('idempotency-key');
-    const result = await services().journal.postEntry({
+    const result = await services.journal.postEntry({
       description: body.data.description,
       currency: body.data.currency,
       ...(body.data.occurredAt ? { occurredAt: new Date(body.data.occurredAt) } : {}),

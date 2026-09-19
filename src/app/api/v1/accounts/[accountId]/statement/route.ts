@@ -1,4 +1,3 @@
-import { services } from '@/server/container';
 import { defineRoute, json, parseQuery } from '@/server/http/route';
 import { paginationSchema } from '@/server/http/schemas';
 import { problemFor, problemResponse } from '@/server/http/problem';
@@ -7,11 +6,11 @@ type Params = { accountId: string };
 
 export const GET = defineRoute<Params>(
   { name: 'accounts.statement' },
-  async ({ request, params, requestId }) => {
+  async ({ request, params, requestId, services }) => {
     const query = parseQuery(request, paginationSchema, requestId);
     if (!query.ok) return query.response;
 
-    const statement = await services().reporting.statement(params.accountId, query.data);
+    const statement = await services.reporting.statement(params.accountId, query.data);
     if (!statement) {
       return problemResponse(
         problemFor({ code: 'account_not_found', accountId: params.accountId }, requestId),

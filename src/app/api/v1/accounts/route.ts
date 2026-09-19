@@ -1,20 +1,19 @@
-import { services } from '@/server/container';
 import { defineRoute, json, readJson } from '@/server/http/route';
 import { createAccountSchema } from '@/server/http/schemas';
 import { problem, problemResponse } from '@/server/http/problem';
 
-export const GET = defineRoute({ name: 'accounts.list' }, async () => {
-  return json({ data: await services().accounts.list() });
+export const GET = defineRoute({ name: 'accounts.list' }, async ({ services }) => {
+  return json({ data: await services.accounts.list() });
 });
 
 export const POST = defineRoute(
   { name: 'accounts.create', auth: true },
-  async ({ request, requestId }) => {
+  async ({ request, requestId, services }) => {
     const body = await readJson(request, createAccountSchema, requestId);
     if (!body.ok) return body.response;
 
     try {
-      const account = await services().accounts.create(body.data);
+      const account = await services.accounts.create(body.data);
       return json(
         { data: account },
         { status: 201, headers: { location: `/api/v1/accounts/${account.id}` } },

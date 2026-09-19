@@ -9,9 +9,10 @@ import { PageHeader } from '@/components/page-header';
 import { CompactAmount, DirectionalAmount } from '@/components/money';
 import { CursorPagination } from '@/components/pagination';
 import { SetupNotice } from '@/components/setup-notice';
+import { SetupRequiredError } from '@/server/setup-error';
 import { ArrowRightIcon, CheckIcon } from '@/components/icons';
 import { cn } from '@/lib/cn';
-import { services } from '@/server/container';
+import { demoServices } from '@/server/container';
 import type { Page, TransactionDto } from '@/server/services/dto';
 
 export const metadata: Metadata = { title: 'Journal' };
@@ -42,13 +43,15 @@ export default async function JournalPage({ searchParams }: PageProps) {
 
   let page: Page<TransactionDto>;
   try {
-    page = await services().journal.list({
+    page = await (
+      await demoServices()
+    ).journal.list({
       limit: PAGE_SIZE,
       cursor: query.cursor,
       direction: query.direction === 'backward' ? 'backward' : 'forward',
     });
   } catch (error) {
-    if (error instanceof Error && error.message.includes('DATABASE_URL')) {
+    if (error instanceof SetupRequiredError) {
       return <SetupNotice detail={error.message} />;
     }
     throw error;
