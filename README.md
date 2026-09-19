@@ -209,14 +209,20 @@ as extension members so nothing has to be parsed out of prose:
 
 ## Documentation
 
+- **[Design rationale](docs/design-rationale.md)** — the one idea everything
+  follows from, what was considered and **rejected** (event sourcing, CQRS, a
+  separate API service, `numeric` for money), where the seams are, and the three
+  mistakes that are kept on the record because they are the useful part
 - [Architecture](docs/architecture.md) — layering, where each rule is enforced,
   the error model, the testing strategy
+- [Benchmarks](docs/benchmarks.md) — keyset vs `OFFSET`, with query plans
 - [ADR 1](docs/adr/0001-invariants-in-the-database.md) — invariants in the database
 - [ADR 2](docs/adr/0002-signed-postings.md) — signed, debit-positive postings
 - [ADR 3](docs/adr/0003-database-driver.md) — why `node-postgres` over the HTTP driver
 - [ADR 4](docs/adr/0004-money-as-minor-units.md) — money as integer minor units
 - [ADR 5](docs/adr/0005-idempotency.md) — claim-first idempotency keys
 - [ADR 6](docs/adr/0006-keyset-pagination.md) — keyset pagination
+- [ADR 7](docs/adr/0007-tenant-isolation.md) — tenant isolation via row-level security
 
 ## Licence
 
