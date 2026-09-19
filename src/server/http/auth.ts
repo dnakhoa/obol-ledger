@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { problem, type Problem } from './problem';
 
 /**
@@ -44,11 +44,17 @@ export function authorize(request: Request): Problem | undefined {
   return undefined;
 }
 
+/**
+ * Compares two secrets without leaking anything through timing.
+ *
+ * `timingSafeEqual` throws on a length mismatch, so comparing the raw strings
+ * would require a length check first — and that check is itself a timing signal
+ * that tells an attacker how long the token is. Hashing both to a fixed 32
+ * bytes removes the branch entirely: every comparison does the same work
+ * regardless of what was presented.
+ */
 function constantTimeEquals(left: string, right: string): boolean {
-  const a = Buffer.from(left);
-  const b = Buffer.from(right);
-  // timingSafeEqual throws on a length mismatch, which would itself be a timing
-  // signal; hashing to a fixed width first keeps the comparison uniform.
-  if (a.length !== b.length) return false;
+  const a = createHash('sha256').update(left, 'utf8').digest();
+  const b = createHash('sha256').update(right, 'utf8').digest();
   return timingSafeEqual(a, b);
 }

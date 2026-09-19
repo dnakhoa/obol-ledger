@@ -108,8 +108,14 @@ export function VolumeChart({
           </div>
 
           {active ? (
+            /*
+              Hidden from assistive technology rather than announced. This is
+              driven by mouse position, so a live region would narrate hover
+              noise to someone who never hovered; the table below carries the
+              same figures in a form that can actually be navigated.
+            */
             <div
-              role="status"
+              aria-hidden="true"
               className="border-line bg-surface pointer-events-none absolute -top-2 left-1/2 z-10 -translate-x-1/2 -translate-y-full rounded-lg border px-2.5 py-1.5 text-xs whitespace-nowrap shadow-[var(--shadow-raised)]"
             >
               <span className="text-ink-muted">{active.label}</span>
