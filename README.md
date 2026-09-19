@@ -7,6 +7,33 @@ enforced by Postgres as well as by the application.
 Built as a demonstration of production-shaped engineering: the interesting parts
 are the invariants and where they live, not the CRUD.
 
+![The overview, in dark mode: a trial-balance banner reading "The books balance", headline figures, a 30-day posting-volume chart, and the accounting equation by account class](docs/screenshots/overview-dark.png)
+
+<details>
+<summary>More screens</summary>
+
+**The journal.** One `<tbody>` per entry, so an entry and its postings are a
+single group for a screen reader as well as for the eye. Debits and credits get
+their own columns above `sm`, and collapse to one `Dr`/`Cr` column on a phone.
+
+![The journal: entries in date order, each with its postings and a "Balanced" badge](docs/screenshots/journal-dark.png)
+
+**Composing an entry.** The balance is checked as you type — this one is
+balanced, so the badge says so and the button is live. That check has no
+authority; the domain layer and a deferred Postgres constraint each check it
+again. A rejected submit keeps every field exactly as typed and moves focus to
+the error.
+
+![The entry composer with a balanced two-line entry and a green "Balanced" badge](docs/screenshots/compose-light.png)
+
+**Light mode.** Not an inversion — the dark steps were chosen against the dark
+surface, which is why neither theme has the washed-out greys that an
+algorithmic flip produces.
+
+![The same overview in light mode](docs/screenshots/overview-light.png)
+
+</details>
+
 ---
 
 ## Why a ledger
