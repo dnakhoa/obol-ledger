@@ -95,6 +95,15 @@ async function main(): Promise<void> {
       });
       ids[account.key] = created.id;
     }
+    // Back-date the accounts to just before the first entry.
+    //
+    // `created_at` defaults to now(), so a freshly seeded ledger claims every
+    // account was opened today while showing a statement going back six weeks.
+    // Accounts are not append-only — only postings and journal entries are —
+    // so this is a plain UPDATE rather than anything that fights a trigger.
+    // Only created_at: updated_at is trigger-maintained and will correctly
+    // become the time of each account's last movement as the entries post.
+    await database.execute(sql`UPDATE accounts SET created_at = now() - interval '45 days'`);
     console.log(`opened ${ACCOUNTS.length} accounts`);
 
     const dollars = (value: number): MinorUnits => minorUnits(BigInt(Math.round(value * 100)));
