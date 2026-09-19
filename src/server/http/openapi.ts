@@ -65,7 +65,25 @@ const accountSchema = {
     type: { enum: ['asset', 'liability', 'equity', 'revenue', 'expense'] },
     status: { enum: ['open', 'closed'] },
     overdraftAllowed: { type: 'boolean' },
-    balance: { $ref: '#/components/schemas/Money' },
+    balance: {
+      allOf: [{ $ref: '#/components/schemas/Money' }],
+      description: 'The settled balance. Only posted entries count.',
+    },
+    pendingBalance: {
+      allOf: [{ $ref: '#/components/schemas/Money' }],
+      description:
+        'Settled plus in-flight: what the balance becomes if every pending entry settles.',
+    },
+    availableBalance: {
+      allOf: [{ $ref: '#/components/schemas/Money' }],
+      description:
+        'Settled minus in-flight outflows: what can still be spent. This is the balance the overdraft rule consults, so an authorisation reserves funds the moment it is made.',
+    },
+    version: {
+      type: 'integer',
+      description:
+        'Optimistic-concurrency token, incremented on every balance change. Pass it back in `expectedVersions` to apply a write only if the account has not moved.',
+    },
     createdAt: { type: 'string', format: 'date-time' },
   },
 } as const;
@@ -77,6 +95,13 @@ const transactionSchema = {
     id: { type: 'string', examples: ['txn_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'] },
     description: { type: 'string' },
     currency: { type: 'string' },
+    status: {
+      enum: ['pending', 'posted', 'archived'],
+      description:
+        'pending reserves funds without moving them; posted has settled; archived was cancelled before settling. Posted and archived are immutable.',
+    },
+    postedAt: { type: ['string', 'null'], format: 'date-time' },
+    archivedAt: { type: ['string', 'null'], format: 'date-time' },
     occurredAt: { type: 'string', format: 'date-time' },
     createdAt: { type: 'string', format: 'date-time' },
     postings: {
@@ -321,6 +346,13 @@ export function openApiDocument(): Record<string, unknown> {
               description: 'Case-insensitive substring of the description.',
               schema: { type: 'string' },
             },
+            {
+              name: 'status',
+              in: 'query',
+              required: false,
+              description: 'Restrict to one lifecycle state.',
+              schema: { type: 'string', enum: ['pending', 'posted', 'archived'] },
+            },
           ],
           responses: {
             '200': {
@@ -406,6 +438,48 @@ export function openApiDocument(): Record<string, unknown> {
             },
             '200': { description: 'Idempotent replay of an earlier request' },
             ...problemResponses(400, 401, 409, 422, 429),
+          },
+        },
+      },
+      '/entries/{entryId}/post': {
+        post: {
+          tags: ['Journal'],
+          summary: 'Settle a pending entry',
+          description:
+            'Moves the entry from pending to posted: its amounts stop being reserved and start counting toward the posted balance. The overdraft rule is re-checked, because funds available at authorisation may be gone by settlement.',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'entryId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': {
+              description: 'The settled entry',
+              content: {
+                'application/json': {
+                  schema: envelope({ $ref: '#/components/schemas/Transaction' }),
+                },
+              },
+            },
+            ...problemResponses(401, 404, 409, 422, 429),
+          },
+        },
+      },
+      '/entries/{entryId}/archive': {
+        post: {
+          tags: ['Journal'],
+          summary: 'Cancel a pending entry before it settles',
+          description:
+            'Releases the reservation; nothing moves. Distinct from a reversal, which cancels money that did move by posting an opposite entry — here there is nothing to mirror.',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'entryId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': {
+              description: 'The archived entry',
+              content: {
+                'application/json': {
+                  schema: envelope({ $ref: '#/components/schemas/Transaction' }),
+                },
+              },
+            },
+            ...problemResponses(401, 404, 409, 429),
           },
         },
       },

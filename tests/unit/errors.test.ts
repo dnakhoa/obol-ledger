@@ -36,6 +36,18 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
     transactionId: 'txn_x',
     reversedBy: 'txn_y',
   },
+  invalid_status_transition: {
+    code: 'invalid_status_transition',
+    transactionId: 'txn_x',
+    from: 'posted',
+    to: 'archived',
+  },
+  stale_account_version: {
+    code: 'stale_account_version',
+    accountId: 'acct_x',
+    expected: 3,
+    actual: 5,
+  },
 };
 
 const variants = Object.values(EVERY_VARIANT);

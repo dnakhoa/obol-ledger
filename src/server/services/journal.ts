@@ -2,8 +2,9 @@ import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { err, ok, type Result } from '@/lib/result';
 import { newId } from '@/lib/id';
 import { toDecimalString, type CurrencyCode, type MinorUnits } from '@/lib/money';
-import { presentedBalance, type AccountType } from '@/server/domain/account';
+import { deriveBalances, presentedBalance, type AccountType } from '@/server/domain/account';
 import type { LedgerError } from '@/server/domain/errors';
+import { canTransition, type TransactionStatus } from '@/server/domain/transaction-status';
 import { validateDraft, type DraftPosting } from '@/server/domain/transaction';
 import { accounts, idempotencyKeys, postings, transactions } from '@/server/db/schema';
 import type { AccountRow } from '@/server/db/schema';
@@ -19,6 +20,17 @@ export type PostEntryInput = {
   readonly currency: CurrencyCode;
   readonly occurredAt?: Date;
   readonly postings: readonly DraftPosting[];
+  /**
+   * `pending` reserves funds without moving them; `posted` settles
+   * immediately. Defaults to posted, which is what a simple transfer wants.
+   */
+  readonly status?: 'pending' | 'posted' | undefined;
+  /**
+   * Optimistic concurrency: apply only if these accounts are still at the
+   * versions the caller last read. Lets a caller compute a decision from a
+   * balance and commit it without holding a lock across the round trip.
+   */
+  readonly expectedVersions?: Readonly<Record<string, number>> | undefined;
   /**
    * Supplied by the HTTP layer, which fingerprints the *raw* request body. A
    * retry is "the same request" from the client's point of view, so the hash
@@ -168,10 +180,12 @@ export function createJournalService(database: Database, orgId: string) {
     reversesTransactionId?: string,
   ): Promise<TransactionDto> {
     assertCurrenciesMatch(input.currency, input.postings, accountRows);
+    assertVersions(input.expectedVersions, accountRows);
     assertNoOverdraft(input.currency, input.postings, accountRows);
 
     const transactionId = newId('transaction');
     const occurredAt = input.occurredAt ?? new Date();
+    const status = input.status ?? 'posted';
 
     const [transactionRow] = await tx
       .insert(transactions)
@@ -181,6 +195,10 @@ export function createJournalService(database: Database, orgId: string) {
         description: input.description,
         currency: input.currency,
         occurredAt,
+        status,
+        // The CHECK constraint requires the timestamps to agree with the
+        // status, so they are set together rather than backfilled later.
+        ...(status === 'posted' ? { postedAt: new Date() } : {}),
         ...(reversesTransactionId ? { reversesTransactionId } : {}),
       })
       .returning();
@@ -240,6 +258,45 @@ export function createJournalService(database: Database, orgId: string) {
    * "accounts_overdraft_check failed". Projecting the balance here lets the API
    * answer with the account, its available funds, and what was requested.
    */
+  /**
+   * Rejects a write whose accounts have moved since the caller read them.
+   *
+   * This is what lets a caller decide "they can afford it" from a balance and
+   * then commit that decision safely: if anything touched the account in
+   * between, the version has advanced and the write is refused rather than
+   * applied against a world that no longer matches the one it was reasoned
+   * about. A lock held across the round trip would be the alternative, and a
+   * far more expensive one.
+   */
+  function assertVersions(
+    expected: Readonly<Record<string, number>> | undefined,
+    accountRows: Map<string, AccountRow>,
+  ): void {
+    if (!expected) return;
+    for (const [accountId, version] of Object.entries(expected)) {
+      const account = accountRows.get(accountId);
+      if (!account) continue;
+      if (account.version !== version) {
+        throw new DomainAbort({
+          code: 'stale_account_version',
+          accountId,
+          expected: version,
+          actual: account.version,
+        });
+      }
+    }
+  }
+
+  /*
+   * Deliberately the same check for pending and posted entries.
+   *
+   * Projecting against `available` happens to be correct for both: a posted
+   * outflow reduces the posted balance, and a pending one reduces it via the
+   * reservation, so `available + presentedDelta` is the resulting spendable
+   * figure either way. A pending *inflow* is the only asymmetric case — it
+   * does not raise `available` until it settles — and the formula is merely
+   * permissive there, which is harmless because an inflow cannot overdraw.
+   */
   function assertNoOverdraft(
     currency: CurrencyCode,
     draftPostings: readonly DraftPosting[],
@@ -255,15 +312,24 @@ export function createJournalService(database: Database, orgId: string) {
       if (!account || account.overdraftAllowed) continue;
 
       const type = account.type as AccountType;
-      const projected = presentedBalance((account.balanceMinor + delta) as MinorUnits, type);
+      const balances = deriveBalances({
+        signedPosted: account.balanceMinor as MinorUnits,
+        pendingInflow: account.pendingInflowMinor as MinorUnits,
+        pendingOutflow: account.pendingOutflowMinor as MinorUnits,
+        type,
+      });
+
+      // Checked against *available*, not posted. A pending withdrawal has
+      // already reserved its funds, so the next one must see them gone —
+      // otherwise two authorisations against the same balance both succeed.
+      const presentedDelta = presentedBalance(delta as MinorUnits, type);
+      const projected = (balances.available + presentedDelta) as MinorUnits;
+
       if (projected < 0n) {
         throw new DomainAbort({
           code: 'insufficient_funds',
           accountId,
-          available: toDecimalString(
-            presentedBalance(account.balanceMinor as MinorUnits, type),
-            currency,
-          ),
+          available: toDecimalString(balances.available, currency),
           requested: toDecimalString(
             presentedBalance(-delta as MinorUnits, type) as MinorUnits,
             currency,
@@ -387,9 +453,92 @@ export function createJournalService(database: Database, orgId: string) {
     }
   }
 
+  /**
+   * Settles or cancels a pending entry.
+   *
+   * The amounts never change — they were fixed when the entry was written.
+   * What changes is whether they count as reserved or as moved, and the
+   * database moves them between the two balance columns in a trigger, so the
+   * three balances cannot disagree with the postings behind them.
+   *
+   * Posting re-checks the overdraft rule. A reservation made when funds were
+   * available can still fail to settle if something else drained the account
+   * first, and silently overdrawing at settlement would be the worst possible
+   * time to discover it.
+   */
+  async function transitionEntry(input: {
+    readonly transactionId: string;
+    readonly to: 'posted' | 'archived';
+  }): Promise<Result<TransactionDto, LedgerError>> {
+    try {
+      const result = await withTenant(database, orgId, async (tx) => {
+        const [entry] = await tx
+          .select()
+          .from(transactions)
+          .where(eq(transactions.id, input.transactionId))
+          .limit(1);
+        if (!entry) {
+          throw new DomainAbort({ code: 'entry_not_found', transactionId: input.transactionId });
+        }
+
+        const from = entry.status as TransactionStatus;
+        if (!canTransition(from, input.to)) {
+          throw new DomainAbort({
+            code: 'invalid_status_transition',
+            transactionId: entry.id,
+            from,
+            to: input.to,
+          });
+        }
+
+        const now = new Date();
+        await tx
+          .update(transactions)
+          .set(
+            input.to === 'posted'
+              ? { status: 'posted', postedAt: now }
+              : { status: 'archived', archivedAt: now },
+          )
+          .where(eq(transactions.id, entry.id));
+
+        const [updated] = await tx
+          .select()
+          .from(transactions)
+          .where(eq(transactions.id, entry.id))
+          .limit(1);
+        if (!updated) throw new Error('transaction vanished mid-transition');
+
+        const [dto] = await hydrate(tx, [updated]);
+        if (!dto) throw new Error('failed to hydrate the transitioned entry');
+        return dto;
+      });
+
+      return ok(result);
+    } catch (error) {
+      if (error instanceof DomainAbort) return err(error.ledgerError);
+      // The overdraft CHECK is the authority on whether a reservation can
+      // still settle, so a violation at this point is a business outcome
+      // rather than a fault.
+      if (isCheckViolation(error, 'accounts_overdraft_check')) {
+        return err({
+          code: 'insufficient_funds',
+          accountId: 'one of the entry\u2019s accounts',
+          available: 'less than required',
+          requested: 'the entry amount',
+          currency: 'USD',
+        });
+      }
+      throw error;
+    }
+  }
+
   return {
     postEntry,
     reverseEntry,
+    /** Settle a pending entry: its amounts move from reserved to posted. */
+    postPending: (transactionId: string) => transitionEntry({ transactionId, to: 'posted' }),
+    /** Cancel a pending entry: the reservation is released and nothing moves. */
+    archivePending: (transactionId: string) => transitionEntry({ transactionId, to: 'archived' }),
 
     async byId(id: string): Promise<TransactionDto | undefined> {
       return withTenant(database, orgId, async (tx) => {
@@ -426,6 +575,8 @@ export function createJournalService(database: Database, orgId: string) {
       accountId?: string | undefined;
       /** Case-insensitive substring of the description. */
       search?: string | undefined;
+      /** Restrict to one lifecycle state. */
+      status?: TransactionStatus | undefined;
     }): Promise<Page<TransactionDto>> {
       const limit = Math.min(Math.max(options.limit, 1), 100);
       const direction = options.direction ?? 'forward';
@@ -454,6 +605,7 @@ export function createJournalService(database: Database, orgId: string) {
           options.search
             ? sql`${transactions.description} ilike ${`%${options.search}%`}`
             : undefined,
+          options.status ? eq(transactions.status, options.status) : undefined,
         ].filter((clause) => clause !== undefined);
 
         const rows = await tx
@@ -521,6 +673,17 @@ async function hydrate(
 }
 
 export type JournalService = ReturnType<typeof createJournalService>;
+
+/** Walks the cause chain for a check-violation on a named constraint. */
+function isCheckViolation(error: unknown, constraint: string): boolean {
+  let current: unknown = error;
+  while (current instanceof Error) {
+    const candidate = current as { code?: unknown; constraint?: unknown };
+    if (candidate.code === '23514' && candidate.constraint === constraint) return true;
+    current = current.cause;
+  }
+  return false;
+}
 
 /** Walks the cause chain for a unique-violation on a named constraint. */
 function isUniqueViolation(error: unknown, constraint: string): boolean {

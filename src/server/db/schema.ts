@@ -16,6 +16,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { ACCOUNT_STATUSES, ACCOUNT_TYPES } from '@/server/domain/account';
+import { TRANSACTION_STATUSES } from '@/server/domain/transaction-status';
 
 /**
  * The ledger schema.
@@ -80,6 +81,7 @@ export const apiKeys = pgTable(
 
 export const accountType = pgEnum('account_type', ACCOUNT_TYPES);
 export const accountStatus = pgEnum('account_status', ACCOUNT_STATUSES);
+export const transactionStatus = pgEnum('transaction_status', TRANSACTION_STATUSES);
 
 export const accounts = pgTable(
   'accounts',
@@ -92,10 +94,28 @@ export const accounts = pgTable(
     status: accountStatus('status').notNull().default('open'),
     /** When false, the account's presented balance may never go below zero. */
     overdraftAllowed: boolean('overdraft_allowed').notNull().default(false),
-    /** Signed cache of the account's postings; debit-positive. Trigger-maintained. */
+    /**
+     * Signed cache of the account's *posted* postings; debit-positive.
+     * Trigger-maintained. Pending entries are not included here.
+     */
     balanceMinor: bigint('balance_minor', { mode: 'bigint' })
       .notNull()
       .default(sql`0`),
+    /**
+     * In-flight amounts, in presented terms — the sign a reader expects.
+     *
+     * Kept as two non-negative totals rather than one signed number because
+     * `available` only subtracts the *outflows*: an unsettled deposit does not
+     * make money spendable, while an unsettled withdrawal does reserve it.
+     */
+    pendingInflowMinor: bigint('pending_inflow_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    pendingOutflowMinor: bigint('pending_outflow_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    /** Optimistic-concurrency token, incremented on every balance change. */
+    version: integer('version').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -117,6 +137,16 @@ export const transactions = pgTable(
     orgId: text('org_id').notNull(),
     description: text('description').notNull(),
     currency: char('currency', { length: 3 }).notNull(),
+    /**
+     * pending -> posted | archived.
+     *
+     * A pending entry is a proposal: its amounts are already immutable, but it
+     * has not settled, so it reserves funds without moving them. Posted and
+     * archived are terminal — correcting either needs a reversing entry.
+     */
+    status: transactionStatus('status').notNull().default('posted'),
+    postedAt: timestamp('posted_at', { withTimezone: true }),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     /** When the economic event happened, which is not always when we recorded it. */
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
     /**

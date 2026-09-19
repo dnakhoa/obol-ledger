@@ -1,4 +1,5 @@
 import type { CurrencyCode } from '@/lib/money';
+import type { TransactionStatus } from './transaction-status';
 
 /**
  * The closed set of things the ledger can refuse to do.
@@ -41,6 +42,18 @@ export type LedgerError =
       readonly code: 'already_reversed';
       readonly transactionId: string;
       readonly reversedBy: string;
+    }
+  | {
+      readonly code: 'invalid_status_transition';
+      readonly transactionId: string;
+      readonly from: TransactionStatus;
+      readonly to: TransactionStatus;
+    }
+  | {
+      readonly code: 'stale_account_version';
+      readonly accountId: string;
+      readonly expected: number;
+      readonly actual: number;
     };
 
 export type LedgerErrorCode = LedgerError['code'];
@@ -61,6 +74,8 @@ const TITLES: Record<LedgerErrorCode, string> = {
   idempotency_key_reused: 'Idempotency key reused with a different request',
   entry_not_found: 'Journal entry not found',
   already_reversed: 'Entry has already been reversed',
+  invalid_status_transition: 'Entry cannot move to that status',
+  stale_account_version: 'Account changed since it was read',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -93,5 +108,11 @@ export function describe(error: LedgerError): string {
       return `No journal entry with id ${error.transactionId}.`;
     case 'already_reversed':
       return `Entry ${error.transactionId} was already reversed by ${error.reversedBy}; reversing it twice would double the correction.`;
+    case 'invalid_status_transition':
+      return error.from === 'pending'
+        ? `Entry ${error.transactionId} cannot move from ${error.from} to ${error.to}; a pending entry may only be posted or archived.`
+        : `Entry ${error.transactionId} is already ${error.from} and cannot change. Post a reversing entry instead.`;
+    case 'stale_account_version':
+      return `Account ${error.accountId} was at version ${error.actual}, not ${error.expected}; it changed since you read it. Re-read and retry.`;
   }
 }

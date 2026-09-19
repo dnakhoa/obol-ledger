@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import * as schema from '../src/server/db/schema';
 import { createAccountService } from '../src/server/services/accounts';
 import { digestToken } from '../src/server/services/authentication';
@@ -77,14 +77,15 @@ async function main(): Promise<void> {
     // Seeding is destructive and must be explicit. Postings and entries are
     // append-only by trigger, so the triggers are lifted for the truncate.
     console.log('clearing existing data');
-    // TRUNCATE is not subject to row-level security, but the append-only
-    // triggers are, so they come off for the duration and go straight back on.
+    // TRUNCATE does not fire row-level triggers, so the append-only guards
+    // never see it — which is why this is a plain TRUNCATE and not a delete
+    // with the triggers lifted. Naming them here would only create a
+    // maintenance trap: `transactions_append_only` was replaced by
+    // `transactions_guard_mutation` in 0004, and a stale ALTER would fail the
+    // seed for a reason that has nothing to do with seeding.
     await database.execute(sql`
-      ALTER TABLE postings DISABLE TRIGGER postings_append_only;
-      ALTER TABLE transactions DISABLE TRIGGER transactions_append_only;
-      TRUNCATE idempotency_keys, postings, transactions, accounts, api_keys, organizations RESTART IDENTITY CASCADE;
-      ALTER TABLE postings ENABLE TRIGGER postings_append_only;
-      ALTER TABLE transactions ENABLE TRIGGER transactions_append_only;
+      TRUNCATE idempotency_keys, postings, transactions, accounts, api_keys, organizations
+      RESTART IDENTITY CASCADE
     `);
 
     const demoSlug = process.env['DEMO_ORG_SLUG'] ?? 'demo';
@@ -153,11 +154,13 @@ async function main(): Promise<void> {
       description: string,
       occurredAt: Date,
       legs: { account: string; amount: MinorUnits }[],
+      status: 'pending' | 'posted' = 'posted',
     ): Promise<void> {
       const result = await journal.postEntry({
         description,
         currency: 'USD',
         occurredAt,
+        status,
         postings: legs.map((leg) => ({ accountId: at(leg.account), amount: leg.amount })),
       });
       if (!result.ok) {
@@ -245,6 +248,28 @@ async function main(): Promise<void> {
       { account: 'cash', amount: dollars(-14_000) },
     ]);
 
+    // Two entries left in flight, so the demo shows the state a single-balance
+    // ledger cannot represent: funds reserved but not moved. Cash reads a full
+    // posted balance and a lower available one, which is the whole point.
+    await post(
+      'Card authorisation — equipment deposit',
+      daysAgo(0, 14),
+      [
+        { account: 'equipment', amount: dollars(3_200) },
+        { account: 'cash', amount: dollars(-3_200) },
+      ],
+      'pending',
+    );
+    await post(
+      'Wholesale order awaiting delivery',
+      daysAgo(0, 16),
+      [
+        { account: 'receivable', amount: dollars(6_450) },
+        { account: 'wholesale', amount: dollars(-6_450) },
+      ],
+      'pending',
+    );
+
     // Assert the *schema* carries the isolation policies.
     //
     // Deliberately not "does an unscoped read return nothing". Seeding is an
@@ -275,7 +300,14 @@ async function main(): Promise<void> {
       return row?.residual;
     });
 
-    console.log(`posted ${entries} entries`);
+    const [pendingCount] = await withTenant(database, orgId, async (tx) => {
+      const rows = await tx
+        .select({ count: sql<string>`count(*)::text` })
+        .from(schema.transactions)
+        .where(eq(schema.transactions.status, 'pending'));
+      return rows;
+    });
+    console.log(`posted ${entries} entries (${pendingCount?.count ?? 0} left pending)`);
     console.log(`trial balance residual: ${residual ?? 'unknown'} (0 means consistent)`);
     if (residual !== '0') throw new Error('seeded ledger does not balance');
   } finally {

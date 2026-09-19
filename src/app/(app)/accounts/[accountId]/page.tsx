@@ -46,7 +46,7 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
   });
   if (!statement) notFound();
 
-  const { account, lines } = statement;
+  const { account, lines, pending } = statement;
   const normal = normalBalanceOf(account.type as AccountType);
 
   return (
@@ -74,34 +74,86 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile
-          label="Current balance"
+          label="Posted balance"
           value={<Money value={account.balance} signed />}
           unit={account.balance.currency}
+          detail="Settled entries only — what is actually there"
           emphasis
         />
         <StatTile
-          label="Overdraft"
-          value={account.overdraftAllowed ? 'Allowed' : 'Blocked'}
+          label="Available"
+          value={<Money value={account.availableBalance} signed />}
+          unit={account.balance.currency}
           detail={
-            account.overdraftAllowed
-              ? 'This account may go below zero.'
-              : 'A posting that would overdraw this account is rejected.'
+            account.balance.minorUnits === account.availableBalance.minorUnits
+              ? 'Nothing reserved; all of it is spendable'
+              : 'Posted less in-flight outflows — what can still be spent'
           }
         />
         <StatTile
-          label="Opened"
-          value={LINE_DATE.format(new Date(account.createdAt))}
-          detail={`Denominated in ${account.balance.currency}`}
+          label="Pending"
+          value={<Money value={account.pendingBalance} signed />}
+          unit={account.balance.currency}
+          detail="Settled plus in-flight — what it becomes if everything lands"
         />
       </div>
+
+      {/*
+        Pending entries above the ledger, not inside it — the arrangement every
+        bank statement uses, and for the same reason: these have not moved the
+        balance, so interleaving them would make the running total reconcile
+        with nothing on the page.
+      */}
+      {pending.length > 0 ? (
+        <Card className="border-caution">
+          <CardHeader>
+            <div className="space-y-0.5">
+              <CardTitle>Pending — not yet in the balance</CardTitle>
+              <CardDescription>
+                Funds are reserved, so they are already out of <strong>available</strong>, but
+                nothing has moved.
+              </CardDescription>
+            </div>
+            <Badge tone="caution">{pending.length} in flight</Badge>
+          </CardHeader>
+          <TableScroll>
+            <Table caption={`Pending entries for ${account.name}`}>
+              <thead>
+                <tr>
+                  <Th>Date</Th>
+                  <Th>Description</Th>
+                  <Th align="right">Amount</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {pending.map((line) => (
+                  <Tr key={line.postingId}>
+                    <Td className="text-ink-muted whitespace-nowrap">
+                      {LINE_DATE.format(new Date(line.occurredAt))}
+                    </Td>
+                    <Td>
+                      <Link href={`/journal/${line.transactionId}`} className="hover:underline">
+                        {line.description}
+                      </Link>
+                    </Td>
+                    <Td align="right" numeric>
+                      <CompactAmount value={line.amount} direction={line.direction} />
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          </TableScroll>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>
           <div className="space-y-0.5">
             <CardTitle>Statement</CardTitle>
             <CardDescription>
-              Newest first. The running balance is computed by Postgres over this account&rsquo;s
-              own postings.
+              Settled entries, newest first. The running balance is computed by Postgres over this
+              account&rsquo;s own postings, so it reconciles with the posted balance above.
             </CardDescription>
           </div>
         </CardHeader>

@@ -1,4 +1,5 @@
 import type { AccountStatus, AccountType } from '@/server/domain/account';
+import type { TransactionStatus } from '@/server/domain/transaction-status';
 import type { CurrencyCode } from '@/lib/money';
 
 /**
@@ -22,8 +23,17 @@ export type AccountDto = {
   readonly type: AccountType;
   readonly status: AccountStatus;
   readonly overdraftAllowed: boolean;
-  /** Signed as an accountant would read it: positive means a healthy account. */
+  /**
+   * The settled balance. Kept as `balance` for compatibility with every
+   * caller that predates two-phase entries and only ever meant "posted".
+   */
   readonly balance: MoneyDto;
+  /** Settled plus in-flight. */
+  readonly pendingBalance: MoneyDto;
+  /** Settled minus in-flight outflows — what can still be spent. */
+  readonly availableBalance: MoneyDto;
+  /** Optimistic-concurrency token; pass as `lockVersion` to assert freshness. */
+  readonly version: number;
   readonly createdAt: string;
 };
 
@@ -40,8 +50,11 @@ export type TransactionDto = {
   readonly id: string;
   readonly description: string;
   readonly currency: CurrencyCode;
+  readonly status: TransactionStatus;
   readonly occurredAt: string;
   readonly createdAt: string;
+  readonly postedAt: string | null;
+  readonly archivedAt: string | null;
   readonly postings: readonly PostingDto[];
   /** Set when this entry exists to undo another one. */
   readonly reversesTransactionId: string | null;

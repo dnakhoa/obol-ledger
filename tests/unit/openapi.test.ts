@@ -3,6 +3,7 @@ import { openApiDocument } from '@/server/http/openapi';
 
 type Operation = {
   summary?: string;
+  description?: string;
   security?: unknown[];
   responses?: Record<string, unknown>;
   requestBody?: unknown;
@@ -34,6 +35,8 @@ describe('OpenAPI document', () => {
       '/accounts/{accountId}/statement',
       '/entries',
       '/entries/{entryId}',
+      '/entries/{entryId}/archive',
+      '/entries/{entryId}/post',
       '/entries/{entryId}/reverse',
       '/health',
       '/reports/balance-sheet',
@@ -61,9 +64,20 @@ describe('OpenAPI document', () => {
     }
   });
 
-  it('documents a request body for every write', () => {
+  it('documents a request body for every write that takes one', () => {
+    // State transitions are the exception: `/entries/{id}/post` and
+    // `/archive` identify everything they need from the path, so a body would
+    // be ceremony. They must still be documented as taking none, rather than
+    // leaving a client to guess.
+    const TRANSITIONS = ['/entries/{entryId}/post', '/entries/{entryId}/archive'];
+
     for (const { path, method, operation } of operations) {
       if (method !== 'post') continue;
+      if (TRANSITIONS.includes(path)) {
+        expect(operation.requestBody, `${path} should take no body`).toBeUndefined();
+        expect(operation.description, `${path} needs a description`).toBeTruthy();
+        continue;
+      }
       expect(operation.requestBody, `${method} ${path} has no request body`).toBeTruthy();
     }
   });
@@ -84,8 +98,10 @@ describe('OpenAPI document', () => {
     expect(Object.keys(createEntry.properties).sort()).toEqual([
       'currency',
       'description',
+      'expectedVersions',
       'occurredAt',
       'postings',
+      'status',
     ]);
   });
 

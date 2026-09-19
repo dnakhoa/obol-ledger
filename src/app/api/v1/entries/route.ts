@@ -48,6 +48,8 @@ export const POST = defineRoute(
       currency: body.data.currency,
       ...(body.data.occurredAt ? { occurredAt: new Date(body.data.occurredAt) } : {}),
       postings: converted.postings,
+      status: body.data.status,
+      ...(body.data.expectedVersions ? { expectedVersions: body.data.expectedVersions } : {}),
       ...(key ? { idempotency: { key, fingerprint: fingerprintOf(body.raw) } } : {}),
     });
 
