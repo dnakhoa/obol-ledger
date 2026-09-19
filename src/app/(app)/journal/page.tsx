@@ -33,14 +33,20 @@ const ENTRY_TIME = new Intl.DateTimeFormat('en-US', {
 
 const ENTRY_YEAR = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'UTC' });
 
-type PageProps = { searchParams: Promise<{ cursor?: string; highlight?: string }> };
+type PageProps = {
+  searchParams: Promise<{ cursor?: string; direction?: string; highlight?: string }>;
+};
 
 export default async function JournalPage({ searchParams }: PageProps) {
   const query = await searchParams;
 
   let page: Page<TransactionDto>;
   try {
-    page = await services().journal.list({ limit: PAGE_SIZE, cursor: query.cursor });
+    page = await services().journal.list({
+      limit: PAGE_SIZE,
+      cursor: query.cursor,
+      direction: query.direction === 'backward' ? 'backward' : 'forward',
+    });
   } catch (error) {
     if (error instanceof Error && error.message.includes('DATABASE_URL')) {
       return <SetupNotice detail={error.message} />;
@@ -180,8 +186,9 @@ export default async function JournalPage({ searchParams }: PageProps) {
             <CursorPagination
               basePath="/journal"
               nextCursor={page.nextCursor}
-              previousCursor={query.cursor ? '' : undefined}
+              previousCursor={page.previousCursor}
               showing={page.items.length}
+              noun="entry"
             />
           </>
         )}

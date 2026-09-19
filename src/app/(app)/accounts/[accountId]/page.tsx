@@ -14,7 +14,7 @@ import { normalBalanceOf, type AccountType } from '@/server/domain/account';
 
 type PageProps = {
   params: Promise<{ accountId: string }>;
-  searchParams: Promise<{ cursor?: string; from?: string }>;
+  searchParams: Promise<{ cursor?: string; direction?: string }>;
 };
 
 const PAGE_SIZE = 25;
@@ -40,6 +40,7 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
   const statement = await services().reporting.statement(accountId, {
     limit: PAGE_SIZE,
     cursor: query.cursor,
+    direction: query.direction === 'backward' ? 'backward' : 'forward',
   });
   if (!statement) notFound();
 
@@ -171,8 +172,9 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
             <CursorPagination
               basePath={`/accounts/${account.id}`}
               nextCursor={lines.nextCursor}
-              previousCursor={query.cursor ? '' : undefined}
+              previousCursor={lines.previousCursor}
               showing={lines.items.length}
+              noun="line"
             />
           </>
         )}

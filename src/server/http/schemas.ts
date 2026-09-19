@@ -79,6 +79,9 @@ export const paginationSchema = z.object({
   // Cursors are base64url of `<timestamp>|<id>`; 256 leaves headroom without
   // accepting an unbounded string from a query parameter.
   cursor: z.string().min(1).max(256).optional(),
+  // Which side of the cursor to read. Ignored without one — there is nothing
+  // before the first page.
+  direction: z.enum(['forward', 'backward']).default('forward'),
 });
 
 /**

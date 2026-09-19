@@ -152,6 +152,65 @@ describe('reporting service', () => {
       expect(seen).toHaveLength(5);
       expect(new Set(seen).size).toBe(5);
     });
+
+    it('walks a statement back through the same lines it walked forward', async () => {
+      for (let i = 0; i < 7; i += 1) {
+        await post(`Entry ${i}`, [
+          { accountId: cash.id, amount: 1_000n },
+          { accountId: revenue.id, amount: -1_000n },
+        ]);
+      }
+
+      const forward: string[][] = [];
+      let cursor: string | undefined;
+      let lastPage = await services.reporting.statement(cash.id, { limit: 3 });
+      do {
+        const statement = await services.reporting.statement(cash.id, { limit: 3, cursor });
+        if (!statement) throw new Error('statement disappeared mid-pagination');
+        forward.push(statement.lines.items.map((line) => line.postingId));
+        lastPage = statement;
+        cursor = statement.lines.nextCursor ?? undefined;
+      } while (cursor);
+
+      const backward: string[][] = [lastPage?.lines.items.map((line) => line.postingId) ?? []];
+      let previous = lastPage?.lines.previousCursor ?? undefined;
+      while (previous) {
+        const statement = await services.reporting.statement(cash.id, {
+          limit: 3,
+          cursor: previous,
+          direction: 'backward',
+        });
+        if (!statement) throw new Error('statement disappeared mid-pagination');
+        backward.unshift(statement.lines.items.map((line) => line.postingId));
+        previous = statement.lines.previousCursor ?? undefined;
+      }
+
+      expect(backward).toEqual(forward);
+    });
+
+    it('keeps the running balance consistent when paging backward', async () => {
+      // The window function is ordered by the same key as the page, so the
+      // balance beside a line must not change depending on how it was reached.
+      for (let i = 0; i < 5; i += 1) {
+        await post(`Entry ${i}`, [
+          { accountId: cash.id, amount: 1_000n },
+          { accountId: revenue.id, amount: -1_000n },
+        ]);
+      }
+
+      const firstPage = await services.reporting.statement(cash.id, { limit: 2 });
+      const secondPage = await services.reporting.statement(cash.id, {
+        limit: 2,
+        cursor: firstPage?.lines.nextCursor ?? undefined,
+      });
+      const backToFirst = await services.reporting.statement(cash.id, {
+        limit: 2,
+        cursor: secondPage?.lines.previousCursor ?? undefined,
+        direction: 'backward',
+      });
+
+      expect(backToFirst?.lines.items).toEqual(firstPage?.lines.items);
+    });
   });
 
   describe('summary', () => {

@@ -6,7 +6,7 @@ import type { Database } from '@/server/db/types';
 import { toMoneyDto } from './serialize';
 import type { AccountDto, MoneyDto, Page, TrialBalanceRow } from './dto';
 import { toAccountDto } from './serialize';
-import { decodeCursor, encodeCursor } from './cursor';
+import { buildPage, decodeCursor, type PageDirection } from './cursor';
 
 export type StatementLine = {
   readonly postingId: string;
@@ -75,7 +75,11 @@ export function createReportingService(database: Database) {
      */
     async statement(
       accountId: string,
-      options: { limit: number; cursor?: string | undefined },
+      options: {
+        limit: number;
+        cursor?: string | undefined;
+        direction?: PageDirection | undefined;
+      },
     ): Promise<AccountStatement | undefined> {
       const [account] = await database
         .select()
@@ -86,6 +90,7 @@ export function createReportingService(database: Database) {
 
       const limit = Math.min(Math.max(options.limit, 1), 100);
       const after = options.cursor ? decodeCursor(options.cursor) : undefined;
+      const backward = options.direction === 'backward' && after !== undefined;
 
       const ledger = database
         .select({
@@ -109,21 +114,35 @@ export function createReportingService(database: Database) {
         .from(ledger)
         .where(
           after
-            ? sql`(${ledger.occurredAt}, ${ledger.postingId}) < (${after.occurredAt}, ${after.id})`
+            ? backward
+              ? sql`(${ledger.occurredAt}, ${ledger.postingId}) > (${after.occurredAt}, ${after.id})`
+              : sql`(${ledger.occurredAt}, ${ledger.postingId}) < (${after.occurredAt}, ${after.id})`
             : undefined,
         )
-        .orderBy(desc(ledger.occurredAt), desc(ledger.postingId))
+        .orderBy(
+          ...(backward
+            ? [asc(ledger.occurredAt), asc(ledger.postingId)]
+            : [desc(ledger.occurredAt), desc(ledger.postingId)]),
+        )
         .limit(limit + 1);
 
-      const page = rows.slice(0, limit);
       const currency = account.currency as CurrencyCode;
       const type = account.type as AccountType;
-      const last = page.at(-1);
+
+      const page = buildPage({
+        rows,
+        limit,
+        direction: backward ? 'backward' : 'forward',
+        hasCursor: after !== undefined,
+        keyOf: (row) => ({ occurredAt: row.occurredAt, id: row.postingId }),
+      });
 
       return {
         account: toAccountDto(account),
         lines: {
-          items: page.map((row) => {
+          nextCursor: page.nextCursor,
+          previousCursor: page.previousCursor,
+          items: page.items.map((row) => {
             const amount = BigInt(row.amountMinor) as MinorUnits;
             return {
               postingId: row.postingId,
@@ -138,10 +157,6 @@ export function createReportingService(database: Database) {
               ),
             };
           }),
-          nextCursor:
-            rows.length > limit && last
-              ? encodeCursor({ occurredAt: last.occurredAt, id: last.postingId })
-              : null,
         },
       };
     },

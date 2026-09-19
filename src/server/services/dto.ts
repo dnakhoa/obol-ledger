@@ -47,8 +47,10 @@ export type TransactionDto = {
 
 export type Page<T> = {
   readonly items: readonly T[];
-  /** Opaque keyset cursor; absent when the caller has reached the end. */
+  /** Opaque keyset cursor for the next page; null at the end of the list. */
   readonly nextCursor: string | null;
+  /** Cursor for the previous page; null on the first page. */
+  readonly previousCursor: string | null;
 };
 
 export type TrialBalanceRow = {
