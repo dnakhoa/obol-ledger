@@ -19,23 +19,31 @@ are the invariants and where they live, not the CRUD.
 <details>
 <summary>More screens</summary>
 
+Every shot is the live deployment, not a mockup.
+
+**The chart of accounts.** Grouped by class, with each group's own total and
+its normal balance stated. Balances read the way an accountant expects —
+positive means healthy, whichever side the account normally sits on — which is
+one sign flip, applied in one function, never re-derived per view.
+
+![The chart of accounts: assets, liabilities, equity, revenue and expenses, each group totalled](docs/screenshots/accounts-light.png)
+
 **The journal.** One `<tbody>` per entry, so an entry and its postings are a
 single group for a screen reader as well as for the eye. Debits and credits get
-their own columns above `sm`, and collapse to one `Dr`/`Cr` column on a phone.
+their own columns above `sm` and collapse to one `Dr`/`Cr` column on a phone.
 
 ![The journal: entries in date order, each with its postings and a "Balanced" badge](docs/screenshots/journal-dark.png)
 
-**Composing an entry.** The balance is checked as you type — this one is
-balanced, so the badge says so and the button is live. That check has no
-authority; the domain layer and a deferred Postgres constraint each check it
-again. A rejected submit keeps every field exactly as typed and moves focus to
-the error.
+**Composing an entry.** The balance is checked as you type — this one balances,
+so the badge says so and the button is live. That check has no authority; the
+domain layer and a deferred Postgres constraint each check it again. A rejected
+submit keeps every field exactly as typed and moves focus to the error.
 
 ![The entry composer with a balanced two-line entry and a green "Balanced" badge](docs/screenshots/compose-light.png)
 
 **Light mode.** Not an inversion — the dark steps were chosen against the dark
-surface, which is why neither theme has the washed-out greys that an
-algorithmic flip produces.
+surface, which is why neither theme has the washed-out greys an algorithmic
+flip produces.
 
 ![The same overview in light mode](docs/screenshots/overview-light.png)
 
