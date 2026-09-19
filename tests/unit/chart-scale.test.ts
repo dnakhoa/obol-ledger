@@ -1,20 +1,36 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { minorUnits } from '@/lib/money';
-import { buildLinearScale, heightPercent, niceCeiling } from '@/lib/chart-scale';
+import { buildLinearScale, DIVISIONS, heightPercent, niceCeiling } from '@/lib/chart-scale';
 
 describe('niceCeiling', () => {
   it.each([
     [1n, 1n],
     [7n, 10n],
-    [12n, 20n],
-    [21n, 50n],
+    [12n, 15n],
+    [21n, 25n],
     [50n, 50n],
-    [51n, 100n],
+    [51n, 60n],
     [999n, 1000n],
-    [123_456n, 200_000n],
+    [123_456n, 150_000n],
+    // The case that motivated the intermediate steps: a 1/2/5 ladder would
+    // give 50,000 here and leave the tallest bar at half the plot height.
+    [2_496_198n, 2_500_000n],
   ])('rounds %s up to %s', (input, expected) => {
     expect(niceCeiling(minorUnits(input))).toBe(expected);
+  });
+
+  it('always fills at least two thirds of the plot', () => {
+    // The ladder's widest relative gap sets this bound: 10 -> 15 is a factor of
+    // 1.5, so a value just above a step can only fall to 2/3 of the axis. The
+    // old 1/2/5 ladder had a factor-of-2 gap, and so could leave the tallest
+    // bar at half height — which is what this change was for.
+    fc.assert(
+      fc.property(fc.bigInt({ min: 10n, max: 10n ** 15n }), (value) => {
+        const top = niceCeiling(minorUnits(value));
+        expect(heightPercent(minorUnits(value), top)).toBeGreaterThan(66);
+      }),
+    );
   });
 
   it('never returns a ceiling below the value it is given', () => {
@@ -25,13 +41,17 @@ describe('niceCeiling', () => {
     );
   });
 
-  it('always lands on 1, 2 or 5 times a power of ten', () => {
+  it('always produces gridline labels that divide evenly', () => {
+    // Round ticks are the whole point of snapping the axis at all: a reader
+    // holds 0 / 5,000 / 10,000 in their head and 0 / 4,634 / 9,268 not at all.
     fc.assert(
-      fc.property(fc.bigInt({ min: 1n, max: 10n ** 15n }), (value) => {
-        const top = niceCeiling(minorUnits(value));
-        const leading = BigInt(top.toString()[0] ?? '0');
-        expect([1n, 2n, 5n]).toContain(leading);
-        expect(BigInt(top.toString().slice(1) || '0')).toBe(0n);
+      fc.property(fc.bigInt({ min: 10n, max: 10n ** 15n }), (value) => {
+        const scale = buildLinearScale([minorUnits(value)]);
+        for (const tick of scale.ticks) {
+          expect((tick * BigInt(DIVISIONS)) % BigInt(DIVISIONS)).toBe(0n);
+        }
+        expect(scale.ticks.at(-1)).toBe(0n);
+        expect(scale.ticks[0]).toBe(scale.top);
       }),
     );
   });
@@ -46,8 +66,8 @@ describe('niceCeiling', () => {
 describe('buildLinearScale', () => {
   it('produces gridlines from the top down to zero', () => {
     const scale = buildLinearScale([minorUnits(35n), minorUnits(80n), minorUnits(12n)]);
-    expect(scale.top).toBe(100n);
-    expect(scale.ticks).toEqual([100n, 75n, 50n, 25n, 0n]);
+    expect(scale.top).toBe(80n);
+    expect(scale.ticks).toEqual([80n, 64n, 48n, 32n, 16n, 0n]);
     expect(scale.peakIndex).toBe(1);
   });
 
