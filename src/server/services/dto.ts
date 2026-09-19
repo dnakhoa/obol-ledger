@@ -43,6 +43,16 @@ export type TransactionDto = {
   readonly occurredAt: string;
   readonly createdAt: string;
   readonly postings: readonly PostingDto[];
+  /** Set when this entry exists to undo another one. */
+  readonly reversesTransactionId: string | null;
+  /**
+   * Set when a later entry undid this one.
+   *
+   * Carried on the DTO rather than left for the caller to discover, because
+   * "is this entry still in effect?" is the first thing a reader asks and it
+   * is not answerable from the postings alone.
+   */
+  readonly reversedByTransactionId: string | null;
 };
 
 export type Page<T> = {
@@ -60,4 +70,60 @@ export type TrialBalanceRow = {
   /** Zero in a consistent ledger. Anything else is a bug worth paging someone for. */
   readonly residual: MoneyDto;
   readonly balanced: boolean;
+};
+
+/**
+ * A line on a financial statement.
+ *
+ * Statements are read by section, so each line carries its own class rather
+ * than relying on position — a renderer that re-sorts must not change meaning.
+ */
+export type StatementLineDto = {
+  readonly accountId: string;
+  readonly accountName: string;
+  readonly type: AccountType;
+  readonly amount: MoneyDto;
+};
+
+export type StatementSection = {
+  readonly label: string;
+  readonly lines: readonly StatementLineDto[];
+  readonly total: MoneyDto;
+};
+
+/**
+ * The balance sheet: a position at a point in time.
+ *
+ * Assets = Liabilities + Equity, where equity includes the period's retained
+ * earnings (revenue less expenses). A balance sheet that does not balance is
+ * not a rounding problem — it means the ledger is inconsistent, so the identity
+ * is reported rather than assumed.
+ */
+export type BalanceSheet = {
+  readonly asOf: string;
+  readonly currency: CurrencyCode;
+  readonly assets: StatementSection;
+  readonly liabilities: StatementSection;
+  readonly equity: StatementSection;
+  /** Revenue less expenses, folded into equity as it would be at period close. */
+  readonly retainedEarnings: MoneyDto;
+  readonly liabilitiesAndEquity: MoneyDto;
+  readonly balanced: boolean;
+};
+
+/**
+ * The income statement: performance over a period.
+ *
+ * Unlike the balance sheet this is bounded by dates, because revenue and
+ * expenses are flows rather than positions — "revenue" with no period attached
+ * is a meaningless number.
+ */
+export type IncomeStatement = {
+  readonly from: string;
+  readonly to: string;
+  readonly currency: CurrencyCode;
+  readonly revenue: StatementSection;
+  readonly expenses: StatementSection;
+  readonly netIncome: MoneyDto;
+  readonly profitable: boolean;
 };

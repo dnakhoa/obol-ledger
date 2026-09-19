@@ -119,6 +119,14 @@ export const transactions = pgTable(
     currency: char('currency', { length: 3 }).notNull(),
     /** When the economic event happened, which is not always when we recorded it. */
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    /**
+     * Set when this entry exists to undo another one.
+     *
+     * A partial unique index enforces at most one reversal per entry, so two
+     * concurrent reversal requests resolve in the database rather than in a
+     * check either of them could win.
+     */
+    reversesTransactionId: text('reverses_transaction_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

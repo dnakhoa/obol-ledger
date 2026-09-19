@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { err, ok, type Result } from '@/lib/result';
 import { newId } from '@/lib/id';
 import { toDecimalString, type CurrencyCode, type MinorUnits } from '@/lib/money';
@@ -165,6 +165,7 @@ export function createJournalService(database: Database, orgId: string) {
     tx: Transactional,
     input: PostEntryInput,
     accountRows: Map<string, AccountRow>,
+    reversesTransactionId?: string,
   ): Promise<TransactionDto> {
     assertCurrenciesMatch(input.currency, input.postings, accountRows);
     assertNoOverdraft(input.currency, input.postings, accountRows);
@@ -180,6 +181,7 @@ export function createJournalService(database: Database, orgId: string) {
         description: input.description,
         currency: input.currency,
         occurredAt,
+        ...(reversesTransactionId ? { reversesTransactionId } : {}),
       })
       .returning();
     if (!transactionRow) throw new Error('INSERT ... RETURNING produced no transaction row');
@@ -272,8 +274,122 @@ export function createJournalService(database: Database, orgId: string) {
     }
   }
 
+  /**
+   * Undoes an entry by posting its mirror image.
+   *
+   * The only correction a ledger permits. `postings` and `transactions` reject
+   * UPDATE and DELETE, so a mistake cannot be edited away — it is cancelled by
+   * a second entry with the opposite postings, leaving both on the record and
+   * the net effect at zero. An auditor can see what was recorded, that it was
+   * wrong, and what was done about it.
+   *
+   * Three things make this safe rather than merely convenient:
+   *
+   *  - The reversal is a normal entry, so it goes through the same balance
+   *    rule, the same overdraft check and the same deferred constraint. A
+   *    reversal that would overdraw an account is refused, which is correct:
+   *    the money has already moved on.
+   *  - `reverses_transaction_id` records the link, so "is this entry still in
+   *    effect?" is answerable. Without it a reversal is just another entry
+   *    with opposite signs.
+   *  - A partial unique index allows one reversal per entry. Two concurrent
+   *    requests both pass the check below and one loses at the index, which is
+   *    where that race belongs — an application check cannot win it.
+   */
+  async function reverseEntry(input: {
+    readonly transactionId: string;
+    readonly description?: string | undefined;
+    readonly occurredAt?: Date | undefined;
+    readonly idempotency?: { readonly key: string; readonly fingerprint: string } | undefined;
+  }): Promise<Result<PostEntryResult, LedgerError>> {
+    try {
+      const result = await withTenant(database, orgId, async (tx) => {
+        if (input.idempotency) {
+          const replay = await claimIdempotencyKey(tx, input.idempotency);
+          if (replay) return { transaction: replay, replayed: true };
+        }
+
+        const [original] = await tx
+          .select()
+          .from(transactions)
+          .where(eq(transactions.id, input.transactionId))
+          .limit(1);
+        if (!original) {
+          throw new DomainAbort({ code: 'entry_not_found', transactionId: input.transactionId });
+        }
+
+        const [existing] = await tx
+          .select({ id: transactions.id })
+          .from(transactions)
+          .where(eq(transactions.reversesTransactionId, original.id))
+          .limit(1);
+        if (existing) {
+          throw new DomainAbort({
+            code: 'already_reversed',
+            transactionId: original.id,
+            reversedBy: existing.id,
+          });
+        }
+
+        const original_postings = await tx
+          .select()
+          .from(postings)
+          .where(eq(postings.transactionId, original.id))
+          .orderBy(asc(postings.sequence));
+
+        const accountRows = await loadAccounts(
+          tx,
+          original_postings.map((posting) => ({
+            accountId: posting.accountId,
+            amount: posting.amountMinor as MinorUnits,
+          })),
+        );
+
+        const entry = await writeEntry(
+          tx,
+          {
+            description: input.description ?? `Reversal of ${original.description}`,
+            currency: original.currency as CurrencyCode,
+            ...(input.occurredAt ? { occurredAt: input.occurredAt } : {}),
+            // The mirror image: every amount negated, order preserved.
+            postings: original_postings.map((posting) => ({
+              accountId: posting.accountId,
+              amount: -posting.amountMinor as MinorUnits,
+            })),
+          },
+          accountRows,
+          original.id,
+        );
+
+        if (input.idempotency) {
+          await tx
+            .update(idempotencyKeys)
+            .set({ transactionId: entry.id, responseStatus: 201, responseBody: entry })
+            .where(eq(idempotencyKeys.key, input.idempotency.key));
+        }
+
+        return { transaction: entry, replayed: false };
+      });
+
+      return ok(result);
+    } catch (error) {
+      if (error instanceof DomainAbort) return err(error.ledgerError);
+      // The partial unique index is the authority on double reversal, so a
+      // concurrent loser surfaces here rather than as an opaque 500.
+      if (isUniqueViolation(error, 'transactions_one_reversal_per_entry')) {
+        return err({
+          code: 'already_reversed',
+          transactionId: input.transactionId,
+          reversedBy: 'a concurrent request',
+        });
+      }
+      throw error;
+    }
+  }
+
   return {
     postEntry,
+    reverseEntry,
 
     async byId(id: string): Promise<TransactionDto | undefined> {
       return withTenant(database, orgId, async (tx) => {
@@ -306,6 +422,10 @@ export function createJournalService(database: Database, orgId: string) {
       limit: number;
       cursor?: string | undefined;
       direction?: PageDirection | undefined;
+      /** Restrict to entries touching this account. */
+      accountId?: string | undefined;
+      /** Case-insensitive substring of the description. */
+      search?: string | undefined;
     }): Promise<Page<TransactionDto>> {
       const limit = Math.min(Math.max(options.limit, 1), 100);
       const direction = options.direction ?? 'forward';
@@ -313,16 +433,33 @@ export function createJournalService(database: Database, orgId: string) {
       const backward = direction === 'backward' && after !== undefined;
 
       return withTenant(database, orgId, async (tx) => {
+        // Filters combine with the keyset predicate rather than replacing it,
+        // so a filtered list pages exactly as an unfiltered one does. The
+        // account filter is a semi-join: an entry qualifies if *any* of its
+        // postings touch the account, and `exists` stops at the first match
+        // instead of materialising them all.
+        const filters = [
+          after
+            ? backward
+              ? sql`(${transactions.occurredAt}, ${transactions.id}) > (${after.occurredAt}, ${after.id})`
+              : sql`(${transactions.occurredAt}, ${transactions.id}) < (${after.occurredAt}, ${after.id})`
+            : undefined,
+          options.accountId
+            ? sql`exists (
+                select 1 from postings p
+                 where p.transaction_id = ${transactions.id}
+                   and p.account_id = ${options.accountId}
+              )`
+            : undefined,
+          options.search
+            ? sql`${transactions.description} ilike ${`%${options.search}%`}`
+            : undefined,
+        ].filter((clause) => clause !== undefined);
+
         const rows = await tx
           .select()
           .from(transactions)
-          .where(
-            after
-              ? backward
-                ? sql`(${transactions.occurredAt}, ${transactions.id}) > (${after.occurredAt}, ${after.id})`
-                : sql`(${transactions.occurredAt}, ${transactions.id}) < (${after.occurredAt}, ${after.id})`
-              : undefined,
-          )
+          .where(filters.length > 0 ? and(...filters) : undefined)
           .orderBy(
             ...(backward
               ? [asc(transactions.occurredAt), asc(transactions.id)]
@@ -366,7 +503,32 @@ async function hydrate(
     byTransaction.set(line.posting.transactionId, bucket);
   }
 
-  return rows.map((row) => toTransactionDto(row, byTransaction.get(row.id) ?? []));
+  // Which of these entries have since been reversed. One query for the page
+  // rather than one per row: "is this still in effect?" is asked of every
+  // entry on screen, and N+1 for a boolean would be a poor trade.
+  const reversals = await database
+    .select({ original: transactions.reversesTransactionId, reversal: transactions.id })
+    .from(transactions)
+    .where(inArray(transactions.reversesTransactionId, ids));
+
+  const reversedBy = new Map(
+    reversals.filter((row) => row.original !== null).map((row) => [row.original!, row.reversal]),
+  );
+
+  return rows.map((row) =>
+    toTransactionDto(row, byTransaction.get(row.id) ?? [], reversedBy.get(row.id) ?? null),
+  );
 }
 
 export type JournalService = ReturnType<typeof createJournalService>;
+
+/** Walks the cause chain for a unique-violation on a named constraint. */
+function isUniqueViolation(error: unknown, constraint: string): boolean {
+  let current: unknown = error;
+  while (current instanceof Error) {
+    const candidate = current as { code?: unknown; constraint?: unknown };
+    if (candidate.code === '23505' && candidate.constraint === constraint) return true;
+    current = current.cause;
+  }
+  return false;
+}

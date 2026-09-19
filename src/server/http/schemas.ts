@@ -85,6 +85,20 @@ export const paginationSchema = z.object({
 });
 
 /**
+ * Journal listing: pagination plus filters.
+ *
+ * A separate schema rather than optional fields on `paginationSchema`, because
+ * the filters only mean something here. Keeping them off the shared schema is
+ * also what stops the accounts statement quietly accepting a `search` it would
+ * then ignore — zod strips unknown keys without complaint, so a filter sent to
+ * the wrong endpoint disappears rather than failing.
+ */
+export const journalQuerySchema = paginationSchema.extend({
+  accountId: accountIdSchema.optional(),
+  search: z.string().trim().min(1).max(120).optional(),
+});
+
+/**
  * Converts a validated decimal string into signed minor units.
  *
  * Returns `undefined` when the string has more decimal places than the currency

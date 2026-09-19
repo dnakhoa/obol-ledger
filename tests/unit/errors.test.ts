@@ -30,6 +30,12 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
     currency: 'USD',
   },
   idempotency_key_reused: { code: 'idempotency_key_reused', key: 'k' },
+  entry_not_found: { code: 'entry_not_found', transactionId: 'txn_x' },
+  already_reversed: {
+    code: 'already_reversed',
+    transactionId: 'txn_x',
+    reversedBy: 'txn_y',
+  },
 };
 
 const variants = Object.values(EVERY_VARIANT);

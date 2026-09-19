@@ -305,7 +305,23 @@ export function openApiDocument(): Record<string, unknown> {
         get: {
           tags: ['Journal'],
           summary: 'List journal entries, newest first',
-          parameters: paginationParameters,
+          parameters: [
+            ...paginationParameters,
+            {
+              name: 'accountId',
+              in: 'query',
+              required: false,
+              description: 'Only entries with a posting touching this account.',
+              schema: { type: 'string' },
+            },
+            {
+              name: 'search',
+              in: 'query',
+              required: false,
+              description: 'Case-insensitive substring of the description.',
+              schema: { type: 'string' },
+            },
+          ],
           responses: {
             '200': {
               description: 'A page of entries',
@@ -390,6 +406,99 @@ export function openApiDocument(): Record<string, unknown> {
             },
             '200': { description: 'Idempotent replay of an earlier request' },
             ...problemResponses(400, 401, 409, 422, 429),
+          },
+        },
+      },
+      '/entries/{entryId}/reverse': {
+        post: {
+          tags: ['Journal'],
+          summary: 'Undo an entry by posting its mirror image',
+          description:
+            'A POST that creates a new entry rather than a DELETE that removes one, because that is what happens: the original stays on the record and a second entry cancels it. An entry can be reversed at most once.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'entryId', in: 'path', required: true, schema: { type: 'string' } },
+            idempotencyHeader,
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    description: {
+                      type: 'string',
+                      description: 'Defaults to "Reversal of <original>".',
+                    },
+                    occurredAt: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'The reversing entry',
+              content: {
+                'application/json': {
+                  schema: envelope({ $ref: '#/components/schemas/Transaction' }),
+                },
+              },
+            },
+            ...problemResponses(401, 404, 409, 422, 429),
+          },
+        },
+      },
+      '/reports/balance-sheet': {
+        get: {
+          tags: ['Reports'],
+          summary: 'Assets, liabilities and equity at a point in time',
+          description:
+            '`balanced` is computed rather than assumed: a balance sheet that does not balance means the ledger is inconsistent.',
+          parameters: [
+            {
+              name: 'currency',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', default: 'USD' },
+            },
+          ],
+          responses: {
+            '200': { description: 'The balance sheet' },
+            ...problemResponses(400, 429),
+          },
+        },
+      },
+      '/reports/income-statement': {
+        get: {
+          tags: ['Reports'],
+          summary: 'Revenue and expenses over a period',
+          description:
+            'Revenue and expenses are flows, so a period is required. Defaults to the last 30 days rather than all time, because an income statement with no period attached is meaningless.',
+          parameters: [
+            {
+              name: 'currency',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', default: 'USD' },
+            },
+            {
+              name: 'from',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', format: 'date-time' },
+            },
+            {
+              name: 'to',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', format: 'date-time' },
+            },
+          ],
+          responses: {
+            '200': { description: 'The income statement' },
+            ...problemResponses(400, 429),
           },
         },
       },

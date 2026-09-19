@@ -50,6 +50,7 @@ export function toPostingDto(row: PostingRow, accountName: string): PostingDto {
 export function toTransactionDto(
   row: TransactionRow,
   postings: readonly PostingDto[],
+  reversedByTransactionId: string | null = null,
 ): TransactionDto {
   return {
     id: row.id,
@@ -58,5 +59,7 @@ export function toTransactionDto(
     occurredAt: row.occurredAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     postings,
+    reversesTransactionId: row.reversesTransactionId,
+    reversedByTransactionId,
   };
 }

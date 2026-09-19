@@ -87,6 +87,31 @@ than merely rejected.
 `tests/integration/schema.test.ts` proves all of it by bypassing the application
 entirely and attacking the database directly.
 
+### History is immutable, so mistakes are corrected not erased
+
+`postings` and `transactions` reject `UPDATE` and `DELETE` at the table. That is
+the right policy for a historical record and useless on its own — so a mistake
+is corrected by posting a **reversing entry**: a mirror of the original with
+every amount negated. Both stay on the record and the net effect becomes zero.
+
+The link is recorded (`reverses_transaction_id`), so "is this entry still in
+effect?" is answerable rather than inferred from signs. A **partial unique
+index** allows one reversal per entry, which is where two concurrent reversal
+requests are resolved — an application check cannot win that race.
+
+The reversal is an ordinary entry, so it passes the same balance rule, the same
+overdraft check and the same deferred constraint. Reversing a deposit that has
+since been spent is _refused_, which is correct: the money has already moved on.
+
+### The statements a ledger exists to produce
+
+A trial balance proves internal consistency; it is not an output. The API and
+dashboard serve a **balance sheet** (Assets = Liabilities + Equity + retained
+earnings) and an **income statement** over a period. Both are computed from the
+same postings as everything else — there is no reporting store to fall out of
+step — and `balanced` is computed rather than assumed, because a balance sheet
+that does not balance means every figure on it is suspect.
+
 ### Tenant isolation the database enforces, and a probe that proves it
 
 Every ledger table carries a `FORCE`d row-level security policy keyed on
@@ -138,7 +163,7 @@ in the test process. The migrations are applied verbatim, so the plpgsql trigger
 and the deferred constraint are exercised as they will be in production.
 
 ```
-211 tests · 16 files · ~14s · no external services
+262 tests · 19 files · ~54s · no external services
 ```
 
 ## Stack

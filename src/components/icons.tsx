@@ -66,6 +66,25 @@ export const ApiIcon = (props: IconProps) => (
   </Icon>
 );
 
+export const ReportsIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+  </Icon>
+);
+
+export const SearchIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </Icon>
+);
+
+export const PlusIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 5v14M5 12h14" />
+  </Icon>
+);
+
 export const CheckIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="m4 12 5 5L20 6" />
