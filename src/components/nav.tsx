@@ -9,6 +9,7 @@ import {
   GaugeIcon,
   JournalIcon,
   ReportsIcon,
+  SettingsIcon,
   TransferIcon,
   WebhookIcon,
 } from './icons';
@@ -27,16 +28,18 @@ const LINKS = [
   { href: '/transfer', label: 'New entry', Icon: TransferIcon, exact: false },
   { href: '/webhooks', label: 'Webhooks', Icon: WebhookIcon, exact: false },
   { href: '/api-reference', label: 'API', Icon: ApiIcon, exact: false },
+  { href: '/settings', label: 'Settings', Icon: SettingsIcon, exact: false },
 ] as const;
 
 /**
  * The bottom bar caps at five, which is the practical ceiling before targets
- * drop below a comfortable 44px. The API reference is the one a reader is
- * least likely to want on a phone, so it is the one that gives up its slot.
+ * drop below a comfortable 44px. The three that give up their slots are the
+ * ones nobody does on a phone: reading an API reference, wiring up a webhook,
+ * or copying a freshly issued key into a config file.
  */
-const MOBILE_LINKS = LINKS.filter(
-  (link) => link.href !== '/api-reference' && link.href !== '/webhooks',
-);
+const DESKTOP_ONLY = new Set(['/api-reference', '/webhooks', '/settings']);
+
+const MOBILE_LINKS = LINKS.filter((link) => !DESKTOP_ONLY.has(link.href));
 
 function isActive(pathname: string, href: string, exact: boolean): boolean {
   return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);

@@ -65,6 +65,7 @@ describe('API', () => {
       orgId: db.$orgId,
       name: 'test key',
       tokenDigest: digestToken(TOKEN),
+      tokenPrefix: TOKEN.slice(0, 6),
     });
   });
 
