@@ -95,6 +95,15 @@ async function main(): Promise<void> {
       });
       ids[account.key] = created.id;
     }
+    // Back-date the accounts to just before the first entry.
+    //
+    // `created_at` defaults to now(), so a freshly seeded ledger claims every
+    // account was opened today while showing a statement going back six weeks.
+    // Accounts are not append-only — only postings and journal entries are —
+    // so this is a plain UPDATE rather than anything that fights a trigger.
+    // Only created_at: updated_at is trigger-maintained and will correctly
+    // become the time of each account's last movement as the entries post.
+    await database.execute(sql`UPDATE accounts SET created_at = now() - interval '45 days'`);
     console.log(`opened ${ACCOUNTS.length} accounts`);
 
     const dollars = (value: number): MinorUnits => minorUnits(BigInt(Math.round(value * 100)));
@@ -122,17 +131,24 @@ async function main(): Promise<void> {
       entries += 1;
     }
 
-    // Opening the books.
-    await post('Owner capital contribution', daysAgo(30, 9), [
+    // Opening the books — six weeks before trading starts.
+    //
+    // The gap is deliberate. A business is capitalised and equipped well before
+    // it takes its first order, and these one-off entries are an order of
+    // magnitude larger than daily takings. Posting them inside the dashboard's
+    // 30-day window would set the chart's axis to $48,000 and squash a month of
+    // real trading into invisible slivers — a chart that is accurate and tells
+    // the reader nothing.
+    await post('Owner capital contribution', daysAgo(44, 9), [
       { account: 'cash', amount: dollars(85_000) },
       { account: 'capital', amount: dollars(-85_000) },
     ]);
-    await post('Roaster purchased on finance', daysAgo(29, 11), [
+    await post('Roaster purchased on finance', daysAgo(43, 11), [
       { account: 'equipment', amount: dollars(48_000) },
       { account: 'loan', amount: dollars(-36_000) },
       { account: 'cash', amount: dollars(-12_000) },
     ]);
-    await post('Opening green coffee stock', daysAgo(28, 8), [
+    await post('Opening green coffee stock', daysAgo(42, 8), [
       { account: 'inventory', amount: dollars(21_500) },
       { account: 'payable', amount: dollars(-21_500) },
     ]);

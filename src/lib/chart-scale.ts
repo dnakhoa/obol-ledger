@@ -10,20 +10,38 @@ import { minorUnits, type MinorUnits } from './money';
  */
 
 /**
- * Rounds an axis top up to 1, 2 or 5 times a power of ten.
+ * Candidate axis tops, as tenths of a power of ten.
  *
- * Gridlines labelled 0 / 2,500 / 5,000 are numbers a reader holds in their
- * head; 0 / 2,317 / 4,634 are not, even though they fit the data more snugly.
+ * A bare 1 / 2 / 5 ladder is the usual shortcut, but it leaves too much air:
+ * a series peaking at 24,962 gets an axis of 50,000, so the tallest bar
+ * reaches half the plot and the chart reads as under-filled. The intermediate
+ * steps close that gap — the same series now tops out at 25,000 and fills it.
+ *
+ * Every entry divides evenly by `DIVISIONS`, which is what keeps the gridline
+ * labels round: a reader holds 0 / 5,000 / 10,000 in their head, and
+ * 0 / 4,634 / 9,268 not at all, however snugly the latter fits the data.
  */
+const STEPS = [10n, 15n, 20n, 25n, 30n, 40n, 50n, 60n, 80n, 100n] as const;
+
+export const DIVISIONS = 5;
+
+/** Rounds an axis top up to the nearest readable step at its magnitude. */
 export function niceCeiling(value: MinorUnits): MinorUnits {
   if (value <= 0n) return minorUnits(1n);
 
-  const magnitude = 10n ** BigInt(value.toString().length - 1);
-  for (const step of [1n, 2n, 5n]) {
+  // Tenths, so the fractional steps above stay integers.
+  const magnitude = 10n ** BigInt(value.toString().length - 1) / 10n;
+  if (magnitude === 0n) {
+    // Single-digit values: nothing below 10 subdivides usefully.
+    for (const step of [1n, 2n, 5n]) if (step >= value) return minorUnits(step);
+    return minorUnits(10n);
+  }
+
+  for (const step of STEPS) {
     const candidate = step * magnitude;
     if (candidate >= value) return minorUnits(candidate);
   }
-  return minorUnits(10n * magnitude);
+  return minorUnits(100n * magnitude);
 }
 
 export type LinearScale = {
@@ -35,7 +53,10 @@ export type LinearScale = {
   readonly peakIndex: number;
 };
 
-export function buildLinearScale(values: readonly MinorUnits[], divisions = 4): LinearScale {
+export function buildLinearScale(
+  values: readonly MinorUnits[],
+  divisions = DIVISIONS,
+): LinearScale {
   const max = values.reduce<MinorUnits>(
     (highest, value) => (value > highest ? value : highest),
     minorUnits(0n),
