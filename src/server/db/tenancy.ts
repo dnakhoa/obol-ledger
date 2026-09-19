@@ -104,7 +104,12 @@ export type PolicyStatus = {
   readonly configured: boolean;
 };
 
-const TENANT_TABLES = ['accounts', 'transactions', 'postings', 'idempotency_keys'];
+const TENANT_TABLES = ['accounts', 'transactions', 'postings', 'idempotency_keys'] as const;
+
+// A fixed internal constant, inlined rather than bound: drizzle passes a JS
+// array as a single scalar parameter, which `= any(...)` rejects. There is no
+// injection surface — these names never come from input.
+const TENANT_TABLE_LIST = sql.raw(TENANT_TABLES.map((table) => `'${table}'`).join(', '));
 
 /**
  * Checks that the *schema* carries the isolation policies.
@@ -126,11 +131,11 @@ export async function checkTenantPolicies(database: Database): Promise<PolicySta
       policies: sql<string>`(
         select count(*)::text from pg_policy p
         join pg_class pc on pc.oid = p.polrelid
-        where pc.relname = any(${TENANT_TABLES})
+        where pc.relname in (${TENANT_TABLE_LIST})
       )`,
     })
     .from(sql`pg_class c join pg_namespace n on n.oid = c.relnamespace`)
-    .where(sql`c.relname = any(${TENANT_TABLES}) and n.nspname = current_schema()`);
+    .where(sql`c.relname in (${TENANT_TABLE_LIST}) and n.nspname = current_schema()`);
 
   const tablesWithRls = Number(row?.withRls ?? 0);
   const tablesForced = Number(row?.forced ?? 0);

@@ -245,19 +245,28 @@ async function main(): Promise<void> {
       { account: 'cash', amount: dollars(-14_000) },
     ]);
 
-    // The seed asserts its own output: if the books do not balance, the script
-    // fails rather than leaving a broken ledger behind for the UI to render.
-    // Read the check outside any tenant context. Row-level security means this
-    // sees nothing at all unless it names a tenant, which is itself worth
-    // asserting: if this ever returns rows, isolation has stopped working.
-    const [leaked] = await database
-      .select({ count: sql<string>`count(*)::text` })
-      .from(schema.accounts);
-    if (leaked?.count !== '0') {
+    // Assert the *schema* carries the isolation policies.
+    //
+    // Deliberately not "does an unscoped read return nothing". Seeding is an
+    // administrative task and runs as a privileged role, which bypasses
+    // row-level security by design — so that check fails on exactly the
+    // connections that are supposed to bypass it. What a migration can
+    // meaningfully verify is that the policies exist and are forced; whether a
+    // given connection is subject to them depends on its role, and that is the
+    // application's question, answered by /api/v1/health.
+    const policies = await checkTenantPolicies(database);
+    if (!policies.configured) {
       throw new Error(
-        `row-level security is not in force: an unscoped read saw ${leaked?.count} accounts`,
+        `tenant isolation is not configured: ${policies.tablesWithRls}/4 tables with RLS, ` +
+          `${policies.tablesForced}/4 forced, ${policies.policies} policies`,
       );
     }
+    console.log(
+      `tenant isolation: ${policies.tablesForced}/4 tables forced, ${policies.policies} policies`,
+    );
+
+    // The seed asserts its own output: if the books do not balance, the script
+    // fails rather than leaving a broken ledger behind for the UI to render.
 
     const residual = await withTenant(database, orgId, async (tx) => {
       const [row] = await tx
