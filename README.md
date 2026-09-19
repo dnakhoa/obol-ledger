@@ -87,6 +87,30 @@ than merely rejected.
 `tests/integration/schema.test.ts` proves all of it by bypassing the application
 entirely and attacking the database directly.
 
+### Money is authorised before it settles, and the ledger knows the difference
+
+An entry is `pending`, `posted` or `archived`, and an account carries **three
+balances**:
+
+|             |                                                                |
+| ----------- | -------------------------------------------------------------- |
+| `posted`    | settled entries only — what is actually there                  |
+| `pending`   | settled plus in-flight — what it becomes if everything lands   |
+| `available` | settled minus in-flight **outflows** — what can still be spent |
+
+The overdraft rule consults `available`, which is the point. Two concurrent
+withdrawals against a balance of 1,000 both see 1,000 in a single-balance
+ledger and both succeed; here the first one's reservation is already gone from
+the second one's view.
+
+Pending is tracked as two non-negative columns rather than one signed number,
+so an unsettled _deposit_ can never fund an unsettled _withdrawal_ — money that
+has not arrived paying for money that is leaving. Settling re-checks the
+overdraft rule, because funds available at authorisation can be gone by
+settlement.
+
+See [ADR 8](docs/adr/0008-two-phase-entries.md).
+
 ### History is immutable, so mistakes are corrected not erased
 
 `postings` and `transactions` reject `UPDATE` and `DELETE` at the table. That is
@@ -163,7 +187,7 @@ in the test process. The migrations are applied verbatim, so the plpgsql trigger
 and the deferred constraint are exercised as they will be in production.
 
 ```
-262 tests · 19 files · ~54s · no external services
+284 tests · 21 files · ~59s · no external services
 ```
 
 ## Stack
@@ -268,6 +292,7 @@ as extension members so nothing has to be parsed out of prose:
 - [ADR 5](docs/adr/0005-idempotency.md) — claim-first idempotency keys
 - [ADR 6](docs/adr/0006-keyset-pagination.md) — keyset pagination
 - [ADR 7](docs/adr/0007-tenant-isolation.md) — tenant isolation via row-level security
+- [ADR 8](docs/adr/0008-two-phase-entries.md) — authorisation and settlement as two phases
 
 ## Licence
 

@@ -11,6 +11,8 @@ import { demoServices } from '@/server/container';
 import { toMoneyDto } from '@/server/services/serialize';
 import type { MinorUnits } from '@/lib/money';
 import { reverseEntryAction } from './actions';
+import { transitionEntryAction } from './settle-actions';
+import { SettleEntry } from '@/components/settle-entry';
 
 type PageProps = { params: Promise<{ entryId: string }> };
 
@@ -46,6 +48,8 @@ export default async function EntryPage({ params }: PageProps) {
 
   const reversed = entry.reversedByTransactionId !== null;
   const isReversal = entry.reversesTransactionId !== null;
+  const isPending = entry.status === 'pending';
+  const isArchived = entry.status === 'archived';
 
   return (
     <>
@@ -64,9 +68,11 @@ export default async function EntryPage({ params }: PageProps) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge>{entry.currency}</Badge>
+            {isPending ? <Badge tone="caution">Pending</Badge> : null}
+            {isArchived ? <Badge tone="neutral">Cancelled</Badge> : null}
             {reversed ? <Badge tone="caution">Reversed</Badge> : null}
             {isReversal ? <Badge tone="neutral">Reversing entry</Badge> : null}
-            {!reversed && !isReversal ? (
+            {!reversed && !isReversal && !isPending && !isArchived ? (
               <Badge tone="positive">
                 <CheckIcon width={11} height={11} />
                 In effect
@@ -105,7 +111,13 @@ export default async function EntryPage({ params }: PageProps) {
           <p className="mt-1.5 text-2xl font-semibold tracking-tight">
             <Money value={totalDebits} />
           </p>
-          <p className="text-ink-muted mt-1 text-xs">Debit side; credits match exactly</p>
+          <p className="text-ink-muted mt-1 text-xs">
+            {isPending
+              ? 'Reserved, not yet moved'
+              : isArchived
+                ? 'Cancelled; never moved'
+                : 'Debit side; credits match exactly'}
+          </p>
         </div>
         <div className="rounded-card border-line bg-surface border px-4 py-3.5">
           <p className="text-ink-muted text-[11px] font-medium tracking-wide uppercase">Occurred</p>
@@ -172,7 +184,14 @@ export default async function EntryPage({ params }: PageProps) {
 
       <Card>
         <CardBody>
-          {reversed ? (
+          {isPending ? (
+            <SettleEntry transactionId={entry.id} action={transitionEntryAction} />
+          ) : isArchived ? (
+            <p className="text-ink-muted text-xs">
+              This entry was cancelled before it settled, so it never reached the balances. There is
+              nothing to reverse — a reversal cancels money that moved, and none did.
+            </p>
+          ) : reversed ? (
             <p className="text-ink-muted text-xs">
               This entry has already been reversed, and an entry can only be reversed once —
               otherwise the correction would be applied twice.

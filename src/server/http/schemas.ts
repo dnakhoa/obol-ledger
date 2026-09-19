@@ -59,6 +59,18 @@ export const createEntrySchema = z.object({
   currency: currencySchema,
   occurredAt: z.iso.datetime({ offset: true }).optional(),
   postings: z.array(postingSchema).min(2).max(64),
+  /**
+   * `pending` reserves the funds without moving them — an authorisation.
+   * `posted` settles immediately. Defaults to posted so an ordinary transfer
+   * needs no ceremony.
+   */
+  status: z.enum(['pending', 'posted']).default('posted'),
+  /**
+   * Optimistic concurrency: `{ "acct_…": 7 }` applies the entry only if each
+   * named account is still at that version. Lets a caller read a balance,
+   * decide on it, and commit without holding a lock across the round trip.
+   */
+  expectedVersions: z.record(accountIdSchema, z.number().int().min(0)).optional(),
 });
 
 export type CreateEntryBody = z.infer<typeof createEntrySchema>;
@@ -96,6 +108,7 @@ export const paginationSchema = z.object({
 export const journalQuerySchema = paginationSchema.extend({
   accountId: accountIdSchema.optional(),
   search: z.string().trim().min(1).max(120).optional(),
+  status: z.enum(['pending', 'posted', 'archived']).optional(),
 });
 
 /**

@@ -29,8 +29,19 @@ export type StatementLine = {
   readonly runningBalance: MoneyDto;
 };
 
+/** A line that has not settled, so it has no running balance to report. */
+export type PendingLine = Omit<StatementLine, 'runningBalance'>;
+
 export type AccountStatement = {
   readonly account: AccountDto;
+  /**
+   * In-flight entries, apart from the settled ledger.
+   *
+   * Listed separately rather than interleaved because they have not moved the
+   * balance: folding them into the running total would produce a figure that
+   * reconciles with neither the posted nor the available balance.
+   */
+  readonly pending: readonly PendingLine[];
   readonly lines: Page<StatementLine>;
 };
 
@@ -119,7 +130,14 @@ export function createReportingService(database: Database, orgId: string) {
           })
           .from(postings)
           .innerJoin(transactions, eq(transactions.id, postings.transactionId))
-          .where(eq(postings.accountId, accountId))
+          // Settled entries only.
+          //
+          // A running balance that included pending lines would not reconcile
+          // with the posted balance shown beside it — the reader would see two
+          // different figures for the same account with no way to tell which
+          // was wrong. Pending entries are returned separately below, the way
+          // a bank statement lists them: above the ledger, not inside it.
+          .where(and(eq(postings.accountId, accountId), eq(transactions.status, 'posted')))
           .as('ledger');
 
         const rows = await tx
@@ -150,8 +168,37 @@ export function createReportingService(database: Database, orgId: string) {
           keyOf: (row) => ({ occurredAt: row.occurredAt, id: row.postingId }),
         });
 
+        // In-flight entries, listed apart from the settled ledger — the way a
+        // bank statement does it. Folding them into the running balance would
+        // produce a figure that reconciles with neither the posted nor the
+        // available balance shown beside it.
+        const pendingRows = await tx
+          .select({
+            postingId: postings.id,
+            transactionId: postings.transactionId,
+            amountMinor: postings.amountMinor,
+            description: transactions.description,
+            occurredAt: transactions.occurredAt,
+          })
+          .from(postings)
+          .innerJoin(transactions, eq(transactions.id, postings.transactionId))
+          .where(and(eq(postings.accountId, accountId), eq(transactions.status, 'pending')))
+          .orderBy(desc(transactions.occurredAt), desc(postings.id))
+          .limit(25);
+
         return {
           account: toAccountDto(account),
+          pending: pendingRows.map((row) => {
+            const amount = BigInt(row.amountMinor) as MinorUnits;
+            return {
+              postingId: row.postingId,
+              transactionId: row.transactionId,
+              description: row.description,
+              occurredAt: row.occurredAt.toISOString(),
+              direction: amount >= 0n ? ('debit' as const) : ('credit' as const),
+              amount: toMoneyDto((amount < 0n ? -amount : amount) as MinorUnits, currency),
+            };
+          }),
           lines: {
             nextCursor: page.nextCursor,
             previousCursor: page.previousCursor,

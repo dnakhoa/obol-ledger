@@ -1,5 +1,5 @@
 import { toDecimalString, type CurrencyCode, type MinorUnits } from '@/lib/money';
-import { presentedBalance, type AccountType } from '@/server/domain/account';
+import { deriveBalances, type AccountType } from '@/server/domain/account';
 import type { AccountDto, MoneyDto, PostingDto, TransactionDto } from './dto';
 import type { AccountRow, PostingRow, TransactionRow } from '@/server/db/schema';
 
@@ -20,14 +20,23 @@ export function toMoneyDto(amount: MinorUnits, currency: CurrencyCode): MoneyDto
 
 export function toAccountDto(row: AccountRow): AccountDto {
   const currency = row.currency as CurrencyCode;
-  const presented = presentedBalance(row.balanceMinor as MinorUnits, row.type as AccountType);
+  const balances = deriveBalances({
+    signedPosted: row.balanceMinor as MinorUnits,
+    pendingInflow: row.pendingInflowMinor as MinorUnits,
+    pendingOutflow: row.pendingOutflowMinor as MinorUnits,
+    type: row.type as AccountType,
+  });
+
   return {
     id: row.id,
     name: row.name,
     type: row.type,
     status: row.status,
     overdraftAllowed: row.overdraftAllowed,
-    balance: toMoneyDto(presented, currency),
+    balance: toMoneyDto(balances.posted, currency),
+    pendingBalance: toMoneyDto(balances.pending, currency),
+    availableBalance: toMoneyDto(balances.available, currency),
+    version: row.version,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -56,8 +65,11 @@ export function toTransactionDto(
     id: row.id,
     description: row.description,
     currency: row.currency as CurrencyCode,
+    status: row.status,
     occurredAt: row.occurredAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
+    postedAt: row.postedAt?.toISOString() ?? null,
+    archivedAt: row.archivedAt?.toISOString() ?? null,
     postings,
     reversesTransactionId: row.reversesTransactionId,
     reversedByTransactionId,
