@@ -45,10 +45,21 @@ If the running-balance window were ordered differently from the rows printed
 beside it, the balance column would not reconcile — which is the one thing a
 statement must never do.
 
+Paging backward is a **separate query**, not a reversal of the forward one: it
+seeks with `>` in ascending order and the rows are flipped for display. A
+forward cursor contains no information about what precedes it, so "previous"
+cannot be derived from it — and a "Previous" link that quietly returns to page
+one, which is the usual shortcut, is a lie about where it goes.
+
 ## Consequences
 
 - Page 500 costs what page 1 costs.
 - Pages are stable while rows are being written.
-- There is no "jump to page 17", because a keyset cursor only knows how to go
-  forward or back one page. For a journal, that is the natural interaction
-  anyway.
+- The two directions are symmetric: walking forward to the end and back again
+  visits exactly the same rows in reverse. That round trip is asserted against a
+  real database, because an off-by-one in the backward cursor would silently
+  skip or repeat an entry and no forward-only test would notice.
+- The statement's running-balance window is ordered by the same key as the page,
+  so a line shows the same balance however it was reached.
+- There is no "jump to page 17". A keyset cursor knows only the row it names,
+  which for a journal is the natural interaction anyway.

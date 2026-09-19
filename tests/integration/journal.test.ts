@@ -347,5 +347,58 @@ describe('journal service', () => {
       expect(seen).toHaveLength(7);
       expect(new Set(seen).size).toBe(7);
     });
+
+    it('walks back through exactly the pages it walked forward', async () => {
+      // The round trip is the assertion that matters. A backward cursor that is
+      // off by one row would silently skip or repeat an entry, and no
+      // forward-only test would ever notice.
+      for (let i = 0; i < 9; i += 1) await fund(1_000n);
+
+      const forward: string[][] = [];
+      let cursor: string | undefined;
+      let lastPage = await services.journal.list({ limit: 4 });
+      do {
+        const page = await services.journal.list({ limit: 4, cursor });
+        forward.push(page.items.map((item) => item.id));
+        lastPage = page;
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+
+      expect(forward.flat()).toHaveLength(9);
+
+      // From the final page, walk back to the first.
+      const backward: string[][] = [lastPage.items.map((item) => item.id)];
+      let previous = lastPage.previousCursor ?? undefined;
+      while (previous) {
+        const page = await services.journal.list({
+          limit: 4,
+          cursor: previous,
+          direction: 'backward',
+        });
+        backward.unshift(page.items.map((item) => item.id));
+        previous = page.previousCursor ?? undefined;
+      }
+
+      expect(backward).toEqual(forward);
+    });
+
+    it('offers no previous page on the first page and no next on the last', async () => {
+      for (let i = 0; i < 3; i += 1) await fund(1_000n);
+
+      const first = await services.journal.list({ limit: 2 });
+      expect(first.previousCursor).toBeNull();
+      expect(first.nextCursor).not.toBeNull();
+
+      const last = await services.journal.list({ limit: 2, cursor: first.nextCursor ?? undefined });
+      expect(last.nextCursor).toBeNull();
+      expect(last.previousCursor).not.toBeNull();
+    });
+
+    it('ignores a backward direction when there is no cursor to walk back from', async () => {
+      await fund(1_000n);
+      const page = await services.journal.list({ limit: 5, direction: 'backward' });
+      expect(page.items).toHaveLength(1);
+      expect(page.previousCursor).toBeNull();
+    });
   });
 });

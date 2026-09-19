@@ -11,7 +11,7 @@ import type { Database, Transactional } from '@/server/db/types';
 import { toPostingDto, toTransactionDto } from './serialize';
 import type { Page, TransactionDto } from './dto';
 import { IDEMPOTENCY_RETENTION_MS } from './idempotency';
-import { decodeCursor, encodeCursor } from './cursor';
+import { buildPage, decodeCursor, type PageDirection } from './cursor';
 
 export type PostEntryInput = {
   readonly description: string;
@@ -280,44 +280,56 @@ export function createJournalService(database: Database) {
      * Keyset pagination over `(occurredAt, id)`, not OFFSET.
      *
      * `OFFSET n` makes Postgres walk and discard n rows, so page 500 costs 500
-     * times page 1, and a concurrent insert shifts every subsequent page —
-     * a reader paging through a busy ledger would see an entry twice or not at
+     * times page 1, and a concurrent insert shifts every subsequent page — a
+     * reader paging through a busy ledger would see an entry twice or not at
      * all. Seeking on the last row's key is a single index dive and is stable
      * while rows are being written.
      *
      * The comparison is row-wise — `(occurred_at, id) < ($1, $2)` — which
-     * Postgres can satisfy directly from the `(occurred_at, id)` index rather
+     * Postgres satisfies directly from the `(occurred_at, id)` index rather
      * than by rewriting it as an OR of two conditions.
+     *
+     * Paging *backward* is its own query, not a reversal of this one: it seeks
+     * with `>` in ascending order and the rows are flipped for display. A
+     * forward cursor simply does not contain the information needed to walk
+     * back, which is the trade keyset pagination makes for its stability.
      */
     async list(options: {
       limit: number;
       cursor?: string | undefined;
+      direction?: PageDirection | undefined;
     }): Promise<Page<TransactionDto>> {
       const limit = Math.min(Math.max(options.limit, 1), 100);
+      const direction = options.direction ?? 'forward';
       const after = options.cursor ? decodeCursor(options.cursor) : undefined;
+      const backward = direction === 'backward' && after !== undefined;
 
       const rows = await database
         .select()
         .from(transactions)
         .where(
           after
-            ? sql`(${transactions.occurredAt}, ${transactions.id}) < (${after.occurredAt}, ${after.id})`
+            ? backward
+              ? sql`(${transactions.occurredAt}, ${transactions.id}) > (${after.occurredAt}, ${after.id})`
+              : sql`(${transactions.occurredAt}, ${transactions.id}) < (${after.occurredAt}, ${after.id})`
             : undefined,
         )
-        .orderBy(desc(transactions.occurredAt), desc(transactions.id))
+        .orderBy(
+          ...(backward
+            ? [asc(transactions.occurredAt), asc(transactions.id)]
+            : [desc(transactions.occurredAt), desc(transactions.id)]),
+        )
         .limit(limit + 1);
 
-      const page = rows.slice(0, limit);
-      const items = await hydrate(database, page);
-      const last = page.at(-1);
+      const page = buildPage({
+        rows,
+        limit,
+        direction: backward ? 'backward' : 'forward',
+        hasCursor: after !== undefined,
+        keyOf: (row) => ({ occurredAt: row.occurredAt, id: row.id }),
+      });
 
-      return {
-        items,
-        nextCursor:
-          rows.length > limit && last
-            ? encodeCursor({ occurredAt: last.occurredAt, id: last.id })
-            : null,
-      };
+      return { ...page, items: await hydrate(database, page.items) };
     },
   };
 }

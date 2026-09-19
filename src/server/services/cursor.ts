@@ -42,3 +42,52 @@ export function decodeCursor(cursor: string): Keyset | undefined {
     return undefined;
   }
 }
+
+export type PageDirection = 'forward' | 'backward';
+
+/**
+ * Turns an over-fetched row set into a page with cursors for both directions.
+ *
+ * A keyset cursor is *directional*: it names a row, and the query says whether
+ * to look at what comes before or after it. "Previous" therefore cannot be
+ * derived from a forward cursor — it needs its own query (`> cursor`, ascending),
+ * whose results come back oldest-first and have to be reversed to be displayed.
+ *
+ * Both queries fetch `limit + 1` rows. The extra row is never shown; its
+ * presence is simply how we know another page exists, which is cheaper and more
+ * accurate than a separate `COUNT(*)` over the whole table.
+ */
+export function buildPage<T>(options: {
+  readonly rows: readonly T[];
+  readonly limit: number;
+  readonly direction: PageDirection;
+  /** Whether the caller arrived here from a cursor, i.e. is not on page one. */
+  readonly hasCursor: boolean;
+  readonly keyOf: (row: T) => Keyset;
+}): { items: T[]; nextCursor: string | null; previousCursor: string | null } {
+  const { rows, limit, direction, hasCursor, keyOf } = options;
+  const overflowed = rows.length > limit;
+  const trimmed = rows.slice(0, limit);
+
+  // The backward query returns rows oldest-first; the page is always displayed
+  // newest-first, so it is reversed here rather than by every caller.
+  const items = direction === 'backward' ? [...trimmed].reverse() : trimmed;
+
+  const first = items[0];
+  const last = items.at(-1);
+
+  if (direction === 'backward') {
+    return {
+      items,
+      // We got here from a later page, so one always exists in that direction.
+      nextCursor: last ? encodeCursor(keyOf(last)) : null,
+      previousCursor: overflowed && first ? encodeCursor(keyOf(first)) : null,
+    };
+  }
+
+  return {
+    items,
+    nextCursor: overflowed && last ? encodeCursor(keyOf(last)) : null,
+    previousCursor: hasCursor && first ? encodeCursor(keyOf(first)) : null,
+  };
+}

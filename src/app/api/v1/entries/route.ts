@@ -10,7 +10,10 @@ export const GET = defineRoute({ name: 'entries.list' }, async ({ request, reque
   if (!query.ok) return query.response;
 
   const page = await services().journal.list(query.data);
-  return json({ data: page.items, meta: { nextCursor: page.nextCursor } });
+  return json({
+    data: page.items,
+    meta: { nextCursor: page.nextCursor, previousCursor: page.previousCursor },
+  });
 });
 
 /**

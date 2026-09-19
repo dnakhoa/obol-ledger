@@ -20,7 +20,11 @@ export const GET = defineRoute<Params>(
 
     return json({
       data: statement.lines.items,
-      meta: { account: statement.account, nextCursor: statement.lines.nextCursor },
+      meta: {
+        account: statement.account,
+        nextCursor: statement.lines.nextCursor,
+        previousCursor: statement.lines.previousCursor,
+      },
     });
   },
 );

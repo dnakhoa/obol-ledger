@@ -107,7 +107,10 @@ function envelope(schema: unknown, withCursor = false): Record<string, unknown> 
         ? {
             meta: {
               type: 'object',
-              properties: { nextCursor: { type: ['string', 'null'] } },
+              properties: {
+                nextCursor: { type: ['string', 'null'] },
+                previousCursor: { type: ['string', 'null'] },
+              },
             },
           }
         : {}),
