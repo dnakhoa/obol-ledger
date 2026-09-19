@@ -1,5 +1,12 @@
 # Obol Ledger
 
+[![CI](https://github.com/dnakhoa/obol-ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/dnakhoa/obol-ledger/actions/workflows/ci.yml)
+[![Live](https://img.shields.io/badge/live-obol--ledger.vercel.app-0f172a)](https://obol-ledger.vercel.app)
+[![Licence](https://img.shields.io/badge/licence-MIT-0f172a)](LICENSE)
+
+**[Live demo →](https://obol-ledger.vercel.app)** · seeded with a month of
+trading for a coffee roastery, and you can post entries yourself.
+
 A double-entry ledger with a typed HTTP API and a server-rendered dashboard.
 Entries are balanced by construction, history is append-only, and the rules are
 enforced by Postgres as well as by the application.
@@ -103,7 +110,7 @@ in the test process. The migrations are applied verbatim, so the plpgsql trigger
 and the deferred constraint are exercised as they will be in production.
 
 ```
-164 tests · 13 files · ~12s · no external services
+211 tests · 16 files · ~14s · no external services
 ```
 
 ## Stack
@@ -142,7 +149,13 @@ pnpm test        # tests alone (no database required)
 schemas — it cannot describe a body the server would reject. A rendered version
 is at `/api-reference`.
 
-Reads are public. Writes need `Authorization: Bearer $LEDGER_API_TOKEN`.
+Reads are public — try them against the live deployment:
+
+```bash
+curl -s https://obol-ledger.vercel.app/api/v1/reports/trial-balance | jq
+```
+
+Writes need `Authorization: Bearer $LEDGER_API_TOKEN`.
 
 ```bash
 curl -X POST https://$HOST/api/v1/entries \
