@@ -9,6 +9,7 @@ import { validateDraft, type DraftPosting } from '@/server/domain/transaction';
 import { accounts, idempotencyKeys, postings, transactions } from '@/server/db/schema';
 import type { AccountRow } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
+import { recordOutcome, traced } from '@/server/observability/tracing';
 import type { Database, Transactional } from '@/server/db/types';
 import { toPostingDto, toTransactionDto } from './serialize';
 import type { Page, TransactionDto } from './dto';
@@ -75,6 +76,33 @@ export function createJournalService(database: Database, orgId: string) {
    *  5. insert, letting the deferred trigger have the final word at COMMIT.
    */
   async function postEntry(input: PostEntryInput): Promise<Result<PostEntryResult, LedgerError>> {
+    return traced(
+      'ledger.post_entry',
+      {
+        'ledger.org_id': orgId,
+        'ledger.currency': input.currency,
+        'ledger.status': input.status ?? 'posted',
+        'ledger.posting_count': input.postings.length,
+        'ledger.idempotent': input.idempotency !== undefined,
+      },
+      async (span) => {
+        const result = await postEntryInner(input);
+        // A refusal is the system working, not failing, so the span stays OK
+        // and carries the reason instead of an exception.
+        recordOutcome(
+          span,
+          result.ok ? 'posted' : 'rejected',
+          result.ok ? undefined : result.error.code,
+        );
+        if (result.ok) span.setAttribute('ledger.transaction_id', result.value.transaction.id);
+        return result;
+      },
+    );
+  }
+
+  async function postEntryInner(
+    input: PostEntryInput,
+  ): Promise<Result<PostEntryResult, LedgerError>> {
     const draft = validateDraft({ currency: input.currency, postings: input.postings });
     if (!draft.ok) return draft;
 

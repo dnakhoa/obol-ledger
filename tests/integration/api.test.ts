@@ -15,6 +15,7 @@ import { GET as trialBalance } from '@/app/api/v1/reports/trial-balance/route';
 import { POST as reverseEntry } from '@/app/api/v1/entries/[entryId]/reverse/route';
 import { GET as balanceSheet } from '@/app/api/v1/reports/balance-sheet/route';
 import { GET as incomeStatement } from '@/app/api/v1/reports/income-statement/route';
+import { GET as metrics } from '@/app/api/v1/metrics/route';
 
 /**
  * These exercise the real route handlers — validation, auth, problem responses,
@@ -680,6 +681,47 @@ describe('API', () => {
     it('never caches ledger data', async () => {
       const response = await listAccounts(request('/api/v1/accounts'), noParams);
       expect(response.headers.get('cache-control')).toBe('no-store');
+    });
+
+    it('exposes metrics a Prometheus scraper can actually parse', async () => {
+      const response = await metrics(request('/api/v1/metrics'), noParams);
+      expect(response.status).toBe(200);
+      // A scraper checks the media type before it parses the body.
+      expect(response.headers.get('content-type')).toContain('text/plain');
+
+      const body = await response.text();
+      for (const name of [
+        'obol_ledger_residual_minor',
+        'obol_ledger_reserved_outflow_minor',
+        'obol_ledger_entries',
+        'obol_ledger_accounts',
+        'obol_tenant_isolation_enforced',
+      ]) {
+        expect(body).toContain(`# TYPE ${name} gauge`);
+      }
+    });
+
+    it('reports a zero residual, which is the only value that is ever correct', async () => {
+      const cash = await openAccount('Metrics cash', 'asset', true);
+      const revenue = await openAccount('Metrics revenue', 'revenue');
+      await createTransfer(
+        authed('/api/v1/transfers', {
+          from: cash.id,
+          to: revenue.id,
+          amount: { amount: '25.00', currency: 'USD' },
+          description: 'Metrics check',
+        }),
+        noParams,
+      );
+
+      const body = await (await metrics(request('/api/v1/metrics'), noParams)).text();
+      const residuals = body
+        .split('\n')
+        .filter((line) => line.startsWith('obol_ledger_residual_minor{'));
+
+      expect(residuals.length).toBeGreaterThan(0);
+      // Every currency, independently: postings net to zero, so balances must.
+      for (const line of residuals) expect(line.split(' ').at(-1)).toBe('0');
     });
   });
 });
