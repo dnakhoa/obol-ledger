@@ -346,6 +346,71 @@ export function createReportingService(database: Database, orgId: string) {
       });
     },
 
+    /**
+     * Operational metrics, for monitoring rather than for people.
+     *
+     * The important one is `residual`. Every posting nets to zero, so the
+     * signed balances of every account must also net to zero — and unlike a
+     * latency graph, this number has exactly one acceptable value. If it ever
+     * moves off zero the cached balances have stopped agreeing with the
+     * postings that justify them, which makes every other figure the system
+     * reports a lie. That is the alert worth waking someone for.
+     */
+    async metrics(): Promise<{
+      readonly residualByCurrency: { currency: string; residual: string }[];
+      readonly accounts: number;
+      readonly entriesByStatus: { status: string; count: number }[];
+      readonly postings: number;
+      readonly reservedOutflow: { currency: string; amount: string }[];
+    }> {
+      return withTenant(database, orgId, async (tx) => {
+        const residual = await tx
+          .select({
+            currency: accounts.currency,
+            residual: sql<string>`coalesce(sum(${accounts.balanceMinor}), 0)::text`,
+          })
+          .from(accounts)
+          .groupBy(accounts.currency);
+
+        const reserved = await tx
+          .select({
+            currency: accounts.currency,
+            amount: sql<string>`coalesce(sum(${accounts.pendingOutflowMinor}), 0)::text`,
+          })
+          .from(accounts)
+          .groupBy(accounts.currency);
+
+        const byStatus = await tx
+          .select({ status: transactions.status, count: sql<string>`count(*)::text` })
+          .from(transactions)
+          .groupBy(transactions.status);
+
+        const [totals] = await tx
+          .select({
+            accounts: sql<string>`(select count(*)::text from ${accounts})`,
+            postings: sql<string>`(select count(*)::text from ${postings})`,
+          })
+          .from(sql`(select 1) as anchor`);
+
+        return {
+          residualByCurrency: residual.map((row) => ({
+            currency: row.currency,
+            residual: row.residual,
+          })),
+          reservedOutflow: reserved.map((row) => ({
+            currency: row.currency,
+            amount: row.amount,
+          })),
+          entriesByStatus: byStatus.map((row) => ({
+            status: row.status,
+            count: Number(row.count),
+          })),
+          accounts: Number(totals?.accounts ?? 0),
+          postings: Number(totals?.postings ?? 0),
+        };
+      });
+    },
+
     /** Headline figures for the dashboard, in one round trip per currency. */
     async summary(): Promise<{
       readonly accountCount: number;
