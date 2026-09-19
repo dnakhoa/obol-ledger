@@ -21,7 +21,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test",
-    "test:concurrency": "vitest run tests/concurrency"
+    "test:concurrency": "vitest run tests/concurrency",
+    "benchmark": "tsx scripts/benchmark.ts"
   },
   "dependencies": {
     "clsx": "2.1.1",
