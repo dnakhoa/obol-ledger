@@ -198,9 +198,34 @@ export function openApiDocument(): Record<string, unknown> {
         get: {
           tags: ['Operations'],
           summary: 'Liveness and database readiness',
+          description:
+            'Runs a trivial query against the database. A 503 body reports whether DATABASE_URL is configured and the driver error code, so the cause is visible without reading logs.',
           responses: {
             '200': { description: 'Healthy' },
-            '503': { description: 'The database is unreachable' },
+            '503': {
+              description: 'The database is unreachable',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      status: { const: 'degraded' },
+                      database: {
+                        type: 'object',
+                        properties: {
+                          configured: { type: 'boolean' },
+                          reachable: { const: false },
+                          code: {
+                            type: 'string',
+                            description: 'Driver or Postgres error code, e.g. ENOTFOUND or 28P01.',
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
