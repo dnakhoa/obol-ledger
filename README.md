@@ -127,6 +127,46 @@ The reversal is an ordinary entry, so it passes the same balance rule, the same
 overdraft check and the same deferred constraint. Reversing a deposit that has
 since been spent is _refused_, which is correct: the money has already moved on.
 
+### Webhooks announced from inside the transaction
+
+A ledger nobody can subscribe to is a database with a web page in front of it.
+The hard part is not the HTTP request — it is that the announcement must agree
+with the books, and the obvious implementation guarantees that sometimes it
+will not:
+
+```ts
+await db.transaction(async (tx) => {
+  await writeEntry(tx, input);
+});
+await notifySubscribers(entry); // ← everything after COMMIT is a gamble
+```
+
+Die between those lines and the entry is durable while the announcement never
+happens — silently, on both ends, because a subscriber cannot notice the
+absence of a message it was never told to expect.
+
+So `enqueue` takes the **transaction handle**, not the database. The delivery
+row and the ledger entry share a COMMIT: either both are durable or neither is.
+A test asserts the half that matters — an entry the ledger _rejects_ announces
+nothing — and it passes for a structural reason rather than a careful one.
+
+That makes delivery at-least-once instead of at-most-once. A duplicate is
+possible; a silent omission is not. Every event carries a stable id so the
+receiver can deduplicate.
+
+The worker that drains the queue **claims** rows with `FOR UPDATE SKIP LOCKED`
+rather than reading them, so two workers — or one cron firing twice — take
+disjoint sets. A concurrency test runs four dispatchers against real Postgres
+and asserts every delivery went out exactly once.
+
+Deliveries are signed to the [Standard Webhooks](https://www.standardwebhooks.com/)
+specification, retried with exponential backoff and full jitter, and an
+endpoint that fails persistently is disabled by a circuit breaker. Targets are
+checked against the private network first, because a URL a caller chooses and
+this server then fetches is an SSRF proxy until it isn't.
+
+See [ADR 9](docs/adr/0009-webhooks.md).
+
 ### The statements a ledger exists to produce
 
 A trial balance proves internal consistency; it is not an output. The API and
@@ -295,6 +335,7 @@ as extension members so nothing has to be parsed out of prose:
 - [ADR 6](docs/adr/0006-keyset-pagination.md) — keyset pagination
 - [ADR 7](docs/adr/0007-tenant-isolation.md) — tenant isolation via row-level security
 - [ADR 8](docs/adr/0008-two-phase-entries.md) — authorisation and settlement as two phases
+- [ADR 9](docs/adr/0009-webhooks.md) — webhooks via a transactional outbox
 
 ## Licence
 

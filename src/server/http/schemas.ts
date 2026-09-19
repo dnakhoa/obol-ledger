@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ACCOUNT_TYPES } from '@/server/domain/account';
+import { WEBHOOK_EVENT_TYPES } from '@/server/domain/webhook';
 import {
   parseDecimal,
   SUPPORTED_CURRENCIES,
@@ -127,3 +128,38 @@ export function toSignedMinorUnits(
   if (!parsed.ok) return undefined;
   return (direction === 'debit' ? parsed.value : -parsed.value) as MinorUnits;
 }
+
+/**
+ * Webhook endpoint registration.
+ *
+ * `https` is required by the schema, by a CHECK constraint, and again by the
+ * dispatcher. That looks like belt and braces until you notice each one covers
+ * a different way in: the schema catches the API caller, the constraint
+ * catches anything that writes the row another way, and the dispatcher catches
+ * a row that was already there when the rule changed.
+ *
+ * An empty `eventTypes` means every type — the right default for a subscriber
+ * that has not thought about it yet, because missing an event is worse than
+ * receiving one you ignore.
+ */
+export const createEndpointSchema = z.object({
+  url: z
+    .string()
+    .trim()
+    .max(2048)
+    .refine((value) => URL.canParse(value) && new URL(value).protocol === 'https:', {
+      message: 'Expected an https:// URL',
+    }),
+  description: z.string().trim().max(200).optional(),
+  eventTypes: z.array(z.enum(WEBHOOK_EVENT_TYPES)).max(WEBHOOK_EVENT_TYPES.length).default([]),
+});
+
+export type CreateEndpointBody = z.infer<typeof createEndpointSchema>;
+
+export const updateEndpointSchema = z.object({ enabled: z.boolean() });
+
+export const deliveryQuerySchema = z.object({
+  endpointId: z.string().trim().optional(),
+  status: z.enum(['pending', 'delivering', 'succeeded', 'failed']).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});

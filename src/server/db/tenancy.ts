@@ -104,12 +104,28 @@ export type PolicyStatus = {
   readonly configured: boolean;
 };
 
-const TENANT_TABLES = ['accounts', 'transactions', 'postings', 'idempotency_keys'] as const;
+const TENANT_TABLES = [
+  'accounts',
+  'transactions',
+  'postings',
+  'idempotency_keys',
+  'webhook_endpoints',
+  'webhook_deliveries',
+] as const;
 
 // A fixed internal constant, inlined rather than bound: drizzle passes a JS
 // array as a single scalar parameter, which `= any(...)` rejects. There is no
 // injection surface — these names never come from input.
 const TENANT_TABLE_LIST = sql.raw(TENANT_TABLES.map((table) => `'${table}'`).join(', '));
+
+/**
+ * How many tables the isolation check expects to find covered.
+ *
+ * Exported so a caller reporting the result cannot print a stale denominator —
+ * which it did, quietly reading "6/4 tables forced" after two tables were
+ * added.
+ */
+export const TENANT_TABLE_COUNT = TENANT_TABLES.length;
 
 /**
  * Checks that the *schema* carries the isolation policies.

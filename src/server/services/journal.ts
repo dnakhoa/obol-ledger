@@ -12,6 +12,7 @@ import { withTenant } from '@/server/db/tenancy';
 import { recordOutcome, traced } from '@/server/observability/tracing';
 import type { Database, Transactional } from '@/server/db/types';
 import { toPostingDto, toTransactionDto } from './serialize';
+import { enqueue } from './outbox';
 import type { Page, TransactionDto } from './dto';
 import { IDEMPOTENCY_RETENTION_MS } from './idempotency';
 import { buildPage, decodeCursor, type PageDirection } from './cursor';
@@ -258,7 +259,22 @@ export function createJournalService(database: Database, orgId: string) {
       .map((row) => toPostingDto(row, accountRows.get(row.accountId)?.name ?? 'unknown'))
       .sort((left, right) => left.sequence - right.sequence);
 
-    return toTransactionDto(transactionRow, dtos);
+    const dto = toTransactionDto(transactionRow, dtos);
+
+    // Announced from inside the transaction that wrote it. If the entry rolls
+    // back — an unbalanced posting set, an overdraft, a serialisation failure
+    // — the announcement rolls back with it, so no subscriber is ever told
+    // about an entry that does not exist.
+    await enqueue(tx, orgId, {
+      type: reversesTransactionId
+        ? 'entry.reversed'
+        : status === 'pending'
+          ? 'entry.pending'
+          : 'entry.posted',
+      data: { entry: dto, ...(reversesTransactionId ? { reverses: reversesTransactionId } : {}) },
+    });
+
+    return dto;
   }
 
   function assertCurrenciesMatch(
@@ -538,6 +554,12 @@ export function createJournalService(database: Database, orgId: string) {
 
         const [dto] = await hydrate(tx, [updated]);
         if (!dto) throw new Error('failed to hydrate the transitioned entry');
+
+        await enqueue(tx, orgId, {
+          type: input.to === 'posted' ? 'entry.settled' : 'entry.archived',
+          data: { entry: dto, from },
+        });
+
         return dto;
       });
 

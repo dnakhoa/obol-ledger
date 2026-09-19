@@ -47,6 +47,9 @@ export const ID_PREFIXES = {
   posting: 'post',
   organization: 'org',
   apiKey: 'key',
+  webhookEndpoint: 'whe',
+  webhookDelivery: 'whd',
+  event: 'evt',
 } as const;
 
 export type EntityKind = keyof typeof ID_PREFIXES;

@@ -5,6 +5,7 @@ import { createAccountService } from './services/accounts';
 import { createAuthenticationService } from './services/authentication';
 import { createJournalService } from './services/journal';
 import { createReportingService } from './services/reporting';
+import { createWebhookService } from './services/webhooks';
 import { SetupRequiredError } from './setup-error';
 
 /**
@@ -25,6 +26,7 @@ export function servicesFor(orgId: string) {
     accounts: createAccountService(database, orgId),
     journal: createJournalService(database, orgId),
     reporting: createReportingService(database, orgId),
+    webhooks: createWebhookService(database, orgId),
   };
 }
 

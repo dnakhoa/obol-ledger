@@ -60,6 +60,21 @@ export function createAuthenticationService(database: Database) {
         .limit(1);
       return row;
     },
+
+    /**
+     * Every tenant, for work that is not driven by a request.
+     *
+     * The delivery worker needs this because row-level security is keyed on a
+     * single tenant: there is no connection state from which it could drain
+     * every queue at once, and there should not be. It iterates instead, which
+     * also buys fairness — one tenant with ten thousand queued deliveries
+     * cannot starve the others out of a batch.
+     */
+    async organizations(): Promise<{ id: string; slug: string }[]> {
+      return database
+        .select({ id: organizations.id, slug: organizations.slug })
+        .from(organizations);
+    },
   };
 }
 

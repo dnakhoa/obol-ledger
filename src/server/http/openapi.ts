@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import {
   createAccountSchema,
+  createEndpointSchema,
   createEntrySchema,
   createTransferSchema,
   paginationSchema,
+  updateEndpointSchema,
 } from './schemas';
 
 /**
@@ -202,7 +204,13 @@ export function openApiDocument(): Record<string, unknown> {
       license: { name: 'MIT', identifier: 'MIT' },
     },
     servers: [{ url: '/api/v1' }],
-    tags: [{ name: 'Accounts' }, { name: 'Journal' }, { name: 'Reports' }, { name: 'Operations' }],
+    tags: [
+      { name: 'Accounts' },
+      { name: 'Journal' },
+      { name: 'Reports' },
+      { name: 'Webhooks' },
+      { name: 'Operations' },
+    ],
     components: {
       securitySchemes: {
         bearerAuth: { type: 'http', scheme: 'bearer', description: 'Required for all writes.' },
@@ -216,6 +224,8 @@ export function openApiDocument(): Record<string, unknown> {
         CreateEntry: jsonSchema(createEntrySchema),
         CreateTransfer: jsonSchema(createTransferSchema),
         Pagination: jsonSchema(paginationSchema),
+        CreateEndpoint: jsonSchema(createEndpointSchema),
+        UpdateEndpoint: jsonSchema(updateEndpointSchema),
       },
     },
     paths: {
@@ -574,6 +584,143 @@ export function openApiDocument(): Record<string, unknown> {
             '200': { description: 'The income statement' },
             ...problemResponses(400, 429),
           },
+        },
+      },
+      '/webhook-endpoints': {
+        get: {
+          tags: ['Webhooks'],
+          summary: 'List registered endpoints',
+          description: 'Signing secrets are never included; they are returned once, at creation.',
+          responses: {
+            '200': { description: 'Endpoints, newest first' },
+            ...problemResponses(429),
+          },
+        },
+        post: {
+          tags: ['Webhooks'],
+          summary: 'Register an endpoint',
+          description:
+            'Returns the signing secret exactly once. Store it: it cannot be read back, only rotated. An empty eventTypes subscribes to everything.',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/CreateEndpoint' } },
+            },
+          },
+          responses: {
+            '201': { description: 'Registered, with the signing secret' },
+            ...problemResponses(400, 401, 409, 429),
+          },
+        },
+      },
+      '/webhook-endpoints/{endpointId}': {
+        get: {
+          tags: ['Webhooks'],
+          summary: 'Fetch one endpoint',
+          parameters: [
+            { name: 'endpointId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: 'The endpoint' },
+            ...problemResponses(404, 429),
+          },
+        },
+        patch: {
+          tags: ['Webhooks'],
+          summary: 'Enable or disable an endpoint',
+          description:
+            'Re-enabling clears the consecutive-failure count, so the circuit breaker does not trip again on the next single failure.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'endpointId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/UpdateEndpoint' } },
+            },
+          },
+          responses: {
+            '200': { description: 'The updated endpoint' },
+            ...problemResponses(400, 401, 404, 429),
+          },
+        },
+        delete: {
+          tags: ['Webhooks'],
+          summary: 'Remove an endpoint and its delivery history',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'endpointId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '204': { description: 'Removed' },
+            ...problemResponses(401, 404, 429),
+          },
+        },
+      },
+      '/webhook-deliveries': {
+        get: {
+          tags: ['Webhooks'],
+          summary: 'The delivery log',
+          description:
+            'Every attempt, with its status code, response excerpt and next retry time — so a subscriber can diagnose its own failures without a support thread.',
+          parameters: [
+            { name: 'endpointId', in: 'query', required: false, schema: { type: 'string' } },
+            {
+              name: 'status',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', enum: ['pending', 'delivering', 'succeeded', 'failed'] },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
+            },
+          ],
+          responses: {
+            '200': { description: 'Deliveries, newest first' },
+            ...problemResponses(400, 429),
+          },
+        },
+      },
+      '/webhook-deliveries/{deliveryId}/replay': {
+        post: {
+          tags: ['Webhooks'],
+          summary: 'Queue the same event again',
+          description:
+            'Creates a new delivery rather than resetting the old one, so the record of the original failure survives. The payload carries a replayOf link for deduplication.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'deliveryId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '202': { description: 'Queued' },
+            ...problemResponses(401, 404, 429),
+          },
+        },
+      },
+      '/webhooks/dispatch': {
+        post: {
+          tags: ['Operations'],
+          summary: 'Drain the delivery queue',
+          description:
+            'Triggered by the scheduler, authenticated with CRON_SECRET. Documented because an operator needs to know it exists, not because clients should call it.',
+          responses: {
+            '200': { description: 'What the run claimed, sent and abandoned' },
+            ...problemResponses(401),
+          },
+        },
+      },
+      '/metrics': {
+        get: {
+          tags: ['Operations'],
+          summary: 'Prometheus metrics',
+          description:
+            'Text exposition format. obol_ledger_residual_minor is the one worth alerting on: it has exactly one correct value, zero, in every currency.',
+          responses: { '200': { description: 'Metrics in Prometheus text format' } },
         },
       },
       '/reports/trial-balance': {

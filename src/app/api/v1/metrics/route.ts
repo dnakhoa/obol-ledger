@@ -20,8 +20,9 @@ import { db } from '@/server/db/client';
  *     severity: page
  */
 export const GET = defineRoute({ name: 'metrics', rateLimit: false }, async ({ services }) => {
-  const [metrics, isolation] = await Promise.all([
+  const [metrics, webhooks, isolation] = await Promise.all([
     services.reporting.metrics(),
+    services.webhooks.summary(),
     checkTenantIsolation(db()),
   ]);
 
@@ -53,6 +54,17 @@ export const GET = defineRoute({ name: 'metrics', rateLimit: false }, async ({ s
 
   gauge('obol_ledger_accounts', 'Open ledger accounts.', [['', metrics.accounts]]);
   gauge('obol_ledger_postings', 'Individual postings written.', [['', metrics.postings]]);
+
+  // Queue depth. A `pending` count that climbs and never drains means the
+  // scheduler has stopped or every subscriber is down; either way the ledger
+  // looks healthy while nobody downstream is hearing about it.
+  gauge(
+    'obol_webhook_deliveries',
+    'Webhook deliveries by status. A pending count that only grows means the queue is not draining.',
+    Object.entries(webhooks.byStatus).map(([status, count]) => [`status="${status}"`, count]),
+  );
+
+  gauge('obol_webhook_endpoints', 'Registered webhook endpoints.', [['', webhooks.endpoints]]);
 
   gauge(
     'obol_tenant_isolation_enforced',
