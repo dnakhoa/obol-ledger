@@ -12,10 +12,18 @@ describe('reporting service', () => {
 
   beforeEach(async () => {
     db = await createTestDatabase();
-    services = servicesFor(db);
-    cash = await openAccount(db, { name: 'Cash', type: 'asset' });
-    revenue = await openAccount(db, { name: 'Sales', type: 'revenue', overdraftAllowed: true });
-    expenses = await openAccount(db, { name: 'Rent', type: 'expense', overdraftAllowed: true });
+    services = servicesFor(db, db.$orgId);
+    cash = await openAccount(db, db.$orgId, { name: 'Cash', type: 'asset' });
+    revenue = await openAccount(db, db.$orgId, {
+      name: 'Sales',
+      type: 'revenue',
+      overdraftAllowed: true,
+    });
+    expenses = await openAccount(db, db.$orgId, {
+      name: 'Rent',
+      type: 'expense',
+      overdraftAllowed: true,
+    });
   });
 
   afterEach(async () => {
@@ -61,8 +69,12 @@ describe('reporting service', () => {
     });
 
     it('reports each currency separately', async () => {
-      const euro = await openAccount(db, { name: 'Euro cash', type: 'asset', currency: 'EUR' });
-      const euroRevenue = await openAccount(db, {
+      const euro = await openAccount(db, db.$orgId, {
+        name: 'Euro cash',
+        type: 'asset',
+        currency: 'EUR',
+      });
+      const euroRevenue = await openAccount(db, db.$orgId, {
         name: 'Euro sales',
         type: 'revenue',
         currency: 'EUR',

@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '../helpers/database';
 import { setDatabaseForTesting } from '@/server/db/client';
 import { resetRateLimits } from '@/server/http/rate-limit';
+import { apiKeys } from '@/server/db/schema';
+import { digestToken } from '@/server/services/authentication';
+import { newId } from '@/lib/id';
 import { GET as listAccounts, POST as createAccount } from '@/app/api/v1/accounts/route';
 import { GET as getAccount } from '@/app/api/v1/accounts/[accountId]/route';
 import { GET as getStatement } from '@/app/api/v1/accounts/[accountId]/statement/route';
@@ -42,7 +45,17 @@ describe('API', () => {
     db = await createTestDatabase();
     setDatabaseForTesting(db);
     resetRateLimits();
-    process.env['LEDGER_API_TOKEN'] = TOKEN;
+
+    // Reads act as the demo tenant, writes authenticate as a real API key —
+    // both through the same code path the deployment uses, so these tests
+    // exercise tenant resolution rather than skipping it.
+    process.env['DEMO_ORG_SLUG'] = 'primary';
+    await db.insert(apiKeys).values({
+      id: newId('apiKey'),
+      orgId: db.$orgId,
+      name: 'test key',
+      tokenDigest: digestToken(TOKEN),
+    });
   });
 
   afterEach(async () => {

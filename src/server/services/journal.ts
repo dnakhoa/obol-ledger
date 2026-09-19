@@ -7,6 +7,7 @@ import type { LedgerError } from '@/server/domain/errors';
 import { validateDraft, type DraftPosting } from '@/server/domain/transaction';
 import { accounts, idempotencyKeys, postings, transactions } from '@/server/db/schema';
 import type { AccountRow } from '@/server/db/schema';
+import { withTenant } from '@/server/db/tenancy';
 import type { Database, Transactional } from '@/server/db/types';
 import { toPostingDto, toTransactionDto } from './serialize';
 import type { Page, TransactionDto } from './dto';
@@ -49,7 +50,7 @@ class DomainAbort extends Error {
   }
 }
 
-export function createJournalService(database: Database) {
+export function createJournalService(database: Database, orgId: string) {
   /**
    * Records a balanced journal entry.
    *
@@ -66,7 +67,9 @@ export function createJournalService(database: Database) {
     if (!draft.ok) return draft;
 
     try {
-      const result = await database.transaction(async (tx) => {
+      // `withTenant` opens the transaction and stamps it with the tenant, so
+      // this does not open a second one: tenancy and atomicity share a scope.
+      const result = await withTenant(database, orgId, async (tx) => {
         if (input.idempotency) {
           const replay = await claimIdempotencyKey(tx, input.idempotency);
           if (replay) return { transaction: replay, replayed: true };
@@ -111,6 +114,7 @@ export function createJournalService(database: Database) {
     const claimed = await tx
       .insert(idempotencyKeys)
       .values({
+        orgId,
         key: idempotency.key,
         fingerprint: idempotency.fingerprint,
         responseStatus: 0,
@@ -172,6 +176,7 @@ export function createJournalService(database: Database) {
       .insert(transactions)
       .values({
         id: transactionId,
+        orgId,
         description: input.description,
         currency: input.currency,
         occurredAt,
@@ -186,6 +191,7 @@ export function createJournalService(database: Database) {
     const rows = input.postings
       .map((posting, sequence) => ({
         id: newId('posting'),
+        orgId,
         transactionId,
         accountId: posting.accountId,
         amountMinor: posting.amount,
@@ -266,14 +272,12 @@ export function createJournalService(database: Database) {
     postEntry,
 
     async byId(id: string): Promise<TransactionDto | undefined> {
-      const [row] = await database
-        .select()
-        .from(transactions)
-        .where(eq(transactions.id, id))
-        .limit(1);
-      if (!row) return undefined;
-      const [entry] = await hydrate(database, [row]);
-      return entry;
+      return withTenant(database, orgId, async (tx) => {
+        const [row] = await tx.select().from(transactions).where(eq(transactions.id, id)).limit(1);
+        if (!row) return undefined;
+        const [entry] = await hydrate(tx, [row]);
+        return entry;
+      });
     },
 
     /**
@@ -304,39 +308,41 @@ export function createJournalService(database: Database) {
       const after = options.cursor ? decodeCursor(options.cursor) : undefined;
       const backward = direction === 'backward' && after !== undefined;
 
-      const rows = await database
-        .select()
-        .from(transactions)
-        .where(
-          after
-            ? backward
-              ? sql`(${transactions.occurredAt}, ${transactions.id}) > (${after.occurredAt}, ${after.id})`
-              : sql`(${transactions.occurredAt}, ${transactions.id}) < (${after.occurredAt}, ${after.id})`
-            : undefined,
-        )
-        .orderBy(
-          ...(backward
-            ? [asc(transactions.occurredAt), asc(transactions.id)]
-            : [desc(transactions.occurredAt), desc(transactions.id)]),
-        )
-        .limit(limit + 1);
+      return withTenant(database, orgId, async (tx) => {
+        const rows = await tx
+          .select()
+          .from(transactions)
+          .where(
+            after
+              ? backward
+                ? sql`(${transactions.occurredAt}, ${transactions.id}) > (${after.occurredAt}, ${after.id})`
+                : sql`(${transactions.occurredAt}, ${transactions.id}) < (${after.occurredAt}, ${after.id})`
+              : undefined,
+          )
+          .orderBy(
+            ...(backward
+              ? [asc(transactions.occurredAt), asc(transactions.id)]
+              : [desc(transactions.occurredAt), desc(transactions.id)]),
+          )
+          .limit(limit + 1);
 
-      const page = buildPage({
-        rows,
-        limit,
-        direction: backward ? 'backward' : 'forward',
-        hasCursor: after !== undefined,
-        keyOf: (row) => ({ occurredAt: row.occurredAt, id: row.id }),
+        const page = buildPage({
+          rows,
+          limit,
+          direction: backward ? 'backward' : 'forward',
+          hasCursor: after !== undefined,
+          keyOf: (row) => ({ occurredAt: row.occurredAt, id: row.id }),
+        });
+
+        return { ...page, items: await hydrate(tx, page.items) };
       });
-
-      return { ...page, items: await hydrate(database, page.items) };
     },
   };
 }
 
 /** Fetches the postings for a page of entries in one round trip, not N. */
 async function hydrate(
-  database: Database,
+  database: Transactional,
   rows: readonly (typeof transactions.$inferSelect)[],
 ): Promise<TransactionDto[]> {
   if (rows.length === 0) return [];

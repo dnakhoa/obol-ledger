@@ -45,6 +45,8 @@ export const ID_PREFIXES = {
   account: 'acct',
   transaction: 'txn',
   posting: 'post',
+  organization: 'org',
+  apiKey: 'key',
 } as const;
 
 export type EntityKind = keyof typeof ID_PREFIXES;
@@ -54,6 +56,7 @@ declare const idBrand: unique symbol;
 /** `AccountId` and `TransactionId` are distinct types despite both being strings. */
 export type Id<K extends EntityKind> = string & { readonly [idBrand]: K };
 
+export type OrganizationId = Id<'organization'>;
 export type AccountId = Id<'account'>;
 export type TransactionId = Id<'transaction'>;
 export type PostingId = Id<'posting'>;

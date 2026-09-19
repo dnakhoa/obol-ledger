@@ -2,6 +2,7 @@ import { asc, desc, eq, sql } from 'drizzle-orm';
 import type { CurrencyCode, MinorUnits } from '@/lib/money';
 import { presentedBalance, type AccountType } from '@/server/domain/account';
 import { accounts, postings, transactions } from '@/server/db/schema';
+import { withTenant } from '@/server/db/tenancy';
 import type { Database } from '@/server/db/types';
 import { toMoneyDto } from './serialize';
 import type { AccountDto, MoneyDto, Page, TrialBalanceRow } from './dto';
@@ -24,7 +25,7 @@ export type AccountStatement = {
   readonly lines: Page<StatementLine>;
 };
 
-export function createReportingService(database: Database) {
+export function createReportingService(database: Database, orgId: string) {
   return {
     /**
      * The trial balance: the ledger auditing itself.
@@ -36,27 +37,29 @@ export function createReportingService(database: Database) {
      * rather than hiding it in a test.
      */
     async trialBalance(): Promise<TrialBalanceRow[]> {
-      const rows = await database
-        .select({
-          currency: accounts.currency,
-          debits: sql<string>`coalesce(sum(case when ${accounts.balanceMinor} > 0 then ${accounts.balanceMinor} else 0 end), 0)`,
-          credits: sql<string>`coalesce(sum(case when ${accounts.balanceMinor} < 0 then -${accounts.balanceMinor} else 0 end), 0)`,
-          residual: sql<string>`coalesce(sum(${accounts.balanceMinor}), 0)`,
-        })
-        .from(accounts)
-        .groupBy(accounts.currency)
-        .orderBy(asc(accounts.currency));
+      return withTenant(database, orgId, async (tx) => {
+        const rows = await tx
+          .select({
+            currency: accounts.currency,
+            debits: sql<string>`coalesce(sum(case when ${accounts.balanceMinor} > 0 then ${accounts.balanceMinor} else 0 end), 0)`,
+            credits: sql<string>`coalesce(sum(case when ${accounts.balanceMinor} < 0 then -${accounts.balanceMinor} else 0 end), 0)`,
+            residual: sql<string>`coalesce(sum(${accounts.balanceMinor}), 0)`,
+          })
+          .from(accounts)
+          .groupBy(accounts.currency)
+          .orderBy(asc(accounts.currency));
 
-      return rows.map((row) => {
-        const currency = row.currency as CurrencyCode;
-        const residual = BigInt(row.residual) as MinorUnits;
-        return {
-          currency,
-          debits: toMoneyDto(BigInt(row.debits) as MinorUnits, currency),
-          credits: toMoneyDto(BigInt(row.credits) as MinorUnits, currency),
-          residual: toMoneyDto(residual, currency),
-          balanced: residual === 0n,
-        };
+        return rows.map((row) => {
+          const currency = row.currency as CurrencyCode;
+          const residual = BigInt(row.residual) as MinorUnits;
+          return {
+            currency,
+            debits: toMoneyDto(BigInt(row.debits) as MinorUnits, currency),
+            credits: toMoneyDto(BigInt(row.credits) as MinorUnits, currency),
+            residual: toMoneyDto(residual, currency),
+            balanced: residual === 0n,
+          };
+        });
       });
     },
 
@@ -81,84 +84,86 @@ export function createReportingService(database: Database) {
         direction?: PageDirection | undefined;
       },
     ): Promise<AccountStatement | undefined> {
-      const [account] = await database
-        .select()
-        .from(accounts)
-        .where(eq(accounts.id, accountId))
-        .limit(1);
-      if (!account) return undefined;
+      return withTenant(database, orgId, async (tx) => {
+        const [account] = await tx
+          .select()
+          .from(accounts)
+          .where(eq(accounts.id, accountId))
+          .limit(1);
+        if (!account) return undefined;
 
-      const limit = Math.min(Math.max(options.limit, 1), 100);
-      const after = options.cursor ? decodeCursor(options.cursor) : undefined;
-      const backward = options.direction === 'backward' && after !== undefined;
+        const limit = Math.min(Math.max(options.limit, 1), 100);
+        const after = options.cursor ? decodeCursor(options.cursor) : undefined;
+        const backward = options.direction === 'backward' && after !== undefined;
 
-      const ledger = database
-        .select({
-          postingId: postings.id,
-          transactionId: postings.transactionId,
-          amountMinor: postings.amountMinor,
-          description: transactions.description,
-          occurredAt: transactions.occurredAt,
-          runningMinor:
-            sql<string>`sum(${postings.amountMinor}) over (order by ${transactions.occurredAt}, ${postings.id} rows between unbounded preceding and current row)`.as(
-              'running_minor',
-            ),
-        })
-        .from(postings)
-        .innerJoin(transactions, eq(transactions.id, postings.transactionId))
-        .where(eq(postings.accountId, accountId))
-        .as('ledger');
-
-      const rows = await database
-        .select()
-        .from(ledger)
-        .where(
-          after
-            ? backward
-              ? sql`(${ledger.occurredAt}, ${ledger.postingId}) > (${after.occurredAt}, ${after.id})`
-              : sql`(${ledger.occurredAt}, ${ledger.postingId}) < (${after.occurredAt}, ${after.id})`
-            : undefined,
-        )
-        .orderBy(
-          ...(backward
-            ? [asc(ledger.occurredAt), asc(ledger.postingId)]
-            : [desc(ledger.occurredAt), desc(ledger.postingId)]),
-        )
-        .limit(limit + 1);
-
-      const currency = account.currency as CurrencyCode;
-      const type = account.type as AccountType;
-
-      const page = buildPage({
-        rows,
-        limit,
-        direction: backward ? 'backward' : 'forward',
-        hasCursor: after !== undefined,
-        keyOf: (row) => ({ occurredAt: row.occurredAt, id: row.postingId }),
-      });
-
-      return {
-        account: toAccountDto(account),
-        lines: {
-          nextCursor: page.nextCursor,
-          previousCursor: page.previousCursor,
-          items: page.items.map((row) => {
-            const amount = BigInt(row.amountMinor) as MinorUnits;
-            return {
-              postingId: row.postingId,
-              transactionId: row.transactionId,
-              description: row.description,
-              occurredAt: row.occurredAt.toISOString(),
-              direction: amount >= 0n ? ('debit' as const) : ('credit' as const),
-              amount: toMoneyDto((amount < 0n ? -amount : amount) as MinorUnits, currency),
-              runningBalance: toMoneyDto(
-                presentedBalance(BigInt(row.runningMinor) as MinorUnits, type),
-                currency,
+        const ledger = tx
+          .select({
+            postingId: postings.id,
+            transactionId: postings.transactionId,
+            amountMinor: postings.amountMinor,
+            description: transactions.description,
+            occurredAt: transactions.occurredAt,
+            runningMinor:
+              sql<string>`sum(${postings.amountMinor}) over (order by ${transactions.occurredAt}, ${postings.id} rows between unbounded preceding and current row)`.as(
+                'running_minor',
               ),
-            };
-          }),
-        },
-      };
+          })
+          .from(postings)
+          .innerJoin(transactions, eq(transactions.id, postings.transactionId))
+          .where(eq(postings.accountId, accountId))
+          .as('ledger');
+
+        const rows = await tx
+          .select()
+          .from(ledger)
+          .where(
+            after
+              ? backward
+                ? sql`(${ledger.occurredAt}, ${ledger.postingId}) > (${after.occurredAt}, ${after.id})`
+                : sql`(${ledger.occurredAt}, ${ledger.postingId}) < (${after.occurredAt}, ${after.id})`
+              : undefined,
+          )
+          .orderBy(
+            ...(backward
+              ? [asc(ledger.occurredAt), asc(ledger.postingId)]
+              : [desc(ledger.occurredAt), desc(ledger.postingId)]),
+          )
+          .limit(limit + 1);
+
+        const currency = account.currency as CurrencyCode;
+        const type = account.type as AccountType;
+
+        const page = buildPage({
+          rows,
+          limit,
+          direction: backward ? 'backward' : 'forward',
+          hasCursor: after !== undefined,
+          keyOf: (row) => ({ occurredAt: row.occurredAt, id: row.postingId }),
+        });
+
+        return {
+          account: toAccountDto(account),
+          lines: {
+            nextCursor: page.nextCursor,
+            previousCursor: page.previousCursor,
+            items: page.items.map((row) => {
+              const amount = BigInt(row.amountMinor) as MinorUnits;
+              return {
+                postingId: row.postingId,
+                transactionId: row.transactionId,
+                description: row.description,
+                occurredAt: row.occurredAt.toISOString(),
+                direction: amount >= 0n ? ('debit' as const) : ('credit' as const),
+                amount: toMoneyDto((amount < 0n ? -amount : amount) as MinorUnits, currency),
+                runningBalance: toMoneyDto(
+                  presentedBalance(BigInt(row.runningMinor) as MinorUnits, type),
+                  currency,
+                ),
+              };
+            }),
+          },
+        };
+      });
     },
 
     /** Headline figures for the dashboard, in one round trip per currency. */
@@ -167,19 +172,21 @@ export function createReportingService(database: Database) {
       readonly entryCount: number;
       readonly postingCount: number;
     }> {
-      const [counts] = await database
-        .select({
-          accountCount: sql<string>`(select count(*) from ${accounts})`,
-          entryCount: sql<string>`(select count(*) from ${transactions})`,
-          postingCount: sql<string>`(select count(*) from ${postings})`,
-        })
-        .from(sql`(select 1) as anchor`);
+      return withTenant(database, orgId, async (tx) => {
+        const [counts] = await tx
+          .select({
+            accountCount: sql<string>`(select count(*) from ${accounts})`,
+            entryCount: sql<string>`(select count(*) from ${transactions})`,
+            postingCount: sql<string>`(select count(*) from ${postings})`,
+          })
+          .from(sql`(select 1) as anchor`);
 
-      return {
-        accountCount: Number(counts?.accountCount ?? 0),
-        entryCount: Number(counts?.entryCount ?? 0),
-        postingCount: Number(counts?.postingCount ?? 0),
-      };
+        return {
+          accountCount: Number(counts?.accountCount ?? 0),
+          entryCount: Number(counts?.entryCount ?? 0),
+          postingCount: Number(counts?.postingCount ?? 0),
+        };
+      });
     },
 
     /**
@@ -199,10 +206,11 @@ export function createReportingService(database: Database) {
     ): Promise<{ readonly day: string; readonly volume: MoneyDto }[]> {
       const span = Math.min(Math.max(Math.trunc(days), 1), 366);
 
-      const rows = await database
-        .select({ day: sql<string>`series.day`, volume: sql<string>`series.volume` })
-        .from(
-          sql`(
+      return withTenant(database, orgId, async (tx) => {
+        const rows = await tx
+          .select({ day: sql<string>`series.day`, volume: sql<string>`series.volume` })
+          .from(
+            sql`(
             SELECT
               to_char(spine.day, 'YYYY-MM-DD') AS day,
               coalesce(sum(p.amount_minor) FILTER (WHERE p.amount_minor > 0), 0)::text AS volume
@@ -218,12 +226,13 @@ export function createReportingService(database: Database) {
             GROUP BY spine.day
             ORDER BY spine.day
           ) AS series`,
-        );
+          );
 
-      return rows.map((row) => ({
-        day: row.day,
-        volume: toMoneyDto(BigInt(row.volume) as MinorUnits, currency),
-      }));
+        return rows.map((row) => ({
+          day: row.day,
+          volume: toMoneyDto(BigInt(row.volume) as MinorUnits, currency),
+        }));
+      });
     },
   };
 }

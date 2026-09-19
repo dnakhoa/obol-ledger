@@ -12,20 +12,30 @@ import { createTestDatabase, expectDatabaseError, type TestDatabase } from '../h
  */
 describe('schema invariants', () => {
   let db: TestDatabase;
+  let org: string;
 
   beforeAll(async () => {
     db = await createTestDatabase();
+    org = db.$orgId;
+
+    // Session-scoped rather than transaction-scoped, because this suite issues
+    // standalone statements rather than going through `withTenant`. That is
+    // acceptable here — PGlite is a single connection owned by this test — and
+    // is exactly what the application must not do: with a pooled connection a
+    // session-level setting outlives the request that set it.
+    await db.execute(sql`select set_config('app.current_org', ${org}, false)`);
+
     await db.execute(sql`
-      INSERT INTO accounts (id, name, type, currency, overdraft_allowed)
+      INSERT INTO accounts (id, org_id, name, type, currency, overdraft_allowed)
       VALUES
-        ('acct_cash',    'Cash',    'asset',     'USD', false),
-        ('acct_revenue', 'Revenue', 'revenue',   'USD', true),
-        ('acct_loan',    'Loan',    'liability', 'USD', true),
-        ('acct_eur',     'Euro',    'asset',     'EUR', true)
+        ('acct_cash',    ${org}, 'Cash',    'asset',     'USD', false),
+        ('acct_revenue', ${org}, 'Revenue', 'revenue',   'USD', true),
+        ('acct_loan',    ${org}, 'Loan',    'liability', 'USD', true),
+        ('acct_eur',     ${org}, 'Euro',    'asset',     'EUR', true)
     `);
     await db.execute(sql`
-      INSERT INTO transactions (id, description, currency, occurred_at)
-      VALUES ('txn_seed', 'seed', 'USD', now())
+      INSERT INTO transactions (id, org_id, description, currency, occurred_at)
+      VALUES ('txn_seed', ${org}, 'seed', 'USD', now())
     `);
   });
 
@@ -36,14 +46,14 @@ describe('schema invariants', () => {
   it('rejects an entry whose postings do not sum to zero', async () => {
     const unbalanced = db.transaction(async (tx) => {
       await tx.execute(sql`
-        INSERT INTO transactions (id, description, currency, occurred_at)
-        VALUES ('txn_unbalanced', 'bad', 'USD', now())
+        INSERT INTO transactions (id, org_id, description, currency, occurred_at)
+        VALUES ('txn_unbalanced', ${org}, 'bad', 'USD', now())
       `);
       await tx.execute(sql`
-        INSERT INTO postings (id, transaction_id, account_id, amount_minor, currency, sequence)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
         VALUES
-          ('post_a', 'txn_unbalanced', 'acct_cash',      1000, 'USD', 0),
-          ('post_b', 'txn_unbalanced', 'acct_revenue', 0 - 999, 'USD', 1)
+          ('post_a', ${org}, 'txn_unbalanced', 'acct_cash',      1000, 'USD', 0),
+          ('post_b', ${org}, 'txn_unbalanced', 'acct_revenue', 0 - 999, 'USD', 1)
       `);
     });
 
@@ -53,14 +63,14 @@ describe('schema invariants', () => {
   it('rejects a single-sided entry', async () => {
     const oneSided = db.transaction(async (tx) => {
       await tx.execute(sql`
-        INSERT INTO transactions (id, description, currency, occurred_at)
-        VALUES ('txn_single', 'bad', 'USD', now())
+        INSERT INTO transactions (id, org_id, description, currency, occurred_at)
+        VALUES ('txn_single', ${org}, 'bad', 'USD', now())
       `);
       // acct_revenue allows overdraft, so nothing but the double-entry rule
       // itself can reject this row.
       await tx.execute(sql`
-        INSERT INTO postings (id, transaction_id, account_id, amount_minor, currency, sequence)
-        VALUES ('post_single', 'txn_single', 'acct_revenue', 1000, 'USD', 0)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
+        VALUES ('post_single', ${org}, 'txn_single', 'acct_revenue', 1000, 'USD', 0)
       `);
     });
 
@@ -71,8 +81,8 @@ describe('schema invariants', () => {
     // acct_eur holds EUR, so the composite foreign key has no row to point at.
     await expectDatabaseError(
       db.execute(sql`
-        INSERT INTO postings (id, transaction_id, account_id, amount_minor, currency, sequence)
-        VALUES ('post_x', 'txn_seed', 'acct_eur', 100, 'USD', 99)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
+        VALUES ('post_x', ${org}, 'txn_seed', 'acct_eur', 100, 'USD', 99)
       `),
       /postings_account_currency_fk/,
     );
@@ -81,14 +91,14 @@ describe('schema invariants', () => {
   it('accepts a balanced entry and updates the cached balances', async () => {
     await db.transaction(async (tx) => {
       await tx.execute(sql`
-        INSERT INTO transactions (id, description, currency, occurred_at)
-        VALUES ('txn_good', 'sale', 'USD', now())
+        INSERT INTO transactions (id, org_id, description, currency, occurred_at)
+        VALUES ('txn_good', ${org}, 'sale', 'USD', now())
       `);
       await tx.execute(sql`
-        INSERT INTO postings (id, transaction_id, account_id, amount_minor, currency, sequence)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
         VALUES
-          ('post_c', 'txn_good', 'acct_cash',        2500, 'USD', 0),
-          ('post_d', 'txn_good', 'acct_revenue', 0 - 2500, 'USD', 1)
+          ('post_c', ${org}, 'txn_good', 'acct_cash',        2500, 'USD', 0),
+          ('post_d', ${org}, 'txn_good', 'acct_revenue', 0 - 2500, 'USD', 1)
       `);
     });
 
@@ -110,14 +120,14 @@ describe('schema invariants', () => {
   it('refuses to overdraw an account that does not allow it', async () => {
     const overdraft = db.transaction(async (tx) => {
       await tx.execute(sql`
-        INSERT INTO transactions (id, description, currency, occurred_at)
-        VALUES ('txn_overdraw', 'too much', 'USD', now())
+        INSERT INTO transactions (id, org_id, description, currency, occurred_at)
+        VALUES ('txn_overdraw', ${org}, 'too much', 'USD', now())
       `);
       await tx.execute(sql`
-        INSERT INTO postings (id, transaction_id, account_id, amount_minor, currency, sequence)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
         VALUES
-          ('post_e', 'txn_overdraw', 'acct_cash', 0 - 999999, 'USD', 0),
-          ('post_f', 'txn_overdraw', 'acct_loan',     999999, 'USD', 1)
+          ('post_e', ${org}, 'txn_overdraw', 'acct_cash', 0 - 999999, 'USD', 0),
+          ('post_f', ${org}, 'txn_overdraw', 'acct_loan',     999999, 'USD', 1)
       `);
     });
 
@@ -139,8 +149,8 @@ describe('schema invariants', () => {
     await db.execute(sql`UPDATE accounts SET status = 'closed' WHERE id = 'acct_loan'`);
     await expectDatabaseError(
       db.execute(sql`
-        INSERT INTO postings (id, transaction_id, account_id, amount_minor, currency, sequence)
-        VALUES ('post_g', 'txn_seed', 'acct_loan', 100, 'USD', 98)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
+        VALUES ('post_g', ${org}, 'txn_seed', 'acct_loan', 100, 'USD', 98)
       `),
       /is closed/,
     );

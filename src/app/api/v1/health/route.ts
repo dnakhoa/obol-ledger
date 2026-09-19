@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { db } from '@/server/db/client';
+import { checkTenantIsolation } from '@/server/db/tenancy';
 import { defineRoute, json } from '@/server/http/route';
 
 /**
@@ -21,28 +22,45 @@ import { defineRoute, json } from '@/server/http/route';
  *    closed vocabulary; the *message* can carry a host or a user name, so it
  *    stays in the logs.
  */
-export const GET = defineRoute({ name: 'health', rateLimit: false }, async ({ logger }) => {
-  const configured = Boolean(process.env['DATABASE_URL']);
-  const startedAt = performance.now();
+export const GET = defineRoute(
+  { name: 'health', rateLimit: false, tenantless: true },
+  async ({ logger }) => {
+    const configured = Boolean(process.env['DATABASE_URL']);
+    const startedAt = performance.now();
 
-  try {
-    await db().execute(sql`select 1`);
-    return json({
-      status: 'ok',
-      database: {
-        configured,
-        reachable: true,
-        latencyMs: Math.round(performance.now() - startedAt),
-      },
-    });
-  } catch (error) {
-    logger.error('health.database_unreachable', { error });
-    return json(
-      { status: 'degraded', database: { configured, reachable: false, code: errorCodeOf(error) } },
-      { status: 503, headers: { 'retry-after': '5' } },
-    );
-  }
-});
+    try {
+      await db().execute(sql`select 1`);
+
+      // Tenant isolation is checked, not assumed. A connection whose role
+      // bypasses row-level security would leave every policy inert while the
+      // application carried on looking healthy, so the probe reports it as a
+      // degraded state rather than waiting for someone to notice.
+      const isolation = await checkTenantIsolation(db());
+
+      return json(
+        {
+          status: isolation.enforced ? 'ok' : 'degraded',
+          database: {
+            configured,
+            reachable: true,
+            latencyMs: Math.round(performance.now() - startedAt),
+          },
+          tenantIsolation: isolation,
+        },
+        isolation.enforced ? {} : { status: 503 },
+      );
+    } catch (error) {
+      logger.error('health.database_unreachable', { error });
+      return json(
+        {
+          status: 'degraded',
+          database: { configured, reachable: false, code: errorCodeOf(error) },
+        },
+        { status: 503, headers: { 'retry-after': '5' } },
+      );
+    }
+  },
+);
 
 /**
  * Walks the `cause` chain for a driver or Postgres error code.

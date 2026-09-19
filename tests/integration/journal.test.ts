@@ -13,10 +13,14 @@ describe('journal service', () => {
 
   beforeEach(async () => {
     db = await createTestDatabase();
-    services = servicesFor(db);
-    cash = await openAccount(db, { name: 'Cash', type: 'asset' });
-    savings = await openAccount(db, { name: 'Savings', type: 'asset' });
-    revenue = await openAccount(db, { name: 'Sales', type: 'revenue', overdraftAllowed: true });
+    services = servicesFor(db, db.$orgId);
+    cash = await openAccount(db, db.$orgId, { name: 'Cash', type: 'asset' });
+    savings = await openAccount(db, db.$orgId, { name: 'Savings', type: 'asset' });
+    revenue = await openAccount(db, db.$orgId, {
+      name: 'Sales',
+      type: 'revenue',
+      overdraftAllowed: true,
+    });
   });
 
   afterEach(async () => {
@@ -174,7 +178,11 @@ describe('journal service', () => {
   });
 
   it('refuses to mix currencies inside one entry', async () => {
-    const euro = await openAccount(db, { name: 'Euro cash', type: 'asset', currency: 'EUR' });
+    const euro = await openAccount(db, db.$orgId, {
+      name: 'Euro cash',
+      type: 'asset',
+      currency: 'EUR',
+    });
     const result = await services.journal.postEntry({
       description: 'Cross currency',
       currency: 'USD',

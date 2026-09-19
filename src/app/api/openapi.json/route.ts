@@ -8,11 +8,14 @@ import { defineRoute } from '@/server/http/route';
  * previous version of the code: it is assembled from the live zod schemas on
  * every request, and cached at the edge because it only changes on deploy.
  */
-export const GET = defineRoute({ name: 'openapi', rateLimit: false }, async () => {
-  return new Response(JSON.stringify(openApiDocument(), null, 2), {
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'public, max-age=300, stale-while-revalidate=86400',
-    },
-  });
-});
+export const GET = defineRoute(
+  { name: 'openapi', rateLimit: false, tenantless: true },
+  async () => {
+    return new Response(JSON.stringify(openApiDocument(), null, 2), {
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'public, max-age=300, stale-while-revalidate=86400',
+      },
+    });
+  },
+);

@@ -1,7 +1,8 @@
 import type { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { createLogger, type Logger } from '@/server/observability/logger';
-import { authorize } from './auth';
+import { authenticate, type Authenticated } from './auth';
+import { servicesFor, type Services } from '@/server/container';
 import { rateLimit, rateLimitProblem } from './rate-limit';
 import { problem, problemResponse } from './problem';
 
@@ -20,14 +21,20 @@ export type RouteContext<Params> = {
   readonly params: Params;
   readonly requestId: string;
   readonly logger: Logger;
+  /** The tenant this request acts as. Never absent — see `http/auth.ts`. */
+  readonly orgId: string;
+  /** Services already bound to that tenant, so a handler cannot forget to. */
+  readonly services: Services;
 };
 
 export type RouteOptions = {
   /** Used as the log `event` and to identify the route in traces. */
   readonly name: string;
-  /** Write endpoints require a bearer token; reads are public. */
+  /** Write endpoints require a bearer token; reads act as the demo tenant. */
   readonly auth?: boolean;
   readonly rateLimit?: boolean;
+  /** Opt out of tenant resolution entirely — only `/health` and the spec. */
+  readonly tenantless?: boolean;
 };
 
 type NextContext<Params> = { params: Promise<Params> };
@@ -73,13 +80,31 @@ export function defineRoute<Params = Record<string, never>>(
         }
       }
 
-      if (options.auth) {
-        const rejection = authorize(request);
-        if (rejection) return finish(problemResponse({ ...rejection, requestId }));
+      // Tenant resolution happens for every route that touches the ledger, so
+      // a handler is handed services that are already scoped and cannot reach
+      // another tenant's rows even by mistake.
+      let identity: Authenticated = { orgId: '' };
+      if (!options.tenantless) {
+        const resolved = await authenticate(request, options.auth === true);
+        if ('status' in resolved) {
+          return finish(problemResponse({ ...resolved, requestId }));
+        }
+        identity = resolved;
       }
 
       const params = await context.params;
-      return finish(await handler({ request, params, requestId, logger: log }));
+      return finish(
+        await handler({
+          request,
+          params,
+          requestId,
+          logger: identity.principal
+            ? log.child({ orgId: identity.orgId, apiKeyId: identity.principal.apiKeyId })
+            : log.child({ orgId: identity.orgId }),
+          orgId: identity.orgId,
+          services: servicesFor(identity.orgId),
+        }),
+      );
     } catch (error) {
       // Anything reaching here is a bug or an outage, never a business outcome.
       // The client gets a correlation id; the details stay in the logs.

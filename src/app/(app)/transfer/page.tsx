@@ -3,7 +3,8 @@ import { Card, CardBody } from '@/components/ui/card';
 import { PageHeader } from '@/components/page-header';
 import { EntryComposer } from '@/components/entry-composer';
 import { SetupNotice } from '@/components/setup-notice';
-import { services } from '@/server/container';
+import { SetupRequiredError } from '@/server/setup-error';
+import { demoServices } from '@/server/container';
 import { postEntryAction } from './actions';
 import type { AccountDto } from '@/server/services/dto';
 
@@ -13,9 +14,9 @@ export const dynamic = 'force-dynamic';
 export default async function PostEntryPage() {
   let accounts: AccountDto[];
   try {
-    accounts = await services().accounts.list();
+    accounts = await (await demoServices()).accounts.list();
   } catch (error) {
-    if (error instanceof Error && error.message.includes('DATABASE_URL')) {
+    if (error instanceof SetupRequiredError) {
       return <SetupNotice detail={error.message} />;
     }
     throw error;

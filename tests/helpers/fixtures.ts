@@ -1,4 +1,6 @@
 import { minorUnits, type CurrencyCode, type MinorUnits } from '@/lib/money';
+import { newId } from '@/lib/id';
+import { organizations } from '@/server/db/schema';
 import { createAccountService } from '@/server/services/accounts';
 import { createJournalService } from '@/server/services/journal';
 import { createReportingService } from '@/server/services/reporting';
@@ -6,18 +8,32 @@ import type { Database } from '@/server/db/types';
 import type { AccountType } from '@/server/domain/account';
 
 /** Wires the services the way the application does, against a test database. */
-export function servicesFor(database: Database) {
+export function servicesFor(database: Database, orgId: string) {
   return {
-    accounts: createAccountService(database),
-    journal: createJournalService(database),
-    reporting: createReportingService(database),
+    accounts: createAccountService(database, orgId),
+    journal: createJournalService(database, orgId),
+    reporting: createReportingService(database, orgId),
   };
+}
+
+/**
+ * Creates a tenant.
+ *
+ * Tests take an explicit tenant rather than sharing an implicit one, which is
+ * what lets the isolation suite hold two of them at once and prove the policy
+ * keeps them apart.
+ */
+export async function createOrganization(database: Database, slug: string): Promise<string> {
+  const id = newId('organization');
+  await database.insert(organizations).values({ id, name: slug, slug });
+  return id;
 }
 
 export const usd = (value: bigint): MinorUnits => minorUnits(value);
 
 export async function openAccount(
   database: Database,
+  orgId: string,
   overrides: {
     name: string;
     type: AccountType;
@@ -25,7 +41,7 @@ export async function openAccount(
     overdraftAllowed?: boolean;
   },
 ) {
-  return createAccountService(database).create({
+  return createAccountService(database, orgId).create({
     name: overrides.name,
     type: overrides.type,
     currency: overrides.currency ?? 'USD',

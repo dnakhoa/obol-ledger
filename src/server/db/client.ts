@@ -3,6 +3,7 @@ import 'server-only';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema';
+import { SetupRequiredError } from '../setup-error';
 import type { Database } from './types';
 
 /**
@@ -25,7 +26,7 @@ declare global {
 function connectionString(): string {
   const url = process.env['DATABASE_URL'];
   if (!url) {
-    throw new Error(
+    throw new SetupRequiredError(
       'DATABASE_URL is not set. Copy .env.example to .env.local and point it at a Postgres instance.',
     );
   }

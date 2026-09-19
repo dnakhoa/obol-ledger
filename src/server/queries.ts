@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { services } from './container';
+import { demoServices } from './container';
 import { buildLinearScale, heightPercent } from '@/lib/chart-scale';
 import { type CurrencyCode, type MinorUnits } from '@/lib/money';
 import { formatAxisTick } from '@/lib/format';
@@ -37,7 +37,7 @@ export type DashboardModel = {
 };
 
 export async function loadDashboard(currency: CurrencyCode = 'USD'): Promise<DashboardModel> {
-  const { accounts, journal, reporting } = services();
+  const { accounts, journal, reporting } = await demoServices();
 
   // Independent reads, issued together: awaiting them in sequence would make the
   // page as slow as the sum of the queries instead of the slowest one.
