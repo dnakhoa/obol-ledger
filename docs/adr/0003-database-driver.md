@@ -28,10 +28,24 @@ Neon, Supabase, RDS.
 
 Use `pg` with `drizzle-orm/node-postgres`.
 
-TLS is enabled automatically for any non-loopback host, with certificate
-verification left on — managed providers present certificates from public CAs,
-so `rejectUnauthorized: false` would encrypt the connection while leaving it open
-to interception, which is the worst of both worlds.
+TLS is enabled for any non-loopback host and the certificate chain is verified.
+That is stated explicitly as `{ rejectUnauthorized: true }` rather than left to
+`sslmode=require` in the connection string: `node-postgres` is in the middle of
+changing what that mode means, from verifying the chain to merely encrypting,
+for libpq compatibility. An unverified TLS connection is encrypted and still
+open to interception, so the intent is pinned in code instead of inherited from
+a default that is about to flip.
+
+**Schema work uses the direct endpoint, not the pooler.** Providers publish
+both. The application wants the pooled one — that is what lets many serverless
+instances share a few backend connections. Migrations and seeds want the
+opposite: PgBouncer runs in transaction mode, where consecutive statements can
+land on different backends, so anything relying on session state (a `SET`, a
+session-level advisory lock, the seed's multi-statement
+`ALTER TABLE ... DISABLE TRIGGER` block) is not guaranteed to see its own
+effects. A one-shot script gains nothing from pooling anyway. `scripts/` prefer
+`DATABASE_URL_UNPOOLED` when it exists and fall back to `DATABASE_URL` for a
+plain Postgres with a single endpoint.
 
 The pool is small (`max: 3`) and cached on `globalThis`. A serverless instance
 serves one request at a time, so a large pool only multiplies idle connections

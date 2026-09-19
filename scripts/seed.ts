@@ -1,8 +1,3 @@
-import { loadEnvConfig } from '@next/env';
-
-// Load the same .env cascade Next.js uses (.env.local overrides .env, and so
-// on), so a script can never see different configuration from the application.
-loadEnvConfig(process.cwd());
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
@@ -12,6 +7,7 @@ import { createJournalService } from '../src/server/services/journal';
 import { minorUnits, type MinorUnits } from '../src/lib/money';
 import type { Database } from '../src/server/db/types';
 import type { AccountType } from '../src/server/domain/account';
+import { describeTarget, schemaConnectionString, sslFor } from './connection';
 
 /**
  * Seeds a small, believable set of books.
@@ -69,14 +65,9 @@ function daysAgo(days: number, hour: number): Date {
 }
 
 async function main(): Promise<void> {
-  const url = process.env['DATABASE_URL'];
-  if (!url) throw new Error('DATABASE_URL is required to seed.');
-
-  const pool = new Pool({
-    connectionString: url,
-    ssl: !/^postgres(ql)?:\/\/[^/]*(localhost|127\.0\.0\.1)/u.test(url),
-    max: 1,
-  });
+  const url = schemaConnectionString();
+  const pool = new Pool({ connectionString: url, ssl: sslFor(url), max: 1 });
+  console.log(`seeding ${describeTarget(url)}`);
   try {
     const database = drizzle(pool, { schema, casing: 'snake_case' }) as unknown as Database;
 
