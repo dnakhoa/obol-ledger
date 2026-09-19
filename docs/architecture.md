@@ -1,5 +1,9 @@
 # Architecture
 
+> For _why_ the system has this shape — including what was considered and
+> rejected — see [design-rationale.md](design-rationale.md). This document
+> describes the shape itself.
+
 ## The shape of it
 
 ```
