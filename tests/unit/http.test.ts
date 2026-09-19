@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { rateLimit, resetRateLimits } from '@/server/http/rate-limit';
 import { problemFor, statusFor } from '@/server/http/problem';
 import type { LedgerError } from '@/server/domain/errors';
+import { errorCodeOf } from '@/app/api/v1/health/route';
 
 afterEach(() => resetRateLimits());
 
@@ -73,5 +74,33 @@ describe('problem details', () => {
     // The `type` member is what a client branches on, so it must be stable.
     expect(value.type).toBe('https://obol-ledger.dev/problems/insufficient-funds');
     expect(value.detail).toContain('overdraft is not allowed');
+  });
+});
+
+describe('health diagnostics', () => {
+  it('finds the driver code on a wrapped error', () => {
+    // drizzle wraps driver failures, so the code that identifies the fault is
+    // rarely on the outermost error.
+    const driverError = Object.assign(new Error('getaddrinfo ENOTFOUND db.example'), {
+      code: 'ENOTFOUND',
+    });
+    const wrapped = new Error('Failed query: select 1', { cause: driverError });
+    expect(errorCodeOf(wrapped)).toBe('ENOTFOUND');
+  });
+
+  it('prefers the outermost code when one is present', () => {
+    const outer = Object.assign(new Error('boom'), { code: '28P01' });
+    expect(errorCodeOf(outer)).toBe('28P01');
+  });
+
+  it('reports "unknown" rather than throwing on anything else', () => {
+    expect(errorCodeOf(new Error('no code here'))).toBe('unknown');
+    expect(errorCodeOf('a string')).toBe('unknown');
+    expect(errorCodeOf(undefined)).toBe('unknown');
+  });
+
+  it('ignores a non-string code', () => {
+    const odd = Object.assign(new Error('boom'), { code: 500 });
+    expect(errorCodeOf(odd)).toBe('unknown');
   });
 });
