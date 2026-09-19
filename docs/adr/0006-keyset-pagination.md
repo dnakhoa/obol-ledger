@@ -51,6 +51,25 @@ forward cursor contains no information about what precedes it, so "previous"
 cannot be derived from it — and a "Previous" link that quietly returns to page
 one, which is the usual shortcut, is a lie about where it goes.
 
+## Measured, not assumed
+
+`pnpm benchmark` loads 200,000 entries and runs both queries at increasing
+depth, writing the timings and the query plans to
+[docs/benchmarks.md](../benchmarks.md). At page 5,000:
+
+|          | rows read | buffers |     time |
+| -------- | --------: | ------: | -------: |
+| keyset   |        25 |       6 |  0.02 ms |
+| `OFFSET` |   125,025 |   3,015 | 10.34 ms |
+
+The timings are suggestive; the plans are the evidence. The keyset query shows
+`Index Cond: (ROW(occurred_at, id) < ROW(...))` — Postgres descends the index
+straight to the cursor. The `OFFSET` query fetches 125,025 rows to return 25,
+which is the discarded work made visible.
+
+A textbook claim is exactly the kind nobody checks, and an index that has
+silently stopped being used turns the whole argument into decoration.
+
 ## Consequences
 
 - Page 500 costs what page 1 costs.
