@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MobileNav, SidebarNav } from '@/components/nav';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { CommandPalette, PaletteTrigger } from '@/components/command-palette';
 import { ScaleIcon } from '@/components/icons';
 
 /**
@@ -34,6 +35,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             Obol
           </Link>
         </div>
+        <div className="px-3 pt-3">
+          <PaletteTrigger />
+        </div>
         <div className="flex-1 overflow-y-auto p-3">
           <SidebarNav />
         </div>
@@ -50,8 +54,18 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </span>
             Obol
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <PaletteTrigger variant="icon" />
+            <ThemeToggle />
+          </div>
         </header>
+
+        {/*
+          Mounted at the shell's root rather than beside a trigger: the sidebar
+          is `display: none` below `lg`, and a dialog inside a hidden ancestor
+          is a dialog nobody on a phone can see.
+        */}
+        <CommandPalette />
 
         <main id="main" className="flex-1 px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:py-8 lg:pb-8">
           <div className="mx-auto w-full max-w-6xl space-y-6">{children}</div>
