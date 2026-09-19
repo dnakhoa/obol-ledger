@@ -16,6 +16,7 @@ export type CreateAccountInput = {
   readonly type: AccountType;
   readonly currency: CurrencyCode;
   readonly overdraftAllowed?: boolean;
+  readonly metadata?: Record<string, string> | undefined;
 };
 
 /**
@@ -58,6 +59,7 @@ export function createAccountService(database: Database, orgId: string) {
             type: input.type,
             currency: input.currency,
             overdraftAllowed: input.overdraftAllowed ?? false,
+            metadata: input.metadata ?? {},
           })
           .returning();
 

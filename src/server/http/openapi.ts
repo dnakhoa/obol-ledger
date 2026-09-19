@@ -366,6 +366,21 @@ export function openApiDocument(): Record<string, unknown> {
               description: 'Restrict to one lifecycle state.',
               schema: { type: 'string', enum: ['pending', 'posted', 'archived'] },
             },
+            {
+              name: 'metadataKey',
+              in: 'query',
+              required: false,
+              description:
+                'With metadataValue, an exact match on one metadata pair — e.g. metadataKey=invoice&metadataValue=INV-42. Answered by a GIN index.',
+              schema: { type: 'string' },
+            },
+            {
+              name: 'metadataValue',
+              in: 'query',
+              required: false,
+              description: 'The value metadataKey must equal. Both are required together.',
+              schema: { type: 'string' },
+            },
           ],
           responses: {
             '200': {

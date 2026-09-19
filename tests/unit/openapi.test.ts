@@ -136,6 +136,7 @@ describe('OpenAPI document', () => {
       'currency',
       'description',
       'expectedVersions',
+      'metadata',
       'occurredAt',
       'postings',
       'status',

@@ -37,6 +37,7 @@ export const POST = defineRoute(
         { accountId: body.data.toAccountId, amount },
         { accountId: body.data.fromAccountId, amount: -amount as MinorUnits },
       ],
+      metadata: body.data.metadata,
       ...(key ? { idempotency: { key, fingerprint: fingerprintOf(body.raw) } } : {}),
     });
 

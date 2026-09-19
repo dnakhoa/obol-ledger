@@ -33,6 +33,8 @@ export type PostEntryInput = {
    * balance and commit it without holding a lock across the round trip.
    */
   readonly expectedVersions?: Readonly<Record<string, number>> | undefined;
+  /** Caller-supplied annotation; opaque to the ledger. */
+  readonly metadata?: Record<string, string> | undefined;
   /**
    * Supplied by the HTTP layer, which fingerprints the *raw* request body. A
    * retry is "the same request" from the client's point of view, so the hash
@@ -225,6 +227,7 @@ export function createJournalService(database: Database, orgId: string) {
         currency: input.currency,
         occurredAt,
         status,
+        metadata: input.metadata ?? {},
         // The CHECK constraint requires the timestamps to agree with the
         // status, so they are set together rather than backfilled later.
         ...(status === 'posted' ? { postedAt: new Date() } : {}),
@@ -627,6 +630,9 @@ export function createJournalService(database: Database, orgId: string) {
       search?: string | undefined;
       /** Restrict to one lifecycle state. */
       status?: TransactionStatus | undefined;
+      /** Exact match on one metadata pair, e.g. `invoice` = `INV-42`. */
+      metadataKey?: string | undefined;
+      metadataValue?: string | undefined;
     }): Promise<Page<TransactionDto>> {
       const limit = Math.min(Math.max(options.limit, 1), 100);
       const direction = options.direction ?? 'forward';
@@ -656,6 +662,14 @@ export function createJournalService(database: Database, orgId: string) {
             ? sql`${transactions.description} ilike ${`%${options.search}%`}`
             : undefined,
           options.status ? eq(transactions.status, options.status) : undefined,
+          // Containment (`@>`), not `->>`, because containment is what the GIN
+          // index answers. `metadata->>'invoice' = $1` is equivalent in result
+          // and has to read every row to find out.
+          options.metadataKey !== undefined && options.metadataValue !== undefined
+            ? sql`${transactions.metadata} @> ${JSON.stringify({
+                [options.metadataKey]: options.metadataValue,
+              })}::jsonb`
+            : undefined,
         ].filter((clause) => clause !== undefined);
 
         const rows = await tx

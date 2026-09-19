@@ -37,6 +37,7 @@ export function toAccountDto(row: AccountRow): AccountDto {
     pendingBalance: toMoneyDto(balances.pending, currency),
     availableBalance: toMoneyDto(balances.available, currency),
     version: row.version,
+    metadata: row.metadata,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -73,5 +74,6 @@ export function toTransactionDto(
     postings,
     reversesTransactionId: row.reversesTransactionId,
     reversedByTransactionId,
+    metadata: row.metadata,
   };
 }

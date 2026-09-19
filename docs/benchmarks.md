@@ -10,12 +10,12 @@ flat. This measures it rather than asserting it.
 Page size 25. Median of 5 runs. Run inside a tenant context, so the
 row-level security predicate is part of what is timed.
 
-|  Page |  Keyset |   OFFSET | OFFSET cost |
-| ----: | ------: | -------: | ----------: |
-|     1 | 0.19 ms |  0.14 ms |        0.7× |
-|   100 | 0.21 ms |  0.37 ms |        1.8× |
-| 1,000 | 0.21 ms |  2.14 ms |       10.0× |
-| 5,000 | 0.40 ms | 10.27 ms |       25.4× |
+| Page | Keyset | OFFSET | OFFSET cost |
+|---:|---:|---:|---:|
+| 1 | 0.18 ms | 0.18 ms | 1.0× |
+| 100 | 0.16 ms | 0.22 ms | 1.4× |
+| 1,000 | 0.17 ms | 0.91 ms | 5.4× |
+| 5,000 | 0.20 ms | 4.11 ms | 20.7× |
 
 ## Why
 
@@ -27,14 +27,16 @@ cannot.
 
 ```
 Limit (actual rows=25.00 loops=1)
-  Buffers: shared hit=6
+  Buffers: shared hit=4
   ->  Index Only Scan Backward using transactions_occurred_at_idx on transactions (actual rows=25.00 loops=1)
-        Index Cond: (ROW(occurred_at, id) < ROW('2026-09-18 09:05:13.247883+07'::timestamp with time zone, 'txn_bench_000125001'::text))
-        Heap Fetches: 25
+        Index Cond: (ROW(occurred_at, id) < ROW('2026-09-18 17:23:45.352186+07'::timestamp with time zone, 'txn_bench_000124992'::text))
+        Heap Fetches: 0
         Index Searches: 1
-        Buffers: shared hit=6
-Planning Time: 0.049 ms
-Execution Time: 0.024 ms
+        Buffers: shared hit=4
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.058 ms
+Execution Time: 0.016 ms
 ```
 
 The row-wise comparison `(occurred_at, id) < (…)` becomes an `Index Cond`, so
@@ -45,16 +47,69 @@ reads 25 rows. Depth does not appear in the work.
 
 ```
 Limit (actual rows=25.00 loops=1)
-  Buffers: shared hit=3015
+  Buffers: shared hit=1348
   ->  Index Only Scan Backward using transactions_occurred_at_idx on transactions (actual rows=125025.00 loops=1)
-        Heap Fetches: 125025
+        Heap Fetches: 0
         Index Searches: 1
-        Buffers: shared hit=3015
-Planning Time: 0.016 ms
-Execution Time: 10.341 ms
+        Buffers: shared hit=1348
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.018 ms
+Execution Time: 5.119 ms
 ```
 
 Note the rows removed before the limit is applied. That work is proportional to
 the offset, which is why the right-hand column grows, and it is also why an
 insert during paging shifts every subsequent page — the offset is a position in
 a result set that is still being written to.
+
+## Finding an entry by its reference
+
+Metadata is indexed with `GIN (metadata jsonb_path_ops)`, which answers
+containment. The same lookup written with `->>` returns the same row and
+cannot use it.
+
+| Query | Median |
+|---|---:|
+| `metadata @> '{"invoice": "…"}'` | 0.26 ms |
+| `metadata->>'invoice' = '…'` | 8.71 ms |
+
+### Containment
+
+```
+Bitmap Heap Scan on transactions (actual rows=1.00 loops=1)
+  Recheck Cond: (metadata @> jsonb_build_object('invoice', 'INV-100000'::text))
+  Heap Blocks: exact=1
+  Buffers: shared hit=5
+  ->  Bitmap Index Scan on transactions_metadata_idx (actual rows=1.00 loops=1)
+        Index Cond: (metadata @> jsonb_build_object('invoice', 'INV-100000'::text))
+        Index Searches: 1
+        Buffers: shared hit=4
+Planning:
+  Buffers: shared hit=2
+Planning Time: 0.038 ms
+Execution Time: 0.009 ms
+```
+
+### Extraction
+
+```
+Gather (actual rows=1.00 loops=1)
+  Workers Planned: 2
+  Workers Launched: 2
+  Buffers: shared hit=4653
+  ->  Parallel Seq Scan on transactions (actual rows=0.33 loops=3)
+        Filter: ((metadata ->> 'invoice'::text) = 'INV-100000'::text)
+        Rows Removed by Filter: 66695
+        Buffers: shared hit=4653
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.011 ms
+Execution Time: 8.658 ms
+```
+
+`metadata->>'invoice'` is a *function of* the column rather than the column, so
+no index on `metadata` applies and Postgres reads every row to extract the key
+from each one. It is the version people reach for first, because it reads like
+SQL they already know — which is exactly why the service builds the containment
+form instead of leaving the choice to whoever writes the next query.

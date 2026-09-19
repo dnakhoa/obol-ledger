@@ -42,6 +42,8 @@ type PageProps = {
     highlight?: string;
     accountId?: string;
     search?: string;
+    metadataKey?: string;
+    metadataValue?: string;
   }>;
 };
 
@@ -60,6 +62,8 @@ export default async function JournalPage({ searchParams }: PageProps) {
         direction: query.direction === 'backward' ? 'backward' : 'forward',
         accountId: query.accountId,
         search: query.search,
+        metadataKey: query.metadataKey,
+        metadataValue: query.metadataValue,
       }),
       services.accounts.list(),
     ]);
@@ -98,11 +102,13 @@ export default async function JournalPage({ searchParams }: PageProps) {
           accounts={accounts}
           accountId={query.accountId}
           search={query.search}
+          metadataKey={query.metadataKey}
+          metadataValue={query.metadataValue}
           resultCount={page.items.length}
         />
 
         {page.items.length === 0 ? (
-          query.accountId || query.search ? (
+          query.accountId || query.search || query.metadataKey ? (
             <EmptyState
               title="No entries match those filters"
               description="Try a shorter search term, or widen the account filter. The journal itself is unchanged."
@@ -232,6 +238,9 @@ export default async function JournalPage({ searchParams }: PageProps) {
               preserve={{
                 ...(query.accountId ? { accountId: query.accountId } : {}),
                 ...(query.search ? { search: query.search } : {}),
+                ...(query.metadataKey && query.metadataValue
+                  ? { metadataKey: query.metadataKey, metadataValue: query.metadataValue }
+                  : {}),
               }}
             />
           </>

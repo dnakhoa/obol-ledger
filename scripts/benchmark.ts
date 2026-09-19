@@ -84,7 +84,27 @@ async function main(): Promise<void> {
     const keysetPlan = await explain(db, keysetSql(cursor));
     const offsetPlan = await explain(db, offsetSql(deepest * PAGE_SIZE));
 
-    writeFileSync('docs/benchmarks.md', report(measurements, keysetPlan, offsetPlan));
+    // The same treatment for the metadata lookup. `@>` and `->>` return the
+    // same row; only one of them can use the index.
+    const needle = `INV-${Math.floor(ENTRIES / 2)}`;
+    const containsMs: number[] = [];
+    const extractMs: number[] = [];
+    for (let run = 0; run < REPEATS; run += 1) {
+      containsMs.push(await time(async () => void (await db.execute(containsSql(needle)))));
+      extractMs.push(await time(async () => void (await db.execute(extractSql(needle)))));
+    }
+    console.log(
+      `  metadata    @> ${median(containsMs).toFixed(2)}ms   ->> ${median(extractMs).toFixed(2)}ms`,
+    );
+
+    const metadata = {
+      containsMs: median(containsMs),
+      extractMs: median(extractMs),
+      containsPlan: await explain(db, containsSql(needle)),
+      extractPlan: await explain(db, extractSql(needle)),
+    };
+
+    writeFileSync('docs/benchmarks.md', report(measurements, keysetPlan, offsetPlan, metadata));
     console.log('wrote docs/benchmarks.md');
   } finally {
     await pool.end();
@@ -131,13 +151,16 @@ async function load(db: ReturnType<typeof drizzle>, orgId: string): Promise<void
   await db.execute(sql`ALTER TABLE postings DISABLE TRIGGER postings_balanced`);
 
   await db.execute(sql`
-    INSERT INTO transactions (id, org_id, description, currency, occurred_at)
+    INSERT INTO transactions (id, org_id, description, currency, occurred_at, metadata)
     SELECT
       'txn_bench_' || lpad(series::text, 9, '0'),
       ${orgId},
       'Benchmark entry ' || series,
       'USD',
-      now() - make_interval(secs => series)
+      now() - make_interval(secs => series),
+      -- One distinct reference per entry, which is the realistic shape: a
+      -- lookup by invoice number returns one row out of the whole table.
+      jsonb_build_object('invoice', 'INV-' || series, 'source', 'benchmark')
     FROM generate_series(1, ${ENTRIES}) AS series
   `);
 
@@ -177,6 +200,29 @@ function keysetSql(cursor: { occurredAt: string; id: string }) {
      WHERE (occurred_at, id) < (${cursor.occurredAt}::timestamptz, ${cursor.id})
      ORDER BY occurred_at DESC, id DESC
      LIMIT ${PAGE_SIZE}
+  `;
+}
+
+/** Containment: answerable by the `jsonb_path_ops` GIN index. */
+function containsSql(invoice: string) {
+  return sql`
+    SELECT id FROM transactions
+     WHERE metadata @> jsonb_build_object('invoice', ${invoice}::text)
+  `;
+}
+
+/**
+ * Extraction: the same result, and no index can serve it.
+ *
+ * `metadata->>'invoice'` is a function of the column rather than the column,
+ * so the GIN index does not apply and Postgres has no choice but to read every
+ * row and extract the key from each one. This is the version people reach for
+ * first because it reads like SQL they already know.
+ */
+function extractSql(invoice: string) {
+  return sql`
+    SELECT id FROM transactions
+     WHERE metadata->>'invoice' = ${invoice}
   `;
 }
 
@@ -226,7 +272,19 @@ async function explain(db: ReturnType<typeof drizzle>, query: ReturnType<typeof 
   return result.rows.map((row) => row['QUERY PLAN']).join('\n');
 }
 
-function report(measurements: Measurement[], keysetPlan: string, offsetPlan: string): string {
+type MetadataResult = {
+  containsMs: number;
+  extractMs: number;
+  containsPlan: string;
+  extractPlan: string;
+};
+
+function report(
+  measurements: Measurement[],
+  keysetPlan: string,
+  offsetPlan: string,
+  metadata: MetadataResult,
+): string {
   const rows = measurements
     .map((m) => {
       const ratio = m.keysetMs === 0 ? '—' : `${(m.offsetMs / m.keysetMs).toFixed(1)}×`;
@@ -276,6 +334,35 @@ Note the rows removed before the limit is applied. That work is proportional to
 the offset, which is why the right-hand column grows, and it is also why an
 insert during paging shifts every subsequent page — the offset is a position in
 a result set that is still being written to.
+
+## Finding an entry by its reference
+
+Metadata is indexed with \`GIN (metadata jsonb_path_ops)\`, which answers
+containment. The same lookup written with \`->>\` returns the same row and
+cannot use it.
+
+| Query | Median |
+|---|---:|
+| \`metadata @> '{"invoice": "…"}'\` | ${metadata.containsMs.toFixed(2)} ms |
+| \`metadata->>'invoice' = '…'\` | ${metadata.extractMs.toFixed(2)} ms |
+
+### Containment
+
+\`\`\`
+${metadata.containsPlan}
+\`\`\`
+
+### Extraction
+
+\`\`\`
+${metadata.extractPlan}
+\`\`\`
+
+\`metadata->>'invoice'\` is a *function of* the column rather than the column, so
+no index on \`metadata\` applies and Postgres reads every row to extract the key
+from each one. It is the version people reach for first, because it reads like
+SQL they already know — which is exactly why the service builds the containment
+form instead of leaving the choice to whoever writes the next query.
 `;
 }
 

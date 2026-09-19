@@ -206,7 +206,7 @@ describe('two-phase entries', () => {
         withTenant(db, db.$orgId, (tx) =>
           tx.update(transactions).set({ description: 'rewritten' }).where(eq(transactions.id, id)),
         ),
-        /only the status of a pending transaction may change/,
+        /only the status and metadata of a transaction may change/,
       );
     });
 

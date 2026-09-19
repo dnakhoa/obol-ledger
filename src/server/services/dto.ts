@@ -34,6 +34,8 @@ export type AccountDto = {
   readonly availableBalance: MoneyDto;
   /** Optimistic-concurrency token; pass as `lockVersion` to assert freshness. */
   readonly version: number;
+  /** Caller-supplied annotation. Always present, empty when unset. */
+  readonly metadata: Readonly<Record<string, string>>;
   readonly createdAt: string;
 };
 
@@ -66,6 +68,8 @@ export type TransactionDto = {
    * is not answerable from the postings alone.
    */
   readonly reversedByTransactionId: string | null;
+  /** Caller-supplied annotation. Always present, empty when unset. */
+  readonly metadata: Readonly<Record<string, string>>;
 };
 
 export type Page<T> = {
