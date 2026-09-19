@@ -2,6 +2,7 @@ import 'server-only';
 
 import { db } from './db/client';
 import { createAccountService } from './services/accounts';
+import { createApiKeyService } from './services/api-keys';
 import { createAuthenticationService } from './services/authentication';
 import { createJournalService } from './services/journal';
 import { createReportingService } from './services/reporting';
@@ -24,6 +25,7 @@ export function servicesFor(orgId: string) {
   const database = db();
   return {
     accounts: createAccountService(database, orgId),
+    apiKeys: createApiKeyService(database, orgId),
     journal: createJournalService(database, orgId),
     reporting: createReportingService(database, orgId),
     webhooks: createWebhookService(database, orgId),

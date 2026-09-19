@@ -73,6 +73,14 @@ export const apiKeys = pgTable(
       .references(() => organizations.id, { onDelete: 'restrict' }),
     name: text('name').notNull(),
     tokenDigest: text('token_digest').notNull().unique(),
+    /**
+     * The token's opening characters, in the clear.
+     *
+     * Not a weakening of the digest — it is what lets a person with four keys
+     * tell them apart. Without it a management screen can only offer the name
+     * someone typed months ago, and revoking the right one becomes a guess.
+     */
+    tokenPrefix: text('token_prefix').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),

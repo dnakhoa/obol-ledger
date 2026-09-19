@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, or, lt, sql } from 'drizzle-orm';
 import { apiKeys, organizations } from '@/server/db/schema';
 import type { Database } from '@/server/db/types';
 
@@ -32,6 +32,38 @@ export function digestToken(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }
 
+/**
+ * Records that a key was used, at most once a minute.
+ *
+ * "When was this last used?" is the question that decides whether a key is
+ * safe to revoke, and a key nobody can prove is unused is a key nobody dares
+ * revoke. But a write on every authenticated request would double the write
+ * volume of the whole API to maintain a timestamp nobody reads in real time.
+ *
+ * The `WHERE` clause is the compromise: the update only matches when the
+ * stored value is already a minute stale, so a burst of a thousand requests
+ * performs one write and 999 no-ops that touch a single index entry. The
+ * resolution loss is a minute, on a value displayed to the nearest minute.
+ *
+ * Deliberately not awaited. The caller is waiting on an authentication
+ * decision that has already been made; a failure here must not fail the
+ * request, and its latency must not be added to one.
+ */
+const STAMP_INTERVAL = sql`interval '1 minute'`;
+
+function stampLastUsed(database: Database, apiKeyId: string): Promise<unknown> {
+  return database
+    .update(apiKeys)
+    .set({ lastUsedAt: new Date() })
+    .where(
+      and(
+        eq(apiKeys.id, apiKeyId),
+        or(isNull(apiKeys.lastUsedAt), lt(apiKeys.lastUsedAt, sql`now() - ${STAMP_INTERVAL}`)),
+      ),
+    )
+    .catch(() => undefined);
+}
+
 export function createAuthenticationService(database: Database) {
   return {
     async resolve(token: string): Promise<Principal | undefined> {
@@ -48,6 +80,7 @@ export function createAuthenticationService(database: Database) {
         .where(and(eq(apiKeys.tokenDigest, digestToken(token)), isNull(apiKeys.revokedAt)))
         .limit(1);
 
+      if (row) void stampLastUsed(database, row.apiKeyId);
       return row;
     },
 

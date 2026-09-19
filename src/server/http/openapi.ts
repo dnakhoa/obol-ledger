@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   createAccountSchema,
+  createApiKeySchema,
   createEndpointSchema,
   createEntrySchema,
   createTransferSchema,
@@ -209,6 +210,7 @@ export function openApiDocument(): Record<string, unknown> {
       { name: 'Journal' },
       { name: 'Reports' },
       { name: 'Webhooks' },
+      { name: 'Credentials' },
       { name: 'Operations' },
     ],
     components: {
@@ -226,6 +228,7 @@ export function openApiDocument(): Record<string, unknown> {
         Pagination: jsonSchema(paginationSchema),
         CreateEndpoint: jsonSchema(createEndpointSchema),
         UpdateEndpoint: jsonSchema(updateEndpointSchema),
+        CreateApiKey: jsonSchema(createApiKeySchema),
       },
     },
     paths: {
@@ -583,6 +586,50 @@ export function openApiDocument(): Record<string, unknown> {
           responses: {
             '200': { description: 'The income statement' },
             ...problemResponses(400, 429),
+          },
+        },
+      },
+      '/api-keys': {
+        get: {
+          tags: ['Credentials'],
+          summary: 'List this tenant\u2019s keys',
+          description:
+            'Digests are never returned. Each key carries an identifying prefix and the time it was last used, which is what makes revoking the right one possible.',
+          security: [{ bearerAuth: [] }],
+          responses: {
+            '200': { description: 'Keys, newest first' },
+            ...problemResponses(401, 429),
+          },
+        },
+        post: {
+          tags: ['Credentials'],
+          summary: 'Issue a key',
+          description:
+            'Returns the token exactly once; only its SHA-256 digest is stored. Minting a key requires an existing key, so the first one comes from the seed rather than from an open endpoint.',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/CreateApiKey' } },
+            },
+          },
+          responses: {
+            '201': { description: 'Issued, with the token' },
+            ...problemResponses(400, 401, 429),
+          },
+        },
+      },
+      '/api-keys/{keyId}': {
+        delete: {
+          tags: ['Credentials'],
+          summary: 'Revoke a key',
+          description:
+            'The row is kept and `revoked_at` is set, because a deleted row answers "who had access, and until when?" with silence. Revoking twice is a 404, not a silent success.',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'keyId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': { description: 'The revoked key' },
+            ...problemResponses(401, 404, 429),
           },
         },
       },

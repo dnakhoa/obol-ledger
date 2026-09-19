@@ -163,3 +163,7 @@ export const deliveryQuerySchema = z.object({
   status: z.enum(['pending', 'delivering', 'succeeded', 'failed']).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
+
+export const createApiKeySchema = z.object({
+  name: z.string().trim().min(1).max(80),
+});

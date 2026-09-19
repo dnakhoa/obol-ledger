@@ -70,16 +70,25 @@ describe('OpenAPI document', () => {
     }
   });
 
-  it('requires a bearer token on every write and on no read', () => {
+  it('requires a bearer token on every write, and on reads that return credentials', () => {
     const WRITE_METHODS = new Set(['post', 'patch', 'put', 'delete']);
+
     // The scheduler's endpoint is the one write that is not client-facing: it
     // authenticates with CRON_SECRET, so documenting bearerAuth on it would
     // tell an integrator to try a credential that will never work.
     const NOT_BEARER = ['/webhooks/dispatch'];
 
+    // The demo publishes one tenant's *ledger* for anyone to read. Its
+    // credentials are a different kind of data: listing keys reveals what
+    // access exists and when it was last exercised, which is reconnaissance
+    // rather than accounting.
+    const PROTECTED_READS = ['/api-keys'];
+
     for (const { path, method, operation } of operations) {
       const secured = Array.isArray(operation.security);
-      const expected = WRITE_METHODS.has(method) && !NOT_BEARER.includes(path);
+      const expected = WRITE_METHODS.has(method)
+        ? !NOT_BEARER.includes(path)
+        : PROTECTED_READS.includes(path);
       expect(secured, `${method} ${path} security`).toBe(expected);
     }
   });
