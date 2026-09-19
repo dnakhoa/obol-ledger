@@ -33,20 +33,25 @@ function connectionString(): string {
 }
 
 /**
- * TLS is on for anything that is not loopback.
+ * TLS settings for anything that is not loopback.
  *
- * Managed Postgres providers present certificates from a public CA, so the
- * chain is verified rather than blindly accepted — `rejectUnauthorized: false`
- * would encrypt the connection while leaving it open to interception, which is
- * the worst of both worlds.
+ * Returned as an explicit object rather than `true`, and rather than leaving it
+ * to the connection string. `node-postgres` warns that it is changing what
+ * `sslmode=require` means — today it verifies the certificate chain, and for
+ * libpq compatibility it will soon encrypt *without* verifying. Stating
+ * `rejectUnauthorized: true` here pins the behaviour we actually want, because
+ * an unverified TLS connection is encrypted but still open to interception,
+ * which is the worst of both worlds. Managed providers present certificates
+ * from public CAs, so verification costs nothing.
  */
-function sslFor(url: string): boolean {
+export function sslFor(url: string): false | { rejectUnauthorized: true } {
   try {
     const { hostname, searchParams } = new URL(url);
     if (searchParams.get('sslmode') === 'disable') return false;
-    return hostname !== 'localhost' && hostname !== '127.0.0.1' && hostname !== '::1';
+    const loopback = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+    return loopback ? false : { rejectUnauthorized: true };
   } catch {
-    return true;
+    return { rejectUnauthorized: true };
   }
 }
 
