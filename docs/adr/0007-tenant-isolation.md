@@ -73,6 +73,38 @@ Two things came out of that:
 The second is the more important. Isolation is not something the schema can
 prove about the connection using it, so it is checked at runtime instead.
 
+### And it caught a real one
+
+Minutes after the first deploy, `/api/v1/health` reported:
+
+```json
+{
+  "tenantIsolation": {
+    "visibleWithoutTenant": 13,
+    "privilegedRole": true,
+    "enforced": false
+  }
+}
+```
+
+Neon's default role, `neondb_owner`, has `rolbypassrls = true`. Every policy in
+this ADR was inert in production — not misconfigured, just not applicable to
+the role that was connecting. Nothing in the schema, the tests or the migration
+could have revealed that, because none of them run as the deployed connection.
+
+The fix is the half of RLS that is easy to miss: **it requires a
+least-privilege connection**. There are now two.
+
+| variable           | role                                                 | used by                                                                             |
+| ------------------ | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `DATABASE_URL`     | owner                                                | migrations and seeds — they create tables, disable triggers for backfills, truncate |
+| `APP_DATABASE_URL` | `obol_app`, `NOSUPERUSER NOBYPASSRLS`, no DDL rights | everything the application does at runtime                                          |
+
+`scripts/provision-app-role.ts` creates that role and refuses to report success
+unless `pg_roles` confirms it is subject to policies. The application falls back
+to `DATABASE_URL` when `APP_DATABASE_URL` is unset — convenient for a local
+checkout, and exactly the mistake the health probe now catches in production.
+
 ## Consequences
 
 - Every read and write is inside a transaction, because `SET LOCAL` requires
