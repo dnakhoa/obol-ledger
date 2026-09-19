@@ -325,6 +325,9 @@ as extension members so nothing has to be parsed out of prose:
 - [Architecture](docs/architecture.md) — layering, where each rule is enforced,
   the error model, the testing strategy
 - [Benchmarks](docs/benchmarks.md) — keyset vs `OFFSET`, with query plans
+- **[What a real ledger API has](docs/comparison.md)** — measured against
+  Modern Treasury and Increase, including what is deliberately missing and what
+  is honestly broken
 - [Observability](docs/observability.md) — the two alerts worth paging on, and
   why a rejected entry is not an error
 - [ADR 1](docs/adr/0001-invariants-in-the-database.md) — invariants in the database

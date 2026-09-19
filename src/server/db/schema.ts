@@ -125,6 +125,17 @@ export const accounts = pgTable(
       .default(sql`0`),
     /** Optimistic-concurrency token, incremented on every balance change. */
     version: integer('version').notNull().default(0),
+    /**
+     * Caller-supplied annotation: an invoice id, an order number, their own
+     * reference. Deliberately a bag of strings rather than a schema — the
+     * moment it has a schema it is a domain model, and the domain belongs to
+     * the caller rather than to the ledger.
+     */
+    metadata: jsonb('metadata')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -158,6 +169,19 @@ export const transactions = pgTable(
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     /** When the economic event happened, which is not always when we recorded it. */
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    /**
+     * Caller-supplied annotation — see the note on `accounts.metadata`.
+     *
+     * The one field of an entry that may change after it settles, because an
+     * invoice reference often arrives after the entry does. Refusing it would
+     * push the caller back to the parallel mapping table this exists to
+     * remove. Everything an accountant would recognise as the entry stays
+     * frozen; `obol_guard_transaction_mutation` is the authority.
+     */
+    metadata: jsonb('metadata')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     /**
      * Set when this entry exists to undo another one.
      *

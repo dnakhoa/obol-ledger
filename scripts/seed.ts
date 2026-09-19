@@ -158,12 +158,14 @@ async function main(): Promise<void> {
       occurredAt: Date,
       legs: { account: string; amount: MinorUnits }[],
       status: 'pending' | 'posted' = 'posted',
+      metadata: Record<string, string> = {},
     ): Promise<void> {
       const result = await journal.postEntry({
         description,
         currency: 'USD',
         occurredAt,
         status,
+        metadata,
         postings: legs.map((leg) => ({ accountId: at(leg.account), amount: leg.amount })),
       });
       if (!result.ok) {
@@ -210,18 +212,33 @@ async function main(): Promise<void> {
 
       if (day % 3 === 0) {
         const wholesale = between(2_400, 9_800);
-        await post('Wholesale order invoiced', daysAgo(day, 10), [
-          { account: 'receivable', amount: dollars(wholesale) },
-          { account: 'wholesale', amount: dollars(-wholesale) },
-        ]);
+        // Annotated, because this is the entry a person actually goes looking
+        // for: "which entry was invoice INV-1042?" is the question metadata
+        // exists to answer, and an unannotated fixture would never show it.
+        await post(
+          'Wholesale order invoiced',
+          daysAgo(day, 10),
+          [
+            { account: 'receivable', amount: dollars(wholesale) },
+            { account: 'wholesale', amount: dollars(-wholesale) },
+          ],
+          'posted',
+          { invoice: `INV-${1000 + day}`, channel: 'wholesale' },
+        );
       }
 
       if (day % 7 === 2) {
         const collected = between(3_000, 11_000);
-        await post('Customer payment received', daysAgo(day, 14), [
-          { account: 'cash', amount: dollars(collected) },
-          { account: 'receivable', amount: dollars(-collected) },
-        ]);
+        await post(
+          'Customer payment received',
+          daysAgo(day, 14),
+          [
+            { account: 'cash', amount: dollars(collected) },
+            { account: 'receivable', amount: dollars(-collected) },
+          ],
+          'posted',
+          { settlementBatch: `BATCH-${day}`, channel: 'wholesale' },
+        );
       }
 
       if (day % 5 === 1) {

@@ -40,11 +40,28 @@ const decimalAmountSchema = z
   .max(32)
   .regex(/^\d+(\.\d+)?$/u, { message: 'Expected a non-negative decimal amount, e.g. "12.50"' });
 
+/**
+ * Caller-supplied annotation.
+ *
+ * String values only, and that is a deliberate refusal rather than laziness.
+ * Allowing nested objects turns the column into a document store that every
+ * balance query has to read past; allowing numbers reintroduces the float
+ * problem this codebase spends a whole ADR avoiding, on a field nobody
+ * validates. A caller who needs `{"amount": 12.10}` needs a posting.
+ */
+export const metadataSchema = z
+  .record(z.string().min(1).max(64), z.string().max(500))
+  .refine((value) => Object.keys(value).length <= 20, {
+    message: 'At most 20 metadata keys',
+  })
+  .default({});
+
 export const createAccountSchema = z.object({
   name: z.string().trim().min(1).max(120),
   type: z.enum(ACCOUNT_TYPES),
   currency: currencySchema,
   overdraftAllowed: z.boolean().default(false),
+  metadata: metadataSchema,
 });
 
 export type CreateAccountBody = z.infer<typeof createAccountSchema>;
@@ -72,6 +89,7 @@ export const createEntrySchema = z.object({
    * decide on it, and commit without holding a lock across the round trip.
    */
   expectedVersions: z.record(accountIdSchema, z.number().int().min(0)).optional(),
+  metadata: metadataSchema,
 });
 
 export type CreateEntryBody = z.infer<typeof createEntrySchema>;
@@ -83,6 +101,7 @@ export const createTransferSchema = z.object({
   toAccountId: accountIdSchema,
   amount: decimalAmountSchema,
   occurredAt: z.iso.datetime({ offset: true }).optional(),
+  metadata: metadataSchema,
 });
 
 export type CreateTransferBody = z.infer<typeof createTransferSchema>;
@@ -110,6 +129,18 @@ export const journalQuerySchema = paginationSchema.extend({
   accountId: accountIdSchema.optional(),
   search: z.string().trim().min(1).max(120).optional(),
   status: z.enum(['pending', 'posted', 'archived']).optional(),
+  /**
+   * `?metadataKey=invoice&metadataValue=INV-42`.
+   *
+   * Two flat parameters rather than the bracket syntax some APIs use
+   * (`?metadata[invoice]=INV-42`), because bracket parsing is where query
+   * strings grow ambiguity: a caller sending `metadata[a][b]` has a reasonable
+   * expectation nothing here would honour. One pair is what the GIN index
+   * answers efficiently, and it is the query people actually issue — find the
+   * entry for this reference.
+   */
+  metadataKey: z.string().trim().min(1).max(64).optional(),
+  metadataValue: z.string().trim().max(500).optional(),
 });
 
 /**

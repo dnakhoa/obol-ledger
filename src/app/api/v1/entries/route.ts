@@ -49,6 +49,7 @@ export const POST = defineRoute(
       ...(body.data.occurredAt ? { occurredAt: new Date(body.data.occurredAt) } : {}),
       postings: converted.postings,
       status: body.data.status,
+      metadata: body.data.metadata,
       ...(body.data.expectedVersions ? { expectedVersions: body.data.expectedVersions } : {}),
       ...(key ? { idempotency: { key, fingerprint: fingerprintOf(body.raw) } } : {}),
     });

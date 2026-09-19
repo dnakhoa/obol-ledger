@@ -19,14 +19,19 @@ export function JournalFilters({
   accounts,
   accountId,
   search,
+  metadataKey,
+  metadataValue,
   resultCount,
 }: {
   accounts: readonly AccountDto[];
   accountId?: string | undefined;
   search?: string | undefined;
+  metadataKey?: string | undefined;
+  metadataValue?: string | undefined;
   resultCount: number;
 }) {
-  const filtered = Boolean(accountId || search);
+  const metadataFilter = metadataKey && metadataValue ? { metadataKey, metadataValue } : undefined;
+  const filtered = Boolean(accountId || search || metadataFilter);
 
   return (
     <form
@@ -67,6 +72,19 @@ export function JournalFilters({
         </Select>
       </div>
 
+      {/*
+        Carried as hidden inputs rather than as a control, because a metadata
+        filter is arrived at by clicking a tag on an entry — not by typing a
+        key and a value into a form. Applying the other filters must not throw
+        it away, and a reader who wants rid of it has the chip below.
+      */}
+      {metadataFilter ? (
+        <>
+          <input type="hidden" name="metadataKey" value={metadataFilter.metadataKey} />
+          <input type="hidden" name="metadataValue" value={metadataFilter.metadataValue} />
+        </>
+      ) : null}
+
       <div className="flex items-center gap-2">
         <button
           type="submit"
@@ -84,10 +102,31 @@ export function JournalFilters({
         ) : null}
       </div>
 
+      {metadataFilter ? (
+        <div className="flex w-full items-center gap-2">
+          <span className="border-line bg-surface-sunken inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[11px]">
+            <span className="text-ink-muted">{metadataFilter.metadataKey}</span>
+            <span className="text-ink">{metadataFilter.metadataValue}</span>
+          </span>
+          <Link
+            href={{
+              pathname: '/journal',
+              query: {
+                ...(accountId ? { accountId } : {}),
+                ...(search ? { search } : {}),
+              },
+            }}
+            className="text-ink-muted hover:text-ink text-xs transition-colors duration-150"
+          >
+            Remove
+          </Link>
+        </div>
+      ) : null}
+
       {filtered ? (
         <p aria-live="polite" className="text-ink-muted w-full text-xs">
           {resultCount === 0
-            ? 'No entries match. Try a shorter search term, or clear the account filter.'
+            ? 'No entries match. Try a shorter search term, or clear the filters.'
             : `Showing entries matching the filters below.`}
         </p>
       ) : null}

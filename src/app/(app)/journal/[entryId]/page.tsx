@@ -135,6 +135,33 @@ export default async function EntryPage({ params }: PageProps) {
         </div>
       </div>
 
+      {Object.keys(entry.metadata).length > 0 ? (
+        <Card>
+          <CardHeader>
+            <div className="space-y-0.5">
+              <CardTitle>Metadata</CardTitle>
+              <CardDescription>
+                The caller&rsquo;s own references. Opaque to the ledger, and searchable —{' '}
+                <code className="font-mono text-[11px]">?metadataKey=&amp;metadataValue=</code> on
+                the journal.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardBody className="flex flex-wrap gap-2">
+            {Object.entries(entry.metadata).map(([key, value]) => (
+              <Link
+                key={key}
+                href={`/journal?metadataKey=${encodeURIComponent(key)}&metadataValue=${encodeURIComponent(value)}`}
+                className="border-line bg-surface-sunken hover:bg-surface-hover inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[11px] transition-colors duration-150"
+              >
+                <span className="text-ink-muted">{key}</span>
+                <span className="text-ink">{value}</span>
+              </Link>
+            ))}
+          </CardBody>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader>
           <div className="space-y-0.5">
