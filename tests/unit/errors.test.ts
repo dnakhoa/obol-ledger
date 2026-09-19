@@ -48,6 +48,9 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
     expected: 3,
     actual: 5,
   },
+  endpoint_not_found: { code: 'endpoint_not_found', endpointId: 'whe_x' },
+  endpoint_url_taken: { code: 'endpoint_url_taken', url: 'https://hooks.example.com/ledger' },
+  delivery_not_found: { code: 'delivery_not_found', deliveryId: 'whd_x' },
 };
 
 const variants = Object.values(EVERY_VARIANT);

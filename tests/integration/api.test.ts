@@ -16,6 +16,12 @@ import { POST as reverseEntry } from '@/app/api/v1/entries/[entryId]/reverse/rou
 import { GET as balanceSheet } from '@/app/api/v1/reports/balance-sheet/route';
 import { GET as incomeStatement } from '@/app/api/v1/reports/income-statement/route';
 import { GET as metrics } from '@/app/api/v1/metrics/route';
+import { GET as listEndpoints, POST as createEndpoint } from '@/app/api/v1/webhook-endpoints/route';
+import {
+  DELETE as deleteEndpoint,
+  PATCH as patchEndpoint,
+} from '@/app/api/v1/webhook-endpoints/[endpointId]/route';
+import { GET as listDeliveries } from '@/app/api/v1/webhook-deliveries/route';
 
 /**
  * These exercise the real route handlers — validation, auth, problem responses,
@@ -669,6 +675,132 @@ describe('API', () => {
     });
   });
 
+  describe('webhooks over HTTP', () => {
+    async function register(url = 'https://hooks.example.com/ledger') {
+      const response = await createEndpoint(
+        authed('/api/v1/webhook-endpoints', { url, eventTypes: ['entry.posted'] }),
+        noParams,
+      );
+      expect(response.status).toBe(201);
+      return (await response.json()) as { data: { id: string; secret: string } };
+    }
+
+    it('returns the signing secret exactly once', async () => {
+      const created = await register();
+      expect(created.data.secret).toMatch(/^whsec_/u);
+
+      // Every subsequent read omits it. A credential that can be re-read is a
+      // credential a read-only compromise turns into forged deliveries.
+      const listed = await listEndpoints(request('/api/v1/webhook-endpoints'), noParams);
+      const body = await listed.text();
+      expect(body).toContain(created.data.id);
+      expect(body).not.toContain('whsec_');
+    });
+
+    it('refuses a plaintext endpoint', async () => {
+      const response = await createEndpoint(
+        authed('/api/v1/webhook-endpoints', { url: 'http://hooks.example.com/ledger' }),
+        noParams,
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it('refuses an unknown event type rather than silently subscribing to none', async () => {
+      const response = await createEndpoint(
+        authed('/api/v1/webhook-endpoints', {
+          url: 'https://hooks.example.com/typo',
+          eventTypes: ['entry.exploded'],
+        }),
+        noParams,
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it('rejects a second endpoint on the same url with a 409', async () => {
+      await register();
+      const again = await createEndpoint(
+        authed('/api/v1/webhook-endpoints', { url: 'https://hooks.example.com/ledger' }),
+        noParams,
+      );
+      expect(again.status).toBe(409);
+      const problem = (await again.json()) as { code: string };
+      expect(problem.code).toBe('endpoint_url_taken');
+    });
+
+    it('requires a key to register, but not to read the delivery log', async () => {
+      const anonymous = await createEndpoint(
+        request('/api/v1/webhook-endpoints', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ url: 'https://hooks.example.com/anon' }),
+        }),
+        noParams,
+      );
+      expect(anonymous.status).toBe(401);
+
+      const log = await listDeliveries(request('/api/v1/webhook-deliveries'), noParams);
+      expect(log.status).toBe(200);
+    });
+
+    it('logs a delivery for an entry posted after registration', async () => {
+      await register();
+      // Both assets: moving money into a revenue account would debit it,
+      // pushing its presented balance negative and tripping the overdraft rule.
+      const cash = await openAccount('Webhook cash', 'asset', true);
+      const revenue = await openAccount('Webhook savings', 'asset');
+      const transfer = await createTransfer(
+        authed('/api/v1/transfers', {
+          description: 'Hooked',
+          currency: 'USD',
+          fromAccountId: cash.id,
+          toAccountId: revenue.id,
+          amount: '10.00',
+        }),
+        noParams,
+      );
+      expect(transfer.status).toBe(201);
+
+      const response = await listDeliveries(
+        request('/api/v1/webhook-deliveries?status=pending'),
+        noParams,
+      );
+      const payload = (await response.json()) as { data: { eventType: string }[] };
+      expect(payload.data.map((row) => row.eventType)).toContain('entry.posted');
+    });
+
+    it('rejects an unknown delivery status instead of returning everything', async () => {
+      const response = await listDeliveries(
+        request('/api/v1/webhook-deliveries?status=maybe'),
+        noParams,
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it('disables and removes an endpoint', async () => {
+      const created = await register();
+      const params = { params: Promise.resolve({ endpointId: created.data.id }) };
+
+      const disabled = await patchEndpoint(
+        authed(`/api/v1/webhook-endpoints/${created.data.id}`, { enabled: false }),
+        params,
+      );
+      expect(disabled.status).toBe(200);
+      expect(((await disabled.json()) as { data: { enabled: boolean } }).data.enabled).toBe(false);
+
+      const removed = await deleteEndpoint(
+        authed(`/api/v1/webhook-endpoints/${created.data.id}`, {}),
+        params,
+      );
+      expect(removed.status).toBe(204);
+
+      const missing = await patchEndpoint(
+        authed(`/api/v1/webhook-endpoints/${created.data.id}`, { enabled: true }),
+        params,
+      );
+      expect(missing.status).toBe(404);
+    });
+  });
+
   describe('observability', () => {
     it('echoes an inbound correlation id on every response', async () => {
       const response = await listAccounts(
@@ -703,16 +835,18 @@ describe('API', () => {
 
     it('reports a zero residual, which is the only value that is ever correct', async () => {
       const cash = await openAccount('Metrics cash', 'asset', true);
-      const revenue = await openAccount('Metrics revenue', 'revenue');
-      await createTransfer(
+      const revenue = await openAccount('Metrics savings', 'asset');
+      const transfer = await createTransfer(
         authed('/api/v1/transfers', {
-          from: cash.id,
-          to: revenue.id,
-          amount: { amount: '25.00', currency: 'USD' },
           description: 'Metrics check',
+          currency: 'USD',
+          fromAccountId: cash.id,
+          toAccountId: revenue.id,
+          amount: '25.00',
         }),
         noParams,
       );
+      expect(transfer.status).toBe(201);
 
       const body = await (await metrics(request('/api/v1/metrics'), noParams)).text();
       const residuals = body

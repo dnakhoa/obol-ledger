@@ -17,6 +17,7 @@ import {
 import { relations, sql } from 'drizzle-orm';
 import { ACCOUNT_STATUSES, ACCOUNT_TYPES } from '@/server/domain/account';
 import { TRANSACTION_STATUSES } from '@/server/domain/transaction-status';
+import { DELIVERY_STATUSES } from '@/server/domain/webhook';
 
 /**
  * The ledger schema.
@@ -237,6 +238,100 @@ export const idempotencyKeys = pgTable(
   (table) => [
     primaryKey({ name: 'idempotency_keys_pkey', columns: [table.orgId, table.key] }),
     index('idempotency_keys_expires_at_idx').on(table.expiresAt),
+  ],
+);
+
+export const deliveryStatus = pgEnum('webhook_delivery_status', DELIVERY_STATUSES);
+
+/**
+ * A subscriber's HTTPS endpoint.
+ *
+ * The signing secret is stored in the clear, unlike an API key — and that is
+ * not an oversight. An API key is a *bearer* credential: the server only ever
+ * needs to recognise one, so a digest suffices and a database leak yields
+ * nothing usable. A webhook secret is a *shared* symmetric key that this side
+ * must reproduce on every delivery in order to sign. There is no digest that
+ * can be signed with. The honest mitigations are rotation and encryption at
+ * rest, not a hash that would make the feature impossible.
+ */
+export const webhookEndpoints = pgTable(
+  'webhook_endpoints',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    url: text('url').notNull(),
+    description: text('description'),
+    secret: text('secret').notNull(),
+    /** Event types this endpoint wants. Empty means every type. */
+    eventTypes: jsonb('event_types')
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    enabled: boolean('enabled').notNull().default(true),
+    /**
+     * Drives the circuit breaker. A subscriber whose endpoint has been gone
+     * for days should not cost a retry budget forever, so a run of failures
+     * disables it and the operator re-enables it deliberately.
+     */
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    disabledAt: timestamp('disabled_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('webhook_endpoints_org_url_key').on(table.orgId, table.url),
+    index('webhook_endpoints_org_idx').on(table.orgId, table.createdAt),
+  ],
+);
+
+/**
+ * The outbox: one row per (event, endpoint), written inside the same
+ * transaction as the ledger change that caused it.
+ *
+ * This is the whole point of the table. A webhook fired after COMMIT — from a
+ * queue client, an HTTP call, a `setTimeout` — is lost if the process dies in
+ * the gap, and a subscriber that never hears about a posted entry has no way
+ * to discover the omission. A row written *in* the transaction cannot
+ * disagree with the ledger: either both exist or neither does.
+ *
+ * Fan-out happens at write time rather than at delivery time, which duplicates
+ * the payload across endpoints. That is a deliberate trade — see
+ * `docs/adr/0009-webhooks.md`.
+ */
+export const webhookDeliveries = pgTable(
+  'webhook_deliveries',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    endpointId: text('endpoint_id').notNull(),
+    /**
+     * Stable across every attempt and every retry of the same event, so a
+     * subscriber can deduplicate. At-least-once delivery is the only honest
+     * guarantee over HTTP; this is what makes it survivable for the receiver.
+     */
+    eventId: text('event_id').notNull(),
+    eventType: text('event_type').notNull(),
+    payload: jsonb('payload').notNull(),
+    status: deliveryStatus('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    /** When this row next becomes claimable. Drives the backoff schedule. */
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    lastStatusCode: integer('last_status_code'),
+    lastError: text('last_error'),
+    durationMs: integer('duration_ms'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => [
+    foreignKey({
+      name: 'webhook_deliveries_endpoint_fk',
+      columns: [table.endpointId],
+      foreignColumns: [webhookEndpoints.id],
+    }).onDelete('cascade'),
+    // The claim query's covering index: status first, then due time, so a
+    // worker reads only the rows it is about to take.
+    index('webhook_deliveries_claim_idx').on(table.status, table.nextAttemptAt),
+    index('webhook_deliveries_endpoint_idx').on(table.endpointId, table.createdAt),
+    index('webhook_deliveries_org_idx').on(table.orgId, table.createdAt),
   ],
 );
 

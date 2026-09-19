@@ -54,7 +54,10 @@ export type LedgerError =
       readonly accountId: string;
       readonly expected: number;
       readonly actual: number;
-    };
+    }
+  | { readonly code: 'endpoint_not_found'; readonly endpointId: string }
+  | { readonly code: 'endpoint_url_taken'; readonly url: string }
+  | { readonly code: 'delivery_not_found'; readonly deliveryId: string };
 
 export type LedgerErrorCode = LedgerError['code'];
 
@@ -76,6 +79,9 @@ const TITLES: Record<LedgerErrorCode, string> = {
   already_reversed: 'Entry has already been reversed',
   invalid_status_transition: 'Entry cannot move to that status',
   stale_account_version: 'Account changed since it was read',
+  endpoint_not_found: 'Webhook endpoint not found',
+  endpoint_url_taken: 'Webhook endpoint already registered',
+  delivery_not_found: 'Webhook delivery not found',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -114,5 +120,11 @@ export function describe(error: LedgerError): string {
         : `Entry ${error.transactionId} is already ${error.from} and cannot change. Post a reversing entry instead.`;
     case 'stale_account_version':
       return `Account ${error.accountId} was at version ${error.actual}, not ${error.expected}; it changed since you read it. Re-read and retry.`;
+    case 'endpoint_not_found':
+      return `No webhook endpoint with id ${error.endpointId}.`;
+    case 'endpoint_url_taken':
+      return `${error.url} is already registered. Update that endpoint's subscription instead of adding a second one, or every event would be delivered twice.`;
+    case 'delivery_not_found':
+      return `No webhook delivery with id ${error.deliveryId}.`;
   }
 }

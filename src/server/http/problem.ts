@@ -44,6 +44,9 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   already_reversed: 409,
   invalid_status_transition: 409,
   stale_account_version: 409,
+  endpoint_not_found: 404,
+  endpoint_url_taken: 409,
+  delivery_not_found: 404,
 };
 
 export function statusFor(error: LedgerError): number {

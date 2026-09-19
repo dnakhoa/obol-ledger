@@ -3,7 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
-import { AccountsIcon, ApiIcon, GaugeIcon, JournalIcon, ReportsIcon, TransferIcon } from './icons';
+import {
+  AccountsIcon,
+  ApiIcon,
+  GaugeIcon,
+  JournalIcon,
+  ReportsIcon,
+  TransferIcon,
+  WebhookIcon,
+} from './icons';
 
 /**
  * The navigation is the only part of the shell that needs to know the current
@@ -17,6 +25,7 @@ const LINKS = [
   { href: '/journal', label: 'Journal', Icon: JournalIcon, exact: false },
   { href: '/reports', label: 'Reports', Icon: ReportsIcon, exact: false },
   { href: '/transfer', label: 'New entry', Icon: TransferIcon, exact: false },
+  { href: '/webhooks', label: 'Webhooks', Icon: WebhookIcon, exact: false },
   { href: '/api-reference', label: 'API', Icon: ApiIcon, exact: false },
 ] as const;
 
@@ -25,7 +34,9 @@ const LINKS = [
  * drop below a comfortable 44px. The API reference is the one a reader is
  * least likely to want on a phone, so it is the one that gives up its slot.
  */
-const MOBILE_LINKS = LINKS.filter((link) => link.href !== '/api-reference');
+const MOBILE_LINKS = LINKS.filter(
+  (link) => link.href !== '/api-reference' && link.href !== '/webhooks',
+);
 
 function isActive(pathname: string, href: string, exact: boolean): boolean {
   return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);

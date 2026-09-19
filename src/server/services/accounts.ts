@@ -8,6 +8,7 @@ import { accounts } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
 import type { Database } from '@/server/db/types';
 import { toAccountDto } from './serialize';
+import { enqueue } from './outbox';
 import type { AccountDto } from './dto';
 
 export type CreateAccountInput = {
@@ -63,7 +64,10 @@ export function createAccountService(database: Database, orgId: string) {
         // `.returning()` on a single-row insert always yields exactly one row;
         // an empty result would mean the driver lied to us.
         if (!row) throw new Error('INSERT ... RETURNING produced no row');
-        return toAccountDto(row);
+
+        const dto = toAccountDto(row);
+        await enqueue(tx, orgId, { type: 'account.opened', data: { account: dto } });
+        return dto;
       });
     },
 

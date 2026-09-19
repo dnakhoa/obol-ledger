@@ -1,3 +1,6 @@
+import { readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { openApiDocument } from '@/server/http/openapi';
 
@@ -17,6 +20,26 @@ const operations = Object.entries(paths).flatMap(([path, methods]) =>
   Object.entries(methods).map(([method, operation]) => ({ path, method, operation })),
 );
 
+const API_ROOT = fileURLToPath(new URL('../../src/app/api/v1', import.meta.url));
+
+/** Every `route.ts` under `/api/v1`, as the OpenAPI path it serves. */
+function routesOnDisk(): string[] {
+  const found: string[] = [];
+  const walk = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name === 'route.ts') {
+        // `src/app/api/v1/accounts/[accountId]/route.ts` -> `/accounts/{accountId}`
+        const segment = relative(API_ROOT, directory).replaceAll('\\', '/');
+        found.push(`/${segment}`.replace(/\[(\w+)\]/gu, '{$1}'));
+      }
+    }
+  };
+  walk(API_ROOT);
+  return found.sort();
+}
+
 /**
  * The published contract is generated, so these assert the *generator* — that
  * it produces a document a client can actually consume, and that it keeps
@@ -29,21 +52,11 @@ describe('OpenAPI document', () => {
   });
 
   it('covers every route the application serves', () => {
-    expect(Object.keys(paths).sort()).toEqual([
-      '/accounts',
-      '/accounts/{accountId}',
-      '/accounts/{accountId}/statement',
-      '/entries',
-      '/entries/{entryId}',
-      '/entries/{entryId}/archive',
-      '/entries/{entryId}/post',
-      '/entries/{entryId}/reverse',
-      '/health',
-      '/reports/balance-sheet',
-      '/reports/income-statement',
-      '/reports/trial-balance',
-      '/transfers',
-    ]);
+    // Read off the filesystem rather than compared with a list written by
+    // hand. A hand-written list is a second copy of the same mistake: someone
+    // adding a route forgets the document *and* the list, and the test passes
+    // while the published contract silently omits an endpoint.
+    expect(routesOnDisk()).toEqual(Object.keys(paths).sort());
   });
 
   it('gives every operation a summary and a success response', () => {
@@ -58,9 +71,16 @@ describe('OpenAPI document', () => {
   });
 
   it('requires a bearer token on every write and on no read', () => {
+    const WRITE_METHODS = new Set(['post', 'patch', 'put', 'delete']);
+    // The scheduler's endpoint is the one write that is not client-facing: it
+    // authenticates with CRON_SECRET, so documenting bearerAuth on it would
+    // tell an integrator to try a credential that will never work.
+    const NOT_BEARER = ['/webhooks/dispatch'];
+
     for (const { path, method, operation } of operations) {
       const secured = Array.isArray(operation.security);
-      expect(secured, `${method} ${path} security`).toBe(method === 'post');
+      const expected = WRITE_METHODS.has(method) && !NOT_BEARER.includes(path);
+      expect(secured, `${method} ${path} security`).toBe(expected);
     }
   });
 
@@ -69,7 +89,15 @@ describe('OpenAPI document', () => {
     // `/archive` identify everything they need from the path, so a body would
     // be ceremony. They must still be documented as taking none, rather than
     // leaving a client to guess.
-    const TRANSITIONS = ['/entries/{entryId}/post', '/entries/{entryId}/archive'];
+    const TRANSITIONS = [
+      '/entries/{entryId}/post',
+      '/entries/{entryId}/archive',
+      // Replay names the delivery in the path and copies everything else from
+      // the original; a body could only contradict it.
+      '/webhook-deliveries/{deliveryId}/replay',
+      // Triggered by the scheduler with nothing to say.
+      '/webhooks/dispatch',
+    ];
 
     for (const { path, method, operation } of operations) {
       if (method !== 'post') continue;

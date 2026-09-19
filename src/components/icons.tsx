@@ -135,3 +135,11 @@ export const ScaleIcon = (props: IconProps) => (
     <path d="M12 4v16M7 20h10M5 8h14M5 8l-3 6h6ZM19 8l-3 6h6Z" />
   </Icon>
 );
+
+export const WebhookIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M9 10.5a3 3 0 1 1 4.2 2.75L15.5 17" />
+    <path d="M17.5 13a3 3 0 1 1-1.6 5.54H11" />
+    <path d="M6.5 13A3 3 0 1 0 8.1 18.5" />
+  </Icon>
+);

@@ -8,7 +8,7 @@ import { newId } from '../src/lib/id';
 import { createJournalService } from '../src/server/services/journal';
 import { minorUnits, type MinorUnits } from '../src/lib/money';
 import type { Database } from '../src/server/db/types';
-import { checkTenantPolicies, withTenant } from '../src/server/db/tenancy';
+import { checkTenantPolicies, TENANT_TABLE_COUNT, withTenant } from '../src/server/db/tenancy';
 import type { AccountType } from '../src/server/domain/account';
 import { describeTarget, schemaConnectionString, sslFor } from './connection';
 
@@ -283,11 +283,11 @@ async function main(): Promise<void> {
     if (!policies.configured) {
       throw new Error(
         `tenant isolation is not configured: ${policies.tablesWithRls}/4 tables with RLS, ` +
-          `${policies.tablesForced}/4 forced, ${policies.policies} policies`,
+          `${policies.tablesForced}/${TENANT_TABLE_COUNT} forced, ${policies.policies} policies`,
       );
     }
     console.log(
-      `tenant isolation: ${policies.tablesForced}/4 tables forced, ${policies.policies} policies`,
+      `tenant isolation: ${policies.tablesForced}/${TENANT_TABLE_COUNT} tables forced, ${policies.policies} policies`,
     );
 
     // The seed asserts its own output: if the books do not balance, the script

@@ -90,6 +90,24 @@ an inconvenience, and a ledger that is wrong is a liability.
       `pnpm db:provision-role` and point `APP_DATABASE_URL` at `obol_app`.
 ```
 
+A third alert is worth a ticket rather than a page:
+
+```yaml
+- alert: WebhookQueueNotDraining
+  expr: min_over_time(obol_webhook_deliveries{status="pending"}[30m]) > 100
+  for: 30m
+  severity: ticket
+  annotations:
+    summary: 'The webhook outbox is growing and not draining'
+    runbook: |
+      Either the scheduled dispatcher has stopped, or every subscriber is
+      failing at once. Check that the cron is firing, then hit
+      POST /api/v1/webhooks/dispatch by hand and read what it returns —
+      claimed with nothing succeeded points at the subscribers, claimed
+      zero with a non-zero queue points at the schedule or at endpoints
+      disabled by the circuit breaker.
+```
+
 `obol_ledger_residual_minor` is the metric worth the endpoint. Most gauges have
 a band of acceptable values and a threshold someone guessed at. This one has
 exactly one correct value, forever, in every currency: zero. It cannot produce
