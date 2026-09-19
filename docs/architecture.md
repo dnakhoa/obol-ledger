@@ -74,7 +74,7 @@ new error variant without a status is a compile error.
 
 ## Testing
 
-164 tests, no external services, ~12 seconds.
+211 tests, no external services, ~14 seconds.
 
 Integration tests run against **PGlite** — real Postgres compiled to
 WebAssembly, embedded in the test process. The migrations under `drizzle/` are
