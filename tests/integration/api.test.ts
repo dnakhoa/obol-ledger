@@ -12,6 +12,9 @@ import { GET as listEntries, POST as createEntry } from '@/app/api/v1/entries/ro
 import { GET as getEntry } from '@/app/api/v1/entries/[entryId]/route';
 import { POST as createTransfer } from '@/app/api/v1/transfers/route';
 import { GET as trialBalance } from '@/app/api/v1/reports/trial-balance/route';
+import { POST as reverseEntry } from '@/app/api/v1/entries/[entryId]/reverse/route';
+import { GET as balanceSheet } from '@/app/api/v1/reports/balance-sheet/route';
+import { GET as incomeStatement } from '@/app/api/v1/reports/income-statement/route';
 
 /**
  * These exercise the real route handlers — validation, auth, problem responses,
@@ -493,6 +496,175 @@ describe('API', () => {
         })
       ).json()) as { data: { runningBalance: { amount: string } }[] };
       expect(statement.data[0]?.runningBalance.amount).toBe('250.00');
+    });
+  });
+
+  describe('journal filters over HTTP', () => {
+    it('applies the search filter rather than silently dropping it', async () => {
+      // Regression: the route validated against the shared pagination schema,
+      // which has no `search` field — and zod strips unknown keys without
+      // complaint, so the filter vanished and every entry came back.
+      const cash = await openAccount('Cash', 'asset');
+      const revenue = await openAccount('Sales', 'revenue', true);
+      for (const description of ['Invoice 1042', 'Payroll run']) {
+        await createEntry(
+          authed('/api/v1/entries', {
+            description,
+            currency: 'USD',
+            postings: [
+              { accountId: cash.id, direction: 'debit', amount: '10.00' },
+              { accountId: revenue.id, direction: 'credit', amount: '10.00' },
+            ],
+          }),
+          noParams,
+        );
+      }
+
+      const response = await listEntries(request('/api/v1/entries?search=invoice'), noParams);
+      const payload = (await response.json()) as { data: { description: string }[] };
+      expect(payload.data).toHaveLength(1);
+      expect(payload.data[0]?.description).toBe('Invoice 1042');
+    });
+
+    it('applies the account filter', async () => {
+      const cash = await openAccount('Cash', 'asset');
+      const other = await openAccount('Other', 'asset', true);
+      const revenue = await openAccount('Sales', 'revenue', true);
+
+      await createEntry(
+        authed('/api/v1/entries', {
+          description: 'Touches other',
+          currency: 'USD',
+          postings: [
+            { accountId: other.id, direction: 'debit', amount: '10.00' },
+            { accountId: revenue.id, direction: 'credit', amount: '10.00' },
+          ],
+        }),
+        noParams,
+      );
+      await createEntry(
+        authed('/api/v1/entries', {
+          description: 'Touches cash',
+          currency: 'USD',
+          postings: [
+            { accountId: cash.id, direction: 'debit', amount: '10.00' },
+            { accountId: revenue.id, direction: 'credit', amount: '10.00' },
+          ],
+        }),
+        noParams,
+      );
+
+      const response = await listEntries(
+        request(`/api/v1/entries?accountId=${other.id}`),
+        noParams,
+      );
+      const payload = (await response.json()) as { data: { description: string }[] };
+      expect(payload.data).toHaveLength(1);
+      expect(payload.data[0]?.description).toBe('Touches other');
+    });
+
+    it('rejects a malformed account filter rather than ignoring it', async () => {
+      const response = await listEntries(request('/api/v1/entries?accountId=nope'), noParams);
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe('reversals over HTTP', () => {
+    it('reverses an entry and refuses to do it twice', async () => {
+      const cash = await openAccount('Cash', 'asset');
+      const revenue = await openAccount('Sales', 'revenue', true);
+
+      const posted = await createEntry(
+        authed('/api/v1/entries', {
+          description: 'Invoice 1042',
+          currency: 'USD',
+          postings: [
+            { accountId: cash.id, direction: 'debit', amount: '500.00' },
+            { accountId: revenue.id, direction: 'credit', amount: '500.00' },
+          ],
+        }),
+        noParams,
+      );
+      const entry = ((await posted.json()) as { data: { id: string } }).data;
+
+      const first = await reverseEntry(authed(`/api/v1/entries/${entry.id}/reverse`, {}), {
+        params: Promise.resolve({ entryId: entry.id }),
+      });
+      expect(first.status).toBe(201);
+
+      const reversal = (
+        (await first.json()) as {
+          data: { id: string; reversesTransactionId: string };
+        }
+      ).data;
+      expect(reversal.reversesTransactionId).toBe(entry.id);
+
+      const second = await reverseEntry(authed(`/api/v1/entries/${entry.id}/reverse`, {}), {
+        params: Promise.resolve({ entryId: entry.id }),
+      });
+      expect(second.status).toBe(409);
+      expect(((await second.json()) as { code: string }).code).toBe('already_reversed');
+    });
+
+    it('requires a bearer token', async () => {
+      const response = await reverseEntry(
+        request('/api/v1/entries/txn_x/reverse', { method: 'POST', body: '{}' }),
+        { params: Promise.resolve({ entryId: 'txn_x' }) },
+      );
+      expect(response.status).toBe(401);
+    });
+
+    it('answers 404 for an entry that does not exist', async () => {
+      const response = await reverseEntry(authed('/api/v1/entries/txn_missing/reverse', {}), {
+        params: Promise.resolve({ entryId: 'txn_missing' }),
+      });
+      expect(response.status).toBe(404);
+      expect(((await response.json()) as { code: string }).code).toBe('entry_not_found');
+    });
+  });
+
+  describe('financial statements over HTTP', () => {
+    it('serves a balanced balance sheet', async () => {
+      const cash = await openAccount('Cash', 'asset');
+      const capital = await openAccount('Capital', 'equity', true);
+      await createEntry(
+        authed('/api/v1/entries', {
+          description: 'Owner capital',
+          currency: 'USD',
+          postings: [
+            { accountId: cash.id, direction: 'debit', amount: '1000.00' },
+            { accountId: capital.id, direction: 'credit', amount: '1000.00' },
+          ],
+        }),
+        noParams,
+      );
+
+      const response = await balanceSheet(request('/api/v1/reports/balance-sheet'), noParams);
+      expect(response.status).toBe(200);
+      const payload = (await response.json()) as {
+        data: { assets: { total: { amount: string } }; balanced: boolean };
+        meta: { balanced: boolean };
+      };
+      expect(payload.meta.balanced).toBe(true);
+      expect(payload.data.assets.total.amount).toBe('1000.00');
+    });
+
+    it('rejects a period that runs backwards', async () => {
+      const response = await incomeStatement(
+        request(
+          '/api/v1/reports/income-statement?from=2026-06-01T00:00:00Z&to=2026-01-01T00:00:00Z',
+        ),
+        noParams,
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it('defaults to the last 30 days rather than all time', async () => {
+      const response = await incomeStatement(request('/api/v1/reports/income-statement'), noParams);
+      expect(response.status).toBe(200);
+      const payload = (await response.json()) as { data: { from: string; to: string } };
+      const span = new Date(payload.data.to).getTime() - new Date(payload.data.from).getTime();
+      expect(Math.round(span / 86_400_000)).toBe(30);
     });
   });
 

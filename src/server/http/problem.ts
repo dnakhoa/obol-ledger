@@ -40,6 +40,8 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   duplicate_account_in_transaction: 422,
   insufficient_funds: 422,
   idempotency_key_reused: 409,
+  entry_not_found: 404,
+  already_reversed: 409,
 };
 
 export function statusFor(error: LedgerError): number {

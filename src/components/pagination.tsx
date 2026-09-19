@@ -20,13 +20,22 @@ export function CursorPagination({
   previousCursor,
   showing,
   noun = 'row',
+  preserve,
 }: {
   basePath: string;
   nextCursor: string | null;
   previousCursor: string | null;
   showing: number;
   noun?: string;
+  /** Query parameters to carry across pages, such as active filters. */
+  preserve?: Record<string, string>;
 }) {
+  const href = (cursor: string, direction?: 'backward') => {
+    const params = new URLSearchParams({ ...preserve, cursor });
+    if (direction) params.set('direction', direction);
+    return `${basePath}?${params.toString()}`;
+  };
+
   const linkClass =
     'inline-flex h-8 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-medium transition-colors duration-150 hover:bg-surface-hover';
   const disabledClass = 'pointer-events-none opacity-40';
@@ -42,11 +51,7 @@ export function CursorPagination({
 
       <div className="flex items-center gap-2">
         {previousCursor ? (
-          <Link
-            href={`${basePath}?cursor=${previousCursor}&direction=backward`}
-            className={linkClass}
-            rel="prev"
-          >
+          <Link href={href(previousCursor, 'backward')} className={linkClass} rel="prev">
             <ArrowLeftIcon width={13} height={13} />
             Newer
           </Link>
@@ -58,7 +63,7 @@ export function CursorPagination({
         )}
 
         {nextCursor ? (
-          <Link href={`${basePath}?cursor=${nextCursor}`} className={linkClass} rel="next">
+          <Link href={href(nextCursor)} className={linkClass} rel="next">
             Older
             <ArrowRightIcon width={13} height={13} />
           </Link>

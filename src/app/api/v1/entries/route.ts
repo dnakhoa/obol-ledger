@@ -1,5 +1,5 @@
 import { defineRoute, json, parseQuery, readJson, unprocessable } from '@/server/http/route';
-import { createEntrySchema, paginationSchema } from '@/server/http/schemas';
+import { createEntrySchema, journalQuerySchema } from '@/server/http/schemas';
 import { toDraftPostings } from '@/server/http/entries';
 import { fingerprintOf } from '@/server/services/idempotency';
 import { problemFor, problemResponse } from '@/server/http/problem';
@@ -7,7 +7,7 @@ import { problemFor, problemResponse } from '@/server/http/problem';
 export const GET = defineRoute(
   { name: 'entries.list' },
   async ({ request, requestId, services }) => {
-    const query = parseQuery(request, paginationSchema, requestId);
+    const query = parseQuery(request, journalQuerySchema, requestId);
     if (!query.ok) return query.response;
 
     const page = await services.journal.list(query.data);

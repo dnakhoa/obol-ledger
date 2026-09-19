@@ -13,7 +13,8 @@ import { SetupRequiredError } from '@/server/setup-error';
 import { ArrowRightIcon, CheckIcon } from '@/components/icons';
 import { cn } from '@/lib/cn';
 import { demoServices } from '@/server/container';
-import type { Page, TransactionDto } from '@/server/services/dto';
+import type { AccountDto, Page, TransactionDto } from '@/server/services/dto';
+import { JournalFilters } from '@/components/journal-filters';
 
 export const metadata: Metadata = { title: 'Journal' };
 export const dynamic = 'force-dynamic';
@@ -35,21 +36,33 @@ const ENTRY_TIME = new Intl.DateTimeFormat('en-US', {
 const ENTRY_YEAR = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'UTC' });
 
 type PageProps = {
-  searchParams: Promise<{ cursor?: string; direction?: string; highlight?: string }>;
+  searchParams: Promise<{
+    cursor?: string;
+    direction?: string;
+    highlight?: string;
+    accountId?: string;
+    search?: string;
+  }>;
 };
 
 export default async function JournalPage({ searchParams }: PageProps) {
   const query = await searchParams;
 
   let page: Page<TransactionDto>;
+  let accounts: AccountDto[];
   try {
-    page = await (
-      await demoServices()
-    ).journal.list({
-      limit: PAGE_SIZE,
-      cursor: query.cursor,
-      direction: query.direction === 'backward' ? 'backward' : 'forward',
-    });
+    const services = await demoServices();
+    // Independent reads: the accounts are only needed to populate the filter.
+    [page, accounts] = await Promise.all([
+      services.journal.list({
+        limit: PAGE_SIZE,
+        cursor: query.cursor,
+        direction: query.direction === 'backward' ? 'backward' : 'forward',
+        accountId: query.accountId,
+        search: query.search,
+      }),
+      services.accounts.list(),
+    ]);
   } catch (error) {
     if (error instanceof SetupRequiredError) {
       return <SetupNotice detail={error.message} />;
@@ -81,12 +94,27 @@ export default async function JournalPage({ searchParams }: PageProps) {
           </div>
         </CardHeader>
 
+        <JournalFilters
+          accounts={accounts}
+          accountId={query.accountId}
+          search={query.search}
+          resultCount={page.items.length}
+        />
+
         {page.items.length === 0 ? (
-          <EmptyState
-            title="Nothing posted yet"
-            description="The journal is empty. Post an entry, or run pnpm db:seed to load a month of example books."
-            action={<ButtonLink href="/transfer">Post an entry</ButtonLink>}
-          />
+          query.accountId || query.search ? (
+            <EmptyState
+              title="No entries match those filters"
+              description="Try a shorter search term, or widen the account filter. The journal itself is unchanged."
+              action={<ButtonLink href="/journal">Clear filters</ButtonLink>}
+            />
+          ) : (
+            <EmptyState
+              title="Nothing posted yet"
+              description="The journal is empty. Post an entry, or run pnpm db:seed to load a month of example books."
+              action={<ButtonLink href="/transfer">Post an entry</ButtonLink>}
+            />
+          )
         ) : (
           <>
             <TableScroll>
@@ -137,16 +165,24 @@ export default async function JournalPage({ searchParams }: PageProps) {
                         </span>
                       </Td>
                       <Td className="font-medium">
-                        {entry.description}
+                        <Link href={`/journal/${entry.id}`} className="hover:underline">
+                          {entry.description}
+                        </Link>
                         <span className="text-ink-muted ml-2 text-[11px] font-normal">
                           {entry.currency}
                         </span>
                       </Td>
                       <Td colSpan={2} align="right">
-                        <Badge tone="positive">
-                          <CheckIcon width={11} height={11} />
-                          Balanced
-                        </Badge>
+                        {entry.reversedByTransactionId ? (
+                          <Badge tone="caution">Reversed</Badge>
+                        ) : entry.reversesTransactionId ? (
+                          <Badge tone="neutral">Reversal</Badge>
+                        ) : (
+                          <Badge tone="positive">
+                            <CheckIcon width={11} height={11} />
+                            Balanced
+                          </Badge>
+                        )}
                       </Td>
                     </tr>
                     {entry.postings.map((posting) => (
@@ -192,6 +228,11 @@ export default async function JournalPage({ searchParams }: PageProps) {
               previousCursor={page.previousCursor}
               showing={page.items.length}
               noun="entry"
+              // Paging must not silently drop the filters the reader applied.
+              preserve={{
+                ...(query.accountId ? { accountId: query.accountId } : {}),
+                ...(query.search ? { search: query.search } : {}),
+              }}
             />
           </>
         )}

@@ -34,7 +34,10 @@ describe('OpenAPI document', () => {
       '/accounts/{accountId}/statement',
       '/entries',
       '/entries/{entryId}',
+      '/entries/{entryId}/reverse',
       '/health',
+      '/reports/balance-sheet',
+      '/reports/income-statement',
       '/reports/trial-balance',
       '/transfers',
     ]);

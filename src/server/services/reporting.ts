@@ -1,11 +1,20 @@
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { CurrencyCode, MinorUnits } from '@/lib/money';
 import { presentedBalance, type AccountType } from '@/server/domain/account';
 import { accounts, postings, transactions } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
 import type { Database } from '@/server/db/types';
 import { toMoneyDto } from './serialize';
-import type { AccountDto, MoneyDto, Page, TrialBalanceRow } from './dto';
+import type {
+  AccountDto,
+  BalanceSheet,
+  IncomeStatement,
+  MoneyDto,
+  Page,
+  StatementLineDto,
+  StatementSection,
+  TrialBalanceRow,
+} from './dto';
 import { toAccountDto } from './serialize';
 import { buildPage, decodeCursor, type PageDirection } from './cursor';
 
@@ -166,6 +175,130 @@ export function createReportingService(database: Database, orgId: string) {
       });
     },
 
+    /**
+     * The balance sheet: what is owned and owed at a point in time.
+     *
+     * Balances come from the cached `balance_minor`, which a trigger maintains
+     * from the postings — so this is a read of aggregates Postgres already
+     * keeps rather than a scan of every posting ever written.
+     *
+     * Retained earnings is the part worth explaining. Revenue and expense
+     * accounts accumulate over a period and are closed into equity at period
+     * end; between closes, a balance sheet that ignored them would not
+     * balance. Folding them in as retained earnings is what the accounting
+     * equation requires, and it is why `balanced` is computed rather than
+     * asserted.
+     */
+    async balanceSheet(currency: CurrencyCode): Promise<BalanceSheet> {
+      return withTenant(database, orgId, async (tx) => {
+        const rows = await tx
+          .select()
+          .from(accounts)
+          .where(eq(accounts.currency, currency))
+          .orderBy(asc(accounts.type), asc(accounts.name));
+
+        const section = (type: AccountType, label: string): StatementSection =>
+          buildSection(
+            label,
+            rows.filter((row) => row.type === type),
+            currency,
+          );
+
+        const assets = section('asset', 'Assets');
+        const liabilities = section('liability', 'Liabilities');
+        const equity = section('equity', 'Equity');
+
+        const revenueTotal = sumPresented(rows, 'revenue');
+        const expenseTotal = sumPresented(rows, 'expense');
+        const retained = (revenueTotal - expenseTotal) as MinorUnits;
+
+        const left = BigInt(assets.total.minorUnits);
+        const right =
+          BigInt(liabilities.total.minorUnits) + BigInt(equity.total.minorUnits) + retained;
+
+        return {
+          asOf: new Date().toISOString(),
+          currency,
+          assets,
+          liabilities,
+          equity,
+          retainedEarnings: toMoneyDto(retained, currency),
+          liabilitiesAndEquity: toMoneyDto(right as MinorUnits, currency),
+          balanced: left === right,
+        };
+      });
+    },
+
+    /**
+     * The income statement: performance between two dates.
+     *
+     * Bounded by the period, so this sums *postings* rather than reading the
+     * cached balances — a balance is a position and cannot answer "how much did
+     * we earn in March". The join to `transactions` is what makes the date
+     * filter meaningful: a posting's date is its entry's date.
+     */
+    async incomeStatement(
+      currency: CurrencyCode,
+      period: { from: Date; to: Date },
+    ): Promise<IncomeStatement> {
+      return withTenant(database, orgId, async (tx) => {
+        const rows = await tx
+          .select({
+            accountId: accounts.id,
+            accountName: accounts.name,
+            type: accounts.type,
+            total: sql<string>`coalesce(sum(${postings.amountMinor}), 0)::text`,
+          })
+          .from(accounts)
+          .leftJoin(
+            postings,
+            and(
+              eq(postings.accountId, accounts.id),
+              sql`${postings.transactionId} in (
+                select id from transactions
+                 where occurred_at >= ${period.from} and occurred_at <= ${period.to}
+              )`,
+            ),
+          )
+          .where(
+            and(eq(accounts.currency, currency), inArray(accounts.type, ['revenue', 'expense'])),
+          )
+          .groupBy(accounts.id, accounts.name, accounts.type)
+          .orderBy(asc(accounts.type), asc(accounts.name));
+
+        const lineFor = (row: (typeof rows)[number]): StatementLineDto => ({
+          accountId: row.accountId,
+          accountName: row.accountName,
+          type: row.type as AccountType,
+          amount: toMoneyDto(
+            presentedBalance(BigInt(row.total) as MinorUnits, row.type as AccountType),
+            currency,
+          ),
+        });
+
+        const build = (type: AccountType, label: string): StatementSection => {
+          const lines = rows.filter((row) => row.type === type).map(lineFor);
+          const total = lines.reduce((sum, line) => sum + BigInt(line.amount.minorUnits), 0n);
+          return { label, lines, total: toMoneyDto(total as MinorUnits, currency) };
+        };
+
+        const revenue = build('revenue', 'Revenue');
+        const expenses = build('expense', 'Expenses');
+        const net = (BigInt(revenue.total.minorUnits) -
+          BigInt(expenses.total.minorUnits)) as MinorUnits;
+
+        return {
+          from: period.from.toISOString(),
+          to: period.to.toISOString(),
+          currency,
+          revenue,
+          expenses,
+          netIncome: toMoneyDto(net, currency),
+          profitable: net > 0n,
+        };
+      });
+    },
+
     /** Headline figures for the dashboard, in one round trip per currency. */
     async summary(): Promise<{
       readonly accountCount: number;
@@ -238,3 +371,31 @@ export function createReportingService(database: Database, orgId: string) {
 }
 
 export type ReportingService = ReturnType<typeof createReportingService>;
+
+/** Total of an account class, in the sign a reader expects. */
+function sumPresented(
+  rows: readonly { type: string; balanceMinor: bigint }[],
+  type: AccountType,
+): bigint {
+  return rows
+    .filter((row) => row.type === type)
+    .reduce((total, row) => total + presentedBalance(row.balanceMinor as MinorUnits, type), 0n);
+}
+
+function buildSection(
+  label: string,
+  rows: readonly { id: string; name: string; type: string; balanceMinor: bigint }[],
+  currency: CurrencyCode,
+): StatementSection {
+  const lines: StatementLineDto[] = rows.map((row) => ({
+    accountId: row.id,
+    accountName: row.name,
+    type: row.type as AccountType,
+    amount: toMoneyDto(
+      presentedBalance(row.balanceMinor as MinorUnits, row.type as AccountType),
+      currency,
+    ),
+  }));
+  const total = lines.reduce((sum, line) => sum + BigInt(line.amount.minorUnits), 0n);
+  return { label, lines, total: toMoneyDto(total as MinorUnits, currency) };
+}

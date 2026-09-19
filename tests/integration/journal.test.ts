@@ -340,6 +340,115 @@ describe('journal service', () => {
     });
   });
 
+  describe('filtering', () => {
+    it('restricts to entries touching an account', async () => {
+      const other = await openAccount(db, db.$orgId, {
+        name: 'Other',
+        type: 'asset',
+        overdraftAllowed: true,
+      });
+      await fund(10_000n);
+      const unrelated = await services.journal.postEntry({
+        description: 'Unrelated movement',
+        currency: 'USD',
+        postings: [
+          { accountId: other.id, amount: usd(500n) },
+          { accountId: revenue.id, amount: usd(-500n) },
+        ],
+      });
+      expect(unrelated.ok).toBe(true);
+
+      const filtered = await services.journal.list({ limit: 20, accountId: other.id });
+      expect(filtered.items).toHaveLength(1);
+      expect(filtered.items[0]?.description).toBe('Unrelated movement');
+
+      // Unfiltered still sees both.
+      expect((await services.journal.list({ limit: 20 })).items).toHaveLength(2);
+    });
+
+    it('matches a description case-insensitively', async () => {
+      await services.journal.postEntry({
+        description: 'Invoice 1042 settled',
+        currency: 'USD',
+        postings: [
+          { accountId: cash.id, amount: usd(1_000n) },
+          { accountId: revenue.id, amount: usd(-1_000n) },
+        ],
+      });
+      await fund(1_000n);
+
+      const hit = await services.journal.list({ limit: 20, search: 'invoice' });
+      expect(hit.items).toHaveLength(1);
+      expect(hit.items[0]?.description).toBe('Invoice 1042 settled');
+
+      const miss = await services.journal.list({ limit: 20, search: 'nothing matches this' });
+      expect(miss.items).toEqual([]);
+      expect(miss.nextCursor).toBeNull();
+    });
+
+    it('combines filters with the keyset cursor rather than replacing it', async () => {
+      // A filtered list must page exactly as an unfiltered one does, or the
+      // second page silently ignores the filter.
+      for (let i = 0; i < 5; i += 1) {
+        await services.journal.postEntry({
+          description: `Payroll run ${i}`,
+          currency: 'USD',
+          postings: [
+            { accountId: cash.id, amount: usd(100n) },
+            { accountId: revenue.id, amount: usd(-100n) },
+          ],
+        });
+      }
+      await fund(5_000n);
+
+      const seen: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await services.journal.list({ limit: 2, cursor, search: 'payroll' });
+        for (const item of page.items) {
+          expect(item.description).toContain('Payroll');
+        }
+        seen.push(...page.items.map((item) => item.id));
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+
+      expect(seen).toHaveLength(5);
+      expect(new Set(seen).size).toBe(5);
+    });
+
+    it('applies both filters together', async () => {
+      const other = await openAccount(db, db.$orgId, {
+        name: 'Other',
+        type: 'asset',
+        overdraftAllowed: true,
+      });
+      await services.journal.postEntry({
+        description: 'Rent for March',
+        currency: 'USD',
+        postings: [
+          { accountId: other.id, amount: usd(500n) },
+          { accountId: revenue.id, amount: usd(-500n) },
+        ],
+      });
+      await services.journal.postEntry({
+        description: 'Rent for April',
+        currency: 'USD',
+        postings: [
+          { accountId: cash.id, amount: usd(500n) },
+          { accountId: revenue.id, amount: usd(-500n) },
+        ],
+      });
+
+      const page = await services.journal.list({
+        limit: 20,
+        accountId: other.id,
+        search: 'rent',
+      });
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]?.description).toBe('Rent for March');
+    });
+  });
+
   describe('pagination', () => {
     it('walks every entry exactly once with a keyset cursor', async () => {
       for (let i = 0; i < 7; i += 1) await fund(1_000n);

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
-import { AccountsIcon, ApiIcon, GaugeIcon, JournalIcon, TransferIcon } from './icons';
+import { AccountsIcon, ApiIcon, GaugeIcon, JournalIcon, ReportsIcon, TransferIcon } from './icons';
 
 /**
  * The navigation is the only part of the shell that needs to know the current
@@ -15,9 +15,17 @@ const LINKS = [
   { href: '/', label: 'Overview', Icon: GaugeIcon, exact: true },
   { href: '/accounts', label: 'Accounts', Icon: AccountsIcon, exact: false },
   { href: '/journal', label: 'Journal', Icon: JournalIcon, exact: false },
+  { href: '/reports', label: 'Reports', Icon: ReportsIcon, exact: false },
   { href: '/transfer', label: 'New entry', Icon: TransferIcon, exact: false },
   { href: '/api-reference', label: 'API', Icon: ApiIcon, exact: false },
 ] as const;
+
+/**
+ * The bottom bar caps at five, which is the practical ceiling before targets
+ * drop below a comfortable 44px. The API reference is the one a reader is
+ * least likely to want on a phone, so it is the one that gives up its slot.
+ */
+const MOBILE_LINKS = LINKS.filter((link) => link.href !== '/api-reference');
 
 function isActive(pathname: string, href: string, exact: boolean): boolean {
   return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
@@ -66,7 +74,7 @@ export function MobileNav() {
       className="border-line bg-surface/95 fixed inset-x-0 bottom-0 z-40 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
     >
       <ul className="mx-auto flex max-w-2xl">
-        {LINKS.map(({ href, label, Icon, exact }) => {
+        {MOBILE_LINKS.map(({ href, label, Icon, exact }) => {
           const active = isActive(pathname, href, exact);
           return (
             <li key={href} className="flex-1">

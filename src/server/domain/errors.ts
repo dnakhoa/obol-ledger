@@ -35,7 +35,13 @@ export type LedgerError =
       readonly requested: string;
       readonly currency: CurrencyCode;
     }
-  | { readonly code: 'idempotency_key_reused'; readonly key: string };
+  | { readonly code: 'idempotency_key_reused'; readonly key: string }
+  | { readonly code: 'entry_not_found'; readonly transactionId: string }
+  | {
+      readonly code: 'already_reversed';
+      readonly transactionId: string;
+      readonly reversedBy: string;
+    };
 
 export type LedgerErrorCode = LedgerError['code'];
 
@@ -53,6 +59,8 @@ const TITLES: Record<LedgerErrorCode, string> = {
   duplicate_account_in_transaction: 'Account appears more than once in the transaction',
   insufficient_funds: 'Insufficient funds',
   idempotency_key_reused: 'Idempotency key reused with a different request',
+  entry_not_found: 'Journal entry not found',
+  already_reversed: 'Entry has already been reversed',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -81,5 +89,9 @@ export function describe(error: LedgerError): string {
       return `Account ${error.accountId} holds ${error.available} ${error.currency} but ${error.requested} ${error.currency} was requested and overdraft is not allowed.`;
     case 'idempotency_key_reused':
       return `Idempotency key ${error.key} was already used for a request with a different body.`;
+    case 'entry_not_found':
+      return `No journal entry with id ${error.transactionId}.`;
+    case 'already_reversed':
+      return `Entry ${error.transactionId} was already reversed by ${error.reversedBy}; reversing it twice would double the correction.`;
   }
 }
