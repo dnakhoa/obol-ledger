@@ -8,7 +8,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { StatTile } from '@/components/stat-tile';
 import { CompactAmount, DirectionalAmount, Money } from '@/components/money';
 import { CursorPagination } from '@/components/pagination';
-import { ArrowLeftIcon } from '@/components/icons';
+import { ArrowLeftIcon, DownloadIcon } from '@/components/icons';
+import { ButtonLink } from '@/components/ui/button';
 import { demoServices } from '@/server/container';
 import { normalBalanceOf, type AccountType } from '@/server/domain/account';
 
@@ -156,6 +157,10 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
               account&rsquo;s own postings, so it reconciles with the posted balance above.
             </CardDescription>
           </div>
+          <ButtonLink href={`/api/v1/accounts/${account.id}/statement?format=csv`} size="sm">
+            <DownloadIcon width={13} height={13} />
+            Export CSV
+          </ButtonLink>
         </CardHeader>
 
         {lines.items.length === 0 ? (

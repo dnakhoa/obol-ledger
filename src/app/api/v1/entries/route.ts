@@ -3,12 +3,51 @@ import { createEntrySchema, journalQuerySchema } from '@/server/http/schemas';
 import { toDraftPostings } from '@/server/http/entries';
 import { fingerprintOf } from '@/server/services/idempotency';
 import { problemFor, problemResponse } from '@/server/http/problem';
+import { streamCsv } from '@/server/http/export';
+
+/** Rows per page while streaming an export; invisible to the caller. */
+const EXPORT_PAGE = 100;
 
 export const GET = defineRoute(
   { name: 'entries.list' },
   async ({ request, requestId, services }) => {
     const query = parseQuery(request, journalQuerySchema, requestId);
     if (!query.ok) return query.response;
+
+    if (query.data.format === 'csv') {
+      // One CSV row per *posting*, not per entry. A file with one row per
+      // entry cannot be summed, pivoted or reconciled — which is the only
+      // reason anyone exports a journal — and it would have to invent a single
+      // amount for an entry that has four legs.
+      return streamCsv({
+        filename: 'journal.csv',
+        header: [
+          'Date',
+          'Entry',
+          'Description',
+          'Status',
+          'Account',
+          'Debit',
+          'Credit',
+          'Currency',
+        ],
+        page: async (cursor) => {
+          const next = await services.journal.list({ ...query.data, limit: EXPORT_PAGE, cursor });
+          return { items: next.items, nextCursor: next.nextCursor };
+        },
+        rows: (entry) =>
+          entry.postings.map((posting) => [
+            entry.occurredAt,
+            entry.id,
+            entry.description,
+            entry.status,
+            posting.accountName,
+            posting.direction === 'debit' ? posting.amount.amount : '',
+            posting.direction === 'credit' ? posting.amount.amount : '',
+            entry.currency,
+          ]),
+      });
+    }
 
     const page = await services.journal.list(query.data);
     return json({
