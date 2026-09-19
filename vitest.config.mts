@@ -12,6 +12,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Concurrency suites open many real connections; running files in
+    // sequence keeps them from contending for the pool with each other.
+    fileParallelism: false,
     // Each integration test spins up its own in-process Postgres (PGlite),
     // so files are isolated but cheap; no external database is required.
     testTimeout: 30_000,
