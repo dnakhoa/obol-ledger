@@ -87,6 +87,26 @@ than merely rejected.
 `tests/integration/schema.test.ts` proves all of it by bypassing the application
 entirely and attacking the database directly.
 
+### Tenant isolation the database enforces, and a probe that proves it
+
+Every ledger table carries a `FORCE`d row-level security policy keyed on
+`current_setting('app.current_org')`. `org_id = NULL` is never true, so a
+connection that has not named a tenant sees an **empty database** — a forgotten
+tenant scope returns nothing rather than everything.
+
+The part worth reading is the failure mode. RLS does not apply to a role with
+`BYPASSRLS`, and `FORCE` does not change that. Neon's default role has exactly
+that attribute, so the first deploy ran with every policy inert — caught not by
+an incident but by `/api/v1/health`, which asserts isolation is really in force
+and returns 503 when it is not:
+
+```json
+{ "tenantIsolation": { "visibleWithoutTenant": 13, "privilegedRole": true, "enforced": false } }
+```
+
+Hence two connections: `DATABASE_URL` (owner, for migrations) and
+`APP_DATABASE_URL` (`NOSUPERUSER NOBYPASSRLS`, no DDL rights, for the app).
+
 ### Money is never a float
 
 `0.1 + 0.2 !== 0.3`, and a JSON number is a double — `12.10` is already

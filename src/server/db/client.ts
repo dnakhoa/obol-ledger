@@ -23,11 +23,26 @@ declare global {
   var __obolPool: Pool | undefined;
 }
 
+/**
+ * The connection the *application* uses.
+ *
+ * `APP_DATABASE_URL` is preferred, and it should point at a role that is
+ * neither SUPERUSER nor BYPASSRLS. That is not a nicety: row-level security
+ * simply does not apply to such a role, and `FORCE` does not change it — so an
+ * application wired to the owner credential a managed provider hands out has
+ * tenant isolation switched off in everything but appearance.
+ *
+ * `DATABASE_URL` remains the fallback so a local checkout works with one
+ * variable, and it stays the *owner* connection that migrations and seeds need.
+ * `scripts/provision-app-role.ts` creates the restricted role, and
+ * `/api/v1/health` reports whether the running connection is actually subject
+ * to the policies.
+ */
 function connectionString(): string {
-  const url = process.env['DATABASE_URL'];
+  const url = process.env['APP_DATABASE_URL'] ?? process.env['DATABASE_URL'];
   if (!url) {
     throw new SetupRequiredError(
-      'DATABASE_URL is not set. Copy .env.example to .env.local and point it at a Postgres instance.',
+      'Neither APP_DATABASE_URL nor DATABASE_URL is set. Copy .env.example to .env.local and point it at a Postgres instance.',
     );
   }
   return url;
