@@ -28,6 +28,8 @@ export type CreateAccountInput = {
    * for inventory — so the chart templates set it explicitly.
    */
   readonly monetary?: boolean | undefined;
+  /** Whether this account is managed as a set of open items that age. */
+  readonly openItems?: boolean | undefined;
 };
 
 /**
@@ -106,6 +108,7 @@ export function createAccountService(database: Database, orgId: string) {
             metadata: input.metadata ?? {},
             ...(input.code ? { code: input.code } : {}),
             monetary: input.monetary ?? (input.type === 'asset' || input.type === 'liability'),
+            openItems: input.openItems ?? false,
             ...(input.role ? { role: input.role } : {}),
           })
           .returning();

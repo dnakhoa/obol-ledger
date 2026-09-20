@@ -11,6 +11,7 @@ import { createRevaluationService } from '@/server/services/revaluation';
 import { createInventoryService } from '@/server/services/inventory';
 import { createStockImportService } from '@/server/services/stock-import';
 import { createLandedCostService } from '@/server/services/landed-cost';
+import { createAgingService } from '@/server/services/aging';
 import { createWebhookService } from '@/server/services/webhooks';
 import type { Database } from '@/server/db/types';
 import type { AccountType } from '@/server/domain/account';
@@ -29,6 +30,7 @@ export function servicesFor(database: Database, orgId: string) {
     inventory: createInventoryService(database, orgId),
     stockImport: createStockImportService(database, orgId),
     landedCost: createLandedCostService(database, orgId),
+    aging: createAgingService(database, orgId),
   };
 }
 
@@ -55,6 +57,8 @@ export async function openAccount(
     type: AccountType;
     currency?: CurrencyCode;
     overdraftAllowed?: boolean;
+    /** Managed as unsettled documents, so an aged report means something. */
+    openItems?: boolean;
   },
 ) {
   return createAccountService(database, orgId).create({
@@ -62,5 +66,6 @@ export async function openAccount(
     type: overrides.type,
     currency: overrides.currency ?? 'USD',
     overdraftAllowed: overrides.overdraftAllowed ?? false,
+    ...(overrides.openItems === undefined ? {} : { openItems: overrides.openItems }),
   });
 }

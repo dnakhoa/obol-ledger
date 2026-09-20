@@ -12,6 +12,7 @@ import { createRevaluationService } from './services/revaluation';
 import { createInventoryService } from '@/server/services/inventory';
 import { createStockImportService } from '@/server/services/stock-import';
 import { createLandedCostService } from '@/server/services/landed-cost';
+import { createAgingService } from '@/server/services/aging';
 import { createWebhookService } from './services/webhooks';
 import { SetupRequiredError } from './setup-error';
 import { currentViewer, type Viewer } from './auth/viewer';
@@ -42,6 +43,7 @@ export function servicesFor(orgId: string) {
     inventory: createInventoryService(database, orgId),
     stockImport: createStockImportService(database, orgId),
     landedCost: createLandedCostService(database, orgId),
+    aging: createAgingService(database, orgId),
   };
 }
 

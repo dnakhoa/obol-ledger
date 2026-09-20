@@ -360,6 +360,31 @@ export const ja: Messages = {
     stepNumber: (n) => `手順 ${n}`,
   },
 
+  aging: {
+    title: '債権債務の年齢表',
+    description:
+      '未回収・未払がどれだけ滞留しているかを示します。他と同じ仕訳から作成しており、食い違う余地のある別の補助元帳はありません。',
+    receivables: '売掛金',
+    payables: '買掛金',
+    caption: (account) => `${account}、古い順`,
+    invoice: '請求書番号',
+    dated: '日付',
+    age: '経過日数',
+    outstanding: '残高',
+    days: (count) => `${count} 日`,
+    current: '30 日以内',
+    days31to60: '31〜60 日',
+    days61to90: '61〜90 日',
+    over90: '90 日超',
+    total: '合計',
+    overdue: (percent) => `30 日超が ${percent}%`,
+    emptyTitle: '未決済の残高はありません',
+    emptyBody: 'これらの勘定の請求はすべて決済済みです。',
+    convention:
+      '入金がどの請求書に対応するかは記録されていないため、古いものから順に充当しています。これは事実ではなく約束事です — 得意先が後の請求書を支払い、前の請求書に異議を唱えている場合には違いが出ます。',
+    credit: '過入金',
+  },
+
   shipments: {
     title: '輸入船積',
     description:

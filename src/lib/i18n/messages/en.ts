@@ -361,6 +361,31 @@ export const en = {
     stepNumber: (n: number) => `Step ${n}`,
   },
 
+  aging: {
+    title: 'Who owes what',
+    description:
+      'How long the money has been outstanding. Built from the same postings as everything else — there is no separate receivables ledger to fall out of step.',
+    receivables: 'Owed to you',
+    payables: 'Owed by you',
+    caption: (account: string) => `${account}, oldest first`,
+    invoice: 'Invoice',
+    dated: 'Dated',
+    age: 'Age',
+    outstanding: 'Outstanding',
+    days: (count: number) => `${count} days`,
+    current: 'Up to 30 days',
+    days31to60: '31–60 days',
+    days61to90: '61–90 days',
+    over90: 'Over 90 days',
+    total: 'Total',
+    overdue: (percent: string) => `${percent}% past 30 days`,
+    emptyTitle: 'Nothing outstanding',
+    emptyBody: 'Every invoice on these accounts has been settled.',
+    convention:
+      'Nothing records which invoice a payment settled, so the oldest open one is taken first. That is a convention, not a fact — it matters when a customer pays a later invoice and disputes an earlier one.',
+    credit: 'in credit',
+  },
+
   shipments: {
     title: 'Shipments',
     description:

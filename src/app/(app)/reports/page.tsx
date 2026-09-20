@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Card, CardBody, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ButtonLink } from '@/components/ui/button';
 import { PageHeader } from '@/components/page-header';
 import { Money } from '@/components/money';
 import { StatementSectionTable } from '@/components/statement';
@@ -63,7 +64,11 @@ export default async function ReportsPage({ searchParams }: PageProps) {
 
   return (
     <>
-      <PageHeader title={t.reports.title} description={t.reports.description} />
+      <PageHeader
+        title={t.reports.title}
+        description={t.reports.description}
+        actions={<ButtonLink href="/reports/aging">{t.aging.title}</ButtonLink>}
+      />
 
       {/*
         The accounting identity, stated before the detail that supports it.

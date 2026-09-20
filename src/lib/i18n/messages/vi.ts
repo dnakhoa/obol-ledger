@@ -367,6 +367,31 @@ export const vi: Messages = {
     stepNumber: (n) => `Bước ${n}`,
   },
 
+  aging: {
+    title: 'Công nợ theo tuổi nợ',
+    description:
+      'Khoản phải thu, phải trả đã tồn bao lâu. Tính từ chính các bút toán đã ghi — không có sổ công nợ riêng để lệch với sổ cái.',
+    receivables: 'Phải thu khách hàng',
+    payables: 'Phải trả người bán',
+    caption: (account) => `${account}, nợ cũ nhất trước`,
+    invoice: 'Số hóa đơn',
+    dated: 'Ngày',
+    age: 'Tuổi nợ',
+    outstanding: 'Còn lại',
+    days: (count) => `${count} ngày`,
+    current: 'Đến 30 ngày',
+    days31to60: '31–60 ngày',
+    days61to90: '61–90 ngày',
+    over90: 'Trên 90 ngày',
+    total: 'Cộng',
+    overdue: (percent) => `${percent}% quá 30 ngày`,
+    emptyTitle: 'Không còn công nợ',
+    emptyBody: 'Mọi hóa đơn trên các tài khoản này đều đã thanh toán xong.',
+    convention:
+      'Hệ thống không ghi nhận khoản thanh toán ứng với hóa đơn nào, nên mặc định trừ vào hóa đơn cũ nhất trước. Đó là quy ước chứ không phải sự thật — điều này quan trọng khi khách trả hóa đơn sau nhưng đang khiếu nại hóa đơn trước.',
+    credit: 'trả thừa',
+  },
+
   shipments: {
     title: 'Lô hàng nhập khẩu',
     description:

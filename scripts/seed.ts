@@ -74,6 +74,7 @@ const ACCOUNTS: {
   currency: 'VND' | 'USD' | 'EUR' | 'AUD';
   overdraft?: boolean;
   monetary?: boolean;
+  openItems?: boolean;
   role?: 'retained_earnings' | 'fx_gain_loss';
 }[] = [
   { key: 'cash', code: '111', name: 'Tiền mặt', type: 'asset', currency: 'VND' },
@@ -94,6 +95,8 @@ const ACCOUNTS: {
   },
   {
     key: 'arUsd',
+    // A claim on somebody, so it is managed as open items and ages.
+    openItems: true,
     code: '1311',
     name: 'Phải thu của khách hàng — USD',
     type: 'asset',
@@ -102,6 +105,8 @@ const ACCOUNTS: {
   },
   {
     key: 'arEur',
+    // A claim on somebody, so it is managed as open items and ages.
+    openItems: true,
     code: '1312',
     name: 'Phải thu của khách hàng — EUR',
     type: 'asset',
@@ -110,6 +115,8 @@ const ACCOUNTS: {
   },
   {
     key: 'arAud',
+    // A claim on somebody, so it is managed as open items and ages.
+    openItems: true,
     code: '1313',
     name: 'Phải thu của khách hàng — AUD',
     type: 'asset',
@@ -166,6 +173,8 @@ const ACCOUNTS: {
   },
   {
     key: 'payable',
+    // A claim on somebody, so it is managed as open items and ages.
+    openItems: true,
     code: '331',
     name: 'Phải trả cho người bán',
     type: 'liability',
@@ -416,6 +425,7 @@ async function main(): Promise<void> {
         code: account.code,
         overdraftAllowed: account.overdraft ?? false,
         ...(account.monetary === undefined ? {} : { monetary: account.monetary }),
+        ...(account.openItems === undefined ? {} : { openItems: account.openItems }),
         ...(account.role ? { role: account.role } : {}),
       });
       ids[account.key] = created.id;

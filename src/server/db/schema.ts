@@ -341,6 +341,20 @@ export const accounts = pgTable(
      * treatments at once.
      */
     monetary: boolean('monetary').notNull().default(true),
+    /**
+     * Whether this account is managed as a set of open items.
+     *
+     * "How long has this been outstanding" only means something for an
+     * account whose balance is unsettled documents — invoices a customer has
+     * not paid, bills we have not. A bank account is a monetary asset with a
+     * balance exactly like a receivable, and ageing it produces a confident,
+     * meaningless table: that money is not outstanding, it is there.
+     *
+     * The third property the five types cannot express, after `monetary` and
+     * `role`, and carried the same way rather than guessed from a code prefix
+     * that would only work on one chart.
+     */
+    openItems: boolean('open_items').notNull().default(false),
     /** Optimistic-concurrency token, incremented on every balance change. */
     version: integer('version').notNull().default(0),
     /**
