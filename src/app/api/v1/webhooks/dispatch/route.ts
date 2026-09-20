@@ -3,6 +3,7 @@ import { defineRoute, json } from '@/server/http/route';
 import { problem, problemResponse } from '@/server/http/problem';
 import { authentication } from '@/server/container';
 import { createDispatcher } from '@/server/services/webhook-dispatcher';
+import { sweepRateLimits } from '@/server/http/durable-rate-limit';
 import { db } from '@/server/db/client';
 
 /**
@@ -46,8 +47,12 @@ export const POST = defineRoute(
       totals.retrying += result.retrying;
     }
 
-    logger.info('webhooks.dispatched', { ...totals, tenants: orgs.length });
-    return json({ data: { ...totals, tenants: orgs.length } });
+    // Rides along rather than taking a schedule of its own: a second cron
+    // entry to delete a few rows is a second thing that can fail silently.
+    const sweptCounters = await sweepRateLimits(database);
+
+    logger.info('webhooks.dispatched', { ...totals, tenants: orgs.length, sweptCounters });
+    return json({ data: { ...totals, tenants: orgs.length, sweptCounters } });
   },
 );
 

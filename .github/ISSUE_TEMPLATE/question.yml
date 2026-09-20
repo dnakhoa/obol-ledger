@@ -1,0 +1,18 @@
+name: Question about a decision
+description: Ask why something is built the way it is
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most decisions have an ADR under [`docs/adr/`](../tree/main/docs/adr),
+        and the honest limitations are listed in
+        [`docs/comparison.md`](../blob/main/docs/comparison.md). If the answer
+        is there but hard to find, that is worth reporting too.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+    validations:
+      required: true

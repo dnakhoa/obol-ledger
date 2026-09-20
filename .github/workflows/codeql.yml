@@ -1,0 +1,43 @@
+name: CodeQL
+
+# Weekly plus on pull requests.
+#
+# On pull requests because a finding is cheapest to fix before it merges, and
+# weekly because the *queries* change even when the code does not — a pattern
+# that was not a known vulnerability in September may be one in November, and
+# a scan that only runs on push would never revisit it.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      # Writing results to the Security tab is the point; everything else stays
+      # read-only so a compromised action cannot push, open issues or publish.
+      security-events: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # `security-extended` over the default: this repo builds SQL,
+          # composes HTTP responses and fetches caller-supplied URLs, which is
+          # exactly the surface the extra queries cover.
+          queries: security-extended
+
+      - uses: github/codeql-action/analyze@v3

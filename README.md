@@ -283,6 +283,15 @@ a ledger the attacker's input channel is "type a description". Cells are
 neutralised, the file opens with a UTF-8 BOM so Excel does not mangle every
 accented name, and it streams rather than being assembled in memory.
 
+**A limiter that holds across instances.** The counter is a sliding window in
+Postgres, not a map in one process — an in-process counter lets N instances
+allow N times the quota, and a cold start hands an attacker a fresh allowance.
+The local map stays as a pre-check that may _reject_ but never grant, because a
+local count is a subset of the shared one; that bounds database work at roughly
+the quota per client per window, which is the regime where it matters. A
+concurrency test fires forty requests from forty simulated cold starts and
+asserts ten get through; without the shared counter, all forty do.
+
 **Metrics with one alertable number.** `obol_ledger_residual_minor` has exactly
 one correct value, forever, in every currency: zero. It cannot false-positive
 on a traffic spike, which makes it the rare gauge worth waking someone for. See

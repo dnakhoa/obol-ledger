@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Live demo
+    url: https://obol-ledger.vercel.app
+    about: A seeded ledger you can post entries to.
+  - name: API contract
+    url: https://obol-ledger.vercel.app/api/openapi.json
+    about: Generated from the same schemas the routes validate with.
