@@ -209,3 +209,8 @@ export const deliveryQuerySchema = z.object({
 export const createApiKeySchema = z.object({
   name: z.string().trim().min(1).max(80),
 });
+
+/** `2026-01`. A period is a month, so its name is a month. */
+export const monthSchema = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/u, { message: 'Expected a month as YYYY-MM' });

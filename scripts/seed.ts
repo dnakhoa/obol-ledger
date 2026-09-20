@@ -23,7 +23,13 @@ import { describeTarget, schemaConnectionString, sslFor } from './connection';
 
 type Seeded = Record<string, string>;
 
-const ACCOUNTS: { key: string; name: string; type: AccountType; overdraft?: boolean }[] = [
+const ACCOUNTS: {
+  key: string;
+  name: string;
+  type: AccountType;
+  overdraft?: boolean;
+  role?: 'retained_earnings';
+}[] = [
   { key: 'cash', name: 'Operating Cash', type: 'asset' },
   { key: 'receivable', name: 'Accounts Receivable', type: 'asset' },
   { key: 'inventory', name: 'Green Coffee Inventory', type: 'asset' },
@@ -31,6 +37,15 @@ const ACCOUNTS: { key: string; name: string; type: AccountType; overdraft?: bool
   { key: 'payable', name: 'Accounts Payable', type: 'liability', overdraft: true },
   { key: 'loan', name: 'Equipment Loan', type: 'liability', overdraft: true },
   { key: 'capital', name: 'Owner Capital', type: 'equity', overdraft: true },
+  // Where a closed month's profit lands. Designated by role rather than found
+  // by name, so renaming it does not silently break the close.
+  {
+    key: 'retained',
+    name: 'Retained Earnings',
+    type: 'equity',
+    overdraft: true,
+    role: 'retained_earnings',
+  },
   { key: 'wholesale', name: 'Wholesale Revenue', type: 'revenue', overdraft: true },
   { key: 'retail', name: 'Retail Revenue', type: 'revenue', overdraft: true },
   { key: 'cogs', name: 'Cost of Goods Sold', type: 'expense', overdraft: true },
@@ -131,6 +146,7 @@ async function main(): Promise<void> {
         type: account.type,
         currency: 'USD',
         overdraftAllowed: account.overdraft ?? false,
+        ...(account.role ? { role: account.role } : {}),
       });
       ids[account.key] = created.id;
     }

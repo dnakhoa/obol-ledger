@@ -218,6 +218,7 @@ export function openApiDocument(): Record<string, unknown> {
       { name: 'Journal' },
       { name: 'Reports' },
       { name: 'Webhooks' },
+      { name: 'Periods' },
       { name: 'Credentials' },
       { name: 'Operations' },
     ],
@@ -617,6 +618,61 @@ export function openApiDocument(): Record<string, unknown> {
           responses: {
             '200': { description: 'The income statement' },
             ...problemResponses(400, 429),
+          },
+        },
+      },
+      '/periods': {
+        get: {
+          tags: ['Periods'],
+          summary: 'Months, and whether they still accept entries',
+          description:
+            'A month with entries but no period row is open; the row is created when it is closed.',
+          responses: {
+            '200': { description: 'Months, newest first' },
+            ...problemResponses(429),
+          },
+        },
+      },
+      '/periods/{periodMonth}/close': {
+        post: {
+          tags: ['Periods'],
+          summary: 'Close a month',
+          description:
+            'Posts a closing entry that zeroes revenue and expense into retained earnings, then locks the month against any entry dated inside it. The closing entry goes through the journal like any other, so it obeys the same balance rule. Periods close in order, and the current month cannot be closed.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'periodMonth',
+              in: 'path',
+              required: true,
+              description: 'The month, as YYYY-MM.',
+              schema: { type: 'string', pattern: '^\\d{4}-(0[1-9]|1[0-2])$' },
+            },
+          ],
+          responses: {
+            '200': { description: 'The closed period' },
+            ...problemResponses(400, 401, 409, 422, 429),
+          },
+        },
+      },
+      '/periods/{periodMonth}/reopen': {
+        post: {
+          tags: ['Periods'],
+          summary: 'Reopen a closed month',
+          description:
+            'Reverses the closing entry, dated inside the month rather than today, and unlocks it. The original close stays on the record.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'periodMonth',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', pattern: '^\\d{4}-(0[1-9]|1[0-2])$' },
+            },
+          ],
+          responses: {
+            '200': { description: 'The reopened period' },
+            ...problemResponses(400, 401, 409, 429),
           },
         },
       },

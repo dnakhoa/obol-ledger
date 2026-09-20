@@ -111,6 +111,7 @@ const TENANT_TABLES = [
   'idempotency_keys',
   'webhook_endpoints',
   'webhook_deliveries',
+  'accounting_periods',
 ] as const;
 
 // A fixed internal constant, inlined rather than bound: drizzle passes a JS

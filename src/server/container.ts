@@ -6,6 +6,7 @@ import { createApiKeyService } from './services/api-keys';
 import { createAuthenticationService } from './services/authentication';
 import { createJournalService } from './services/journal';
 import { createReportingService } from './services/reporting';
+import { createPeriodService } from './services/periods';
 import { createWebhookService } from './services/webhooks';
 import { SetupRequiredError } from './setup-error';
 
@@ -28,6 +29,7 @@ export function servicesFor(orgId: string) {
     apiKeys: createApiKeyService(database, orgId),
     journal: createJournalService(database, orgId),
     reporting: createReportingService(database, orgId),
+    periods: createPeriodService(database, orgId),
     webhooks: createWebhookService(database, orgId),
   };
 }

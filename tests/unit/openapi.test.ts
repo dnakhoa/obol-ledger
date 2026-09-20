@@ -106,6 +106,9 @@ describe('OpenAPI document', () => {
       '/webhook-deliveries/{deliveryId}/replay',
       // Triggered by the scheduler with nothing to say.
       '/webhooks/dispatch',
+      // A close names its month in the path and derives everything else.
+      '/periods/{periodMonth}/close',
+      '/periods/{periodMonth}/reopen',
     ];
 
     for (const { path, method, operation } of operations) {

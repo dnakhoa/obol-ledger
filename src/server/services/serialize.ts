@@ -38,6 +38,7 @@ export function toAccountDto(row: AccountRow): AccountDto {
     availableBalance: toMoneyDto(balances.available, currency),
     version: row.version,
     metadata: row.metadata,
+    role: row.role,
     createdAt: row.createdAt.toISOString(),
   };
 }
