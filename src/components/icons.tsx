@@ -136,6 +136,15 @@ export const ScaleIcon = (props: IconProps) => (
   </Icon>
 );
 
+/** A stacked pallet: what a lot of stock physically looks like. */
+export const StockIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 8.5 12 4l9 4.5-9 4.5Z" />
+    <path d="M3 12.5 12 17l9-4.5" />
+    <path d="M3 16.5 12 21l9-4.5" />
+  </Icon>
+);
+
 export const WebhookIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M9 10.5a3 3 0 1 1 4.2 2.75L15.5 17" />

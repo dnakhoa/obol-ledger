@@ -11,6 +11,7 @@ import {
   ReportsIcon,
   CalendarIcon,
   SettingsIcon,
+  StockIcon,
   TransferIcon,
   WebhookIcon,
 } from './icons';
@@ -24,6 +25,7 @@ import {
 const LINKS = [
   { href: '/', label: 'Overview', Icon: GaugeIcon, exact: true },
   { href: '/accounts', label: 'Accounts', Icon: AccountsIcon, exact: false },
+  { href: '/stock', label: 'Stock', Icon: StockIcon, exact: false },
   { href: '/journal', label: 'Journal', Icon: JournalIcon, exact: false },
   { href: '/reports', label: 'Reports', Icon: ReportsIcon, exact: false },
   { href: '/month-end', label: 'Month end', Icon: CalendarIcon, exact: false },
@@ -35,11 +37,21 @@ const LINKS = [
 
 /**
  * The bottom bar caps at five, which is the practical ceiling before targets
- * drop below a comfortable 44px. The three that give up their slots are the
- * ones nobody does on a phone: reading an API reference, wiring up a webhook,
- * or copying a freshly issued key into a config file.
+ * drop below a comfortable 44px. The ones that give up their slots are those
+ * nobody does on a phone: reading an API reference, wiring up a webhook,
+ * copying a freshly issued key into a config file, reading a report that wants
+ * a wide table, or closing a month — which is a desk job done once, carefully.
+ *
+ * Stock takes a slot because it is the opposite: it is the thing somebody
+ * checks standing in the yard.
  */
-const DESKTOP_ONLY = new Set(['/api-reference', '/webhooks', '/settings', '/month-end']);
+const DESKTOP_ONLY = new Set([
+  '/api-reference',
+  '/webhooks',
+  '/settings',
+  '/month-end',
+  '/reports',
+]);
 
 const MOBILE_LINKS = LINKS.filter((link) => !DESKTOP_ONLY.has(link.href));
 

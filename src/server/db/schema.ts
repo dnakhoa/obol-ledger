@@ -21,6 +21,8 @@ import { ACCOUNT_STATUSES, ACCOUNT_TYPES } from '@/server/domain/account';
 import { TRANSACTION_STATUSES } from '@/server/domain/transaction-status';
 import { DELIVERY_STATUSES } from '@/server/domain/webhook';
 import { ACCOUNT_ROLES, PERIOD_STATUSES } from '@/server/domain/period';
+import type { CostingMethod } from '@/server/domain/costing';
+import type { Unit } from '@/lib/quantity';
 
 /**
  * The ledger schema.
@@ -73,6 +75,15 @@ export const organizations = pgTable('organizations', {
    * than a trigger that reads this table.
    */
   chartTemplate: text('chart_template').notNull().default('generic'),
+  /**
+   * How this tenant decides what the stock that left actually cost.
+   *
+   * Beside the chart template because it is the same shape of decision:
+   * partly convention, partly law. LIFO is permitted under US GAAP and
+   * prohibited under IFRS and Vietnamese VAS, and a CHECK refuses it on any
+   * chart but the US one. See `docs/adr/0013-inventory-costing.md`.
+   */
+  costingMethod: text('costing_method').$type<CostingMethod>().notNull().default('fifo'),
   /**
    * The one ledger a signed-out visitor may read.
    *
@@ -648,5 +659,215 @@ export type AccountRow = typeof accounts.$inferSelect;
 export type NewAccountRow = typeof accounts.$inferInsert;
 export type TransactionRow = typeof transactions.$inferSelect;
 export type NewTransactionRow = typeof transactions.$inferInsert;
+/**
+ * A thing that is bought, held and sold.
+ *
+ * Distinct from the account it sits in, which is the whole point: one
+ * inventory account holds many items, so the account balance alone can never
+ * answer "what did that container cost" — the question the spreadsheet exists
+ * to answer.
+ */
+export const inventoryItems = pgTable(
+  'inventory_items',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    /** What the business calls it. Unique within the tenant. */
+    sku: text('sku').notNull(),
+    name: text('name').notNull(),
+    /** Closed list; see `src/lib/quantity.ts` for why it is not free text. */
+    unit: text('unit').$type<Unit>().notNull(),
+    /** Decimal places this item's quantities carry. Scaled integers, like money. */
+    quantityPrecision: integer('quantity_precision').notNull().default(0),
+    /** Where the stock sits, and where its cost goes when it leaves. */
+    inventoryAccountId: text('inventory_account_id').notNull(),
+    cogsAccountId: text('cogs_account_id').notNull(),
+    /**
+     * Null means "whatever the organisation uses".
+     *
+     * Overridable per item because a business genuinely needs two at once: a
+     * granite block is not interchangeable with another granite block and
+     * IAS 2 requires specific identification for it, while a pallet of pavers
+     * is interchangeable and FIFO is right.
+     */
+    costingMethod: text('costing_method').$type<CostingMethod>(),
+    /** Denormalised from the organisation and pinned by a composite key. */
+    chartTemplate: text('chart_template').notNull().default('generic'),
+    status: text('status').$type<'active' | 'archived'>().notNull().default('active'),
+    metadata: jsonb('metadata')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('inventory_items_id_org_key').on(table.id, table.orgId),
+    uniqueIndex('inventory_items_org_sku_key').on(table.orgId, table.sku),
+    index('inventory_items_org_name_idx').on(table.orgId, table.name),
+    foreignKey({
+      name: 'inventory_items_inventory_account_fk',
+      columns: [table.inventoryAccountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'inventory_items_cogs_account_fk',
+      columns: [table.cogsAccountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/**
+ * A purchase lot: a quantity that arrived at a price, and what is left of it.
+ *
+ * The only table in the ledger whose rows legitimately change, and only in one
+ * way — the remainder falls as the lot is consumed. Everything else about a
+ * layer is as fixed as a posting.
+ */
+export const costLayers = pgTable(
+  'cost_layers',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    itemId: text('item_id').notNull(),
+    /** The entry that brought it in; null only for an opening balance. */
+    transactionId: text('transaction_id'),
+    /** Container number, supplier invoice, quarry batch — what they search for. */
+    reference: text('reference'),
+    acquiredAt: timestamp('acquired_at', { withTimezone: true }).notNull(),
+    currency: char('currency', { length: 3 }).notNull(),
+    fxRate: numeric('fx_rate', { precision: 20, scale: 10 }).notNull().default('1'),
+    quantityMinor: bigint('quantity_minor', { mode: 'bigint' }).notNull(),
+    remainingQuantityMinor: bigint('remaining_quantity_minor', { mode: 'bigint' }).notNull(),
+    costMinor: bigint('cost_minor', { mode: 'bigint' }).notNull(),
+    remainingCostMinor: bigint('remaining_cost_minor', { mode: 'bigint' }).notNull(),
+    /**
+     * The functional-currency cost, frozen at the rate on the day it arrived.
+     *
+     * Inventory is non-monetary under IAS 21, so this never moves again even
+     * while the payable that financed it is retranslated every month end. One
+     * credit purchase, two treatments — see `docs/adr/0012-fx-revaluation.md`.
+     */
+    baseCostMinor: bigint('base_cost_minor', { mode: 'bigint' }).notNull(),
+    remainingBaseCostMinor: bigint('remaining_base_cost_minor', { mode: 'bigint' }).notNull(),
+    metadata: jsonb('metadata')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('cost_layers_id_org_key').on(table.id, table.orgId),
+    index('cost_layers_item_idx').on(table.orgId, table.itemId, table.acquiredAt),
+    foreignKey({
+      name: 'cost_layers_item_fk',
+      columns: [table.itemId, table.orgId],
+      foreignColumns: [inventoryItems.id, inventoryItems.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'cost_layers_transaction_fk',
+      columns: [table.transactionId, table.orgId],
+      foreignColumns: [transactions.id, transactions.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/** Something happened to the stock. Append-only, like postings. */
+export const inventoryMovements = pgTable(
+  'inventory_movements',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    itemId: text('item_id').notNull(),
+    kind: text('kind').$type<'receipt' | 'issue' | 'writeoff'>().notNull(),
+    quantityMinor: bigint('quantity_minor', { mode: 'bigint' }).notNull(),
+    costMinor: bigint('cost_minor', { mode: 'bigint' }).notNull(),
+    baseCostMinor: bigint('base_cost_minor', { mode: 'bigint' }).notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    /**
+     * The entry this movement generated.
+     *
+     * Every movement posts one. The point of the exercise is that the cost of
+     * goods sold goes through the ordinary journal and so obeys the balance
+     * rule and the period lock like anything else; what the layers decide is
+     * the amount, not the rules.
+     */
+    transactionId: text('transaction_id').notNull(),
+    /** For a receipt, the layer it opened. */
+    layerId: text('layer_id'),
+    /**
+     * The method in force when this happened, recorded rather than looked up.
+     * A tenant that changes method must not have its history reinterpreted.
+     */
+    costingMethod: text('costing_method').$type<CostingMethod>().notNull(),
+    reference: text('reference'),
+    metadata: jsonb('metadata')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('inventory_movements_id_org_key').on(table.id, table.orgId),
+    index('inventory_movements_item_idx').on(table.orgId, table.itemId, table.occurredAt, table.id),
+    foreignKey({
+      name: 'inventory_movements_item_fk',
+      columns: [table.itemId, table.orgId],
+      foreignColumns: [inventoryItems.id, inventoryItems.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'inventory_movements_transaction_fk',
+      columns: [table.transactionId, table.orgId],
+      foreignColumns: [transactions.id, transactions.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'inventory_movements_layer_fk',
+      columns: [table.layerId, table.orgId],
+      foreignColumns: [costLayers.id, costLayers.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/**
+ * Which lots a movement ate.
+ *
+ * The answer to "which container did this shipment come from" — the question
+ * the spreadsheet existed to answer and the one a packaged accounting system
+ * usually cannot.
+ */
+export const layerConsumptions = pgTable(
+  'layer_consumptions',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    movementId: text('movement_id').notNull(),
+    layerId: text('layer_id').notNull(),
+    quantityMinor: bigint('quantity_minor', { mode: 'bigint' }).notNull(),
+    costMinor: bigint('cost_minor', { mode: 'bigint' }).notNull(),
+    baseCostMinor: bigint('base_cost_minor', { mode: 'bigint' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // A movement that drew from the same lot twice is a movement whose
+    // arithmetic ran twice, which is how a double count gets in.
+    uniqueIndex('layer_consumptions_movement_layer_key').on(table.movementId, table.layerId),
+    index('layer_consumptions_layer_idx').on(table.orgId, table.layerId),
+    foreignKey({
+      name: 'layer_consumptions_movement_fk',
+      columns: [table.movementId, table.orgId],
+      foreignColumns: [inventoryMovements.id, inventoryMovements.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'layer_consumptions_layer_fk',
+      columns: [table.layerId, table.orgId],
+      foreignColumns: [costLayers.id, costLayers.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
 export type PostingRow = typeof postings.$inferSelect;
 export type NewPostingRow = typeof postings.$inferInsert;
+export type InventoryItemRow = typeof inventoryItems.$inferSelect;
+export type CostLayerRow = typeof costLayers.$inferSelect;
+export type InventoryMovementRow = typeof inventoryMovements.$inferSelect;

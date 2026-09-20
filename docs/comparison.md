@@ -17,32 +17,33 @@ expects a set of books to have.
 
 ## Present, and to the same standard
 
-| Capability                                 | Notes                                                                                                                                                                       |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Double-entry with an enforced balance rule | A `DEFERRABLE INITIALLY DEFERRED` constraint trigger, so it holds against `psql` too, not only against the application                                                      |
-| Signed, debit-positive postings            | One representation; presentation flips by account class                                                                                                                     |
-| Money as integer minor units               | Strings on the wire — a JSON number has already lost the cent                                                                                                               |
-| Pending / posted / archived entries        | Three balances, and the overdraft rule consults _available_                                                                                                                 |
-| Immutable history, reversals               | `UPDATE`/`DELETE` rejected at the table; a partial unique index allows one reversal per entry                                                                               |
-| **Multi-currency entries**                 | An entry balances in the organisation's functional currency; each posting keeps what moved _and_ what it was worth. [ADR 10](adr/0010-multi-currency.md)                    |
-| **Realized FX gain and loss**              | Absorbed into a designated account, and only when each transaction currency already balances — so the adjustment cannot hide a typo                                         |
-| **Unrealized FX revaluation**              | IAS 21 remeasurement of foreign monetary balances at the closing rate; inventory and fixed assets stay at historical rate                                                   |
-| **Period close**                           | Locks the month and zeroes revenue and expense into retained earnings. The lock is a trigger, because back-dating arrives through import scripts that never see the service |
-| **Account codes and chart templates**      | Generic, AU/NZ and Thông tư 200. Under a statutory chart the leading digit must agree with the account type, and the database enforces it                                   |
-| Financial statements                       | Trial balance, balance sheet, income statement, from the same postings                                                                                                      |
-| Metadata on accounts and entries           | `GIN (metadata jsonb_path_ops)`; the containment lookup is 33× the `->>` form most people write first, with plans in [benchmarks](benchmarks.md)                            |
-| CSV export                                 | Streamed, RFC 4180, UTF-8 BOM, and cells beginning `=` neutralised against spreadsheet formula injection                                                                    |
-| Idempotency keys                           | Claim-first, fingerprinted over the canonicalised body                                                                                                                      |
-| Cursor pagination                          | Keyset, bidirectional. 25 rows and 6 buffers at page 5,000, against 125,025 rows and 3,015 buffers for `OFFSET`                                                             |
-| Optimistic concurrency                     | `version` per account, checked on write                                                                                                                                     |
-| Multi-tenancy                              | `FORCE`d row-level security, plus a runtime probe that the connection is actually subject to it                                                                             |
-| **Accounts and sign-in**                   | OAuth only. Authorisation is a membership row the policies key off, not the auth library's own organisation model                                                           |
-| Rate limiting across instances             | Sliding window counted in Postgres, with the in-process window kept as a pre-check that can only reject                                                                     |
-| Webhooks                                   | Transactional outbox, Standard Webhooks signatures, backoff with jitter, circuit breaker, delivery log                                                                      |
-| API key management                         | Digest-stored, scannable prefix, revocation that keeps the row                                                                                                              |
-| RFC 9457 problem responses                 | One table maps every domain error to a status                                                                                                                               |
-| OpenAPI document                           | Generated from the same Zod schemas the routes validate with, and a test reads the routes off disk to prove nothing is undocumented                                         |
-| Metrics and alerting                       | Prometheus text format; `obol_ledger_residual_minor` has exactly one correct value                                                                                          |
+| Capability                                 | Notes                                                                                                                                                                                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Double-entry with an enforced balance rule | A `DEFERRABLE INITIALLY DEFERRED` constraint trigger, so it holds against `psql` too, not only against the application                                                                                      |
+| Signed, debit-positive postings            | One representation; presentation flips by account class                                                                                                                                                     |
+| Money as integer minor units               | Strings on the wire — a JSON number has already lost the cent                                                                                                                                               |
+| Pending / posted / archived entries        | Three balances, and the overdraft rule consults _available_                                                                                                                                                 |
+| Immutable history, reversals               | `UPDATE`/`DELETE` rejected at the table; a partial unique index allows one reversal per entry                                                                                                               |
+| **Multi-currency entries**                 | An entry balances in the organisation's functional currency; each posting keeps what moved _and_ what it was worth. [ADR 10](adr/0010-multi-currency.md)                                                    |
+| **Realized FX gain and loss**              | Absorbed into a designated account, and only when each transaction currency already balances — so the adjustment cannot hide a typo                                                                         |
+| **Unrealized FX revaluation**              | IAS 21 remeasurement of foreign monetary balances at the closing rate; inventory and fixed assets stay at historical rate                                                                                   |
+| **Period close**                           | Locks the month and zeroes revenue and expense into retained earnings. The lock is a trigger, because back-dating arrives through import scripts that never see the service                                 |
+| **Account codes and chart templates**      | Generic, AU/NZ, US, Japan and Thông tư 200. Under a statutory chart the leading digit must agree with the account type, and the database enforces it                                                        |
+| **Inventory costing**                      | Cost layers per delivery; FIFO, weighted average, specific identification and LIFO, chosen per tenant and overridable per item. LIFO is refused outside a US chart. [ADR 13](adr/0013-inventory-costing.md) |
+| Financial statements                       | Trial balance, balance sheet, income statement, from the same postings                                                                                                                                      |
+| Metadata on accounts and entries           | `GIN (metadata jsonb_path_ops)`; the containment lookup is 33× the `->>` form most people write first, with plans in [benchmarks](benchmarks.md)                                                            |
+| CSV export                                 | Streamed, RFC 4180, UTF-8 BOM, and cells beginning `=` neutralised against spreadsheet formula injection                                                                                                    |
+| Idempotency keys                           | Claim-first, fingerprinted over the canonicalised body                                                                                                                                                      |
+| Cursor pagination                          | Keyset, bidirectional. 25 rows and 6 buffers at page 5,000, against 125,025 rows and 3,015 buffers for `OFFSET`                                                                                             |
+| Optimistic concurrency                     | `version` per account, checked on write                                                                                                                                                                     |
+| Multi-tenancy                              | `FORCE`d row-level security, plus a runtime probe that the connection is actually subject to it                                                                                                             |
+| **Accounts and sign-in**                   | OAuth only. Authorisation is a membership row the policies key off, not the auth library's own organisation model                                                                                           |
+| Rate limiting across instances             | Sliding window counted in Postgres, with the in-process window kept as a pre-check that can only reject                                                                                                     |
+| Webhooks                                   | Transactional outbox, Standard Webhooks signatures, backoff with jitter, circuit breaker, delivery log                                                                                                      |
+| API key management                         | Digest-stored, scannable prefix, revocation that keeps the row                                                                                                                                              |
+| RFC 9457 problem responses                 | One table maps every domain error to a status                                                                                                                                                               |
+| OpenAPI document                           | Generated from the same Zod schemas the routes validate with, and a test reads the routes off disk to prove nothing is undocumented                                                                         |
+| Metrics and alerting                       | Prometheus text format; `obol_ledger_residual_minor` has exactly one correct value                                                                                                                          |
 
 ## Present here, absent there
 
@@ -51,6 +52,22 @@ infrastructure, and the balance sheet belongs to whoever consumes them. Obol
 produces a trial balance, a balance sheet and an income statement from the same
 postings, because the point of the project is to show that the model is
 complete enough to close a book with.
+
+The inventory costing is the other one, and it is worth being precise about.
+Xero's own tracked inventory values stock at a moving weighted average and has
+no FIFO; FIFO arrives with **Xero Inventory Plus**, which is
+[available in the United States only](https://central.xero.com/s/article/About-Xero-Inventory-Plus)
+and whose rollout to other regions
+[sits on the ideas forum without a roadmap commitment](https://productideas.xero.com/forums/967139-purchase-orders-bills-inventory/suggestions/50393745-inventory-plus-roll-out-xero-inventory-plus-to-a).
+So an importer in Vietnam, Australia or New Zealand cannot buy FIFO from Xero
+at all — which is exactly why so many of them keep the calculation in a
+spreadsheet with a macro walking the purchase lots.
+
+That is not a claim to have out-built Xero. It is the observation that the
+missing piece is small, specific, and squarely a ledger problem: a lot is a
+quantity at a price, and drawing from lots in an order is arithmetic the
+database can hold an invariant over. Obol does the drawing, names the lots each
+shipment came from, and refuses a shipment larger than the yard.
 
 ## Deliberately absent
 
@@ -69,7 +86,9 @@ as an oversight and a gap you have already written down reads as a plan.
 | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ~~Account codes and chart-of-accounts templates~~    | **Shipped.** Generic, AU/NZ, and Vietnam's Thông tư 200. A conventional chart's numbering is a starting point the tenant edits; a statutory one's is enforced by the database. [ADR 11](adr/0011-chart-of-accounts.md) |
 | ~~Unrealized FX revaluation~~                        | **Shipped.** Foreign monetary balances retranslated at the closing rate, cumulative rather than reversing, and the period close refuses without it. [ADR 12](adr/0012-fx-revaluation.md)                               |
+| ~~Inventory costing methods~~                        | **Shipped.** FIFO, weighted average, specific identification and LIFO, with LIFO unrepresentable outside a US chart because IFRS and Vietnamese VAS prohibit it. [ADR 13](adr/0013-inventory-costing.md)               |
 | **Consumption tax**                                  | GST/VAT with input credits, EU reverse charge, and US sales tax are three different mechanisms, and modelling them as one is wrong in a way that only surfaces when you try to produce a return                        |
+| ~~Importing deliveries from a spreadsheet~~          | **Shipped.** Paste a block out of Excel, see every row as the ledger read it, then import all of them or none. Tab, comma and semicolon; day-first dates; headers in the user's own language                           |
 | **Documents**                                        | The invoice, customs declaration and bill of lading attached to the entry they justify                                                                                                                                 |
 | **Audit trail by user**                              | Who entered this. Cheap now that sessions exist                                                                                                                                                                        |
 | **Invites and roles**                                | An organisation has exactly one member today                                                                                                                                                                           |

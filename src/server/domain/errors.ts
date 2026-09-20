@@ -87,6 +87,37 @@ export type LedgerError =
       readonly code: 'currency_imbalance';
       readonly currency: CurrencyCode;
       readonly residual: string;
+    }
+  | { readonly code: 'item_not_found'; readonly itemId: string }
+  | { readonly code: 'item_archived'; readonly itemId: string }
+  | { readonly code: 'sku_taken'; readonly sku: string }
+  | {
+      readonly code: 'insufficient_stock';
+      readonly itemId: string;
+      /** Scaled by the item's precision, like every other quantity. */
+      readonly requested: string;
+      readonly available: string;
+      readonly precision: number;
+      readonly unit: string;
+    }
+  | { readonly code: 'cost_layer_not_found'; readonly layerId: string }
+  | { readonly code: 'cost_layer_required'; readonly itemId: string }
+  | {
+      readonly code: 'costing_method_not_permitted';
+      readonly method: string;
+      readonly chartTemplate: string;
+    }
+  | {
+      readonly code: 'inventory_account_not_functional';
+      readonly accountId: string;
+      readonly currency: CurrencyCode;
+      readonly functional: CurrencyCode;
+    }
+  | {
+      readonly code: 'account_wrong_type';
+      readonly accountId: string;
+      readonly expected: string;
+      readonly actual: string;
     };
 
 export type LedgerErrorCode = LedgerError['code'];
@@ -124,6 +155,15 @@ const TITLES: Record<LedgerErrorCode, string> = {
   revaluation_required: 'Foreign balances have not been retranslated',
   amount_not_representable: 'Amount could not be interpreted',
   currency_imbalance: 'Entry does not balance within a currency',
+  item_not_found: 'Item not found',
+  item_archived: 'Item is archived',
+  sku_taken: 'That item code is already in use',
+  insufficient_stock: 'Not enough stock on hand',
+  cost_layer_not_found: 'Cost layer not found',
+  cost_layer_required: 'A specific lot must be named',
+  costing_method_not_permitted: 'That costing method is not permitted here',
+  inventory_account_not_functional: 'Inventory must be held in the functional currency',
+  account_wrong_type: 'Account is of the wrong type for this use',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -192,5 +232,32 @@ export function describe(error: LedgerError): string {
       return `The ${error.currency} postings sum to ${error.residual} rather than zero. An exchange difference can only be absorbed when each currency already balances on its own — otherwise the adjustment would hide a mistyped amount.`;
     case 'retained_earnings_missing':
       return 'No account is designated as retained earnings, so a period\u2019s profit has nowhere to go. Mark one equity account with the retained_earnings role.';
+    case 'item_not_found':
+      return `No inventory item with id ${error.itemId}.`;
+    case 'item_archived':
+      return `Item ${error.itemId} is archived, so stock cannot move in or out of it. Reopen it first.`;
+    case 'sku_taken':
+      return `Another item already uses the code ${error.sku}. Item codes are how a stock movement names what moved, so they have to be unique.`;
+    case 'insufficient_stock':
+      return `Only ${quantityText(error.available, error.precision)} ${error.unit} on hand, and ${quantityText(error.requested, error.precision)} was requested. Nothing has been posted \u2014 record the receipt that is missing, or correct the quantity.`;
+    case 'cost_layer_not_found':
+      return `No cost layer with id ${error.layerId}. It may already be exhausted.`;
+    case 'cost_layer_required':
+      return `Item ${error.itemId} is costed by specific identification, so the lot being shipped has to be named. That is the point of the method: these units are not interchangeable with the ones beside them.`;
+    case 'costing_method_not_permitted':
+      return `${error.method} is not permitted on a ${error.chartTemplate} chart. LIFO is allowed under US GAAP and prohibited under IFRS and Vietnamese accounting, so it is only available to a US ledger.`;
+    case 'inventory_account_not_functional':
+      return `Account ${error.accountId} is held in ${error.currency}, and inventory must be held in ${error.functional}. Stock is a non-monetary item: its carrying amount is fixed at the rate on the day it arrived, so denominating the account itself in a foreign currency would mean retranslating a figure that must never move.`;
+    case 'account_wrong_type':
+      return `Account ${error.accountId} is ${error.actual}, and this needs ${error.expected}.`;
   }
+}
+
+/** `24687` at precision 3 → `24.687`. Kept local; errors carry raw scaled values. */
+function quantityText(scaled: string, precision: number): string {
+  if (precision === 0) return scaled;
+  const negative = scaled.startsWith('-');
+  const digits = (negative ? scaled.slice(1) : scaled).padStart(precision + 1, '0');
+  const cut = digits.length - precision;
+  return `${negative ? '-' : ''}${digits.slice(0, cut)}.${digits.slice(cut)}`;
 }

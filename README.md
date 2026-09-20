@@ -20,8 +20,9 @@ posting inserts and Postgres reports `40P01 deadlock detected`. Remove
 `SKIP LOCKED` and four webhook workers collapse to one. Connect as a role with
 `BYPASSRLS` and the health probe says so before a request is served.
 
-**Double-entry core** · pending/posted/archived with three balances · reversals
-· idempotency · keyset pagination · optimistic concurrency ·
+**Double-entry core** · **multi-currency** balanced in the functional currency ·
+**FIFO inventory costing** · pending/posted/archived with three balances ·
+reversals · idempotency · keyset pagination · optimistic concurrency ·
 **row-level tenant isolation** · **webhooks** through a transactional outbox ·
 API key management · metadata with a GIN index · CSV export · Prometheus
 metrics · generated OpenAPI · ⌘K
@@ -442,6 +443,7 @@ including the metadata filter and every problem type, are in the
 - [ADR 10](docs/adr/0010-multi-currency.md) — balancing in the functional currency
 - [ADR 11](docs/adr/0011-chart-of-accounts.md) — account codes, convention versus law
 - [ADR 12](docs/adr/0012-fx-revaluation.md) — unrealized FX as a remeasurement
+- [ADR 13](docs/adr/0013-inventory-costing.md) — inventory as layers, costing as a policy
 
 ## Licence
 
