@@ -297,6 +297,56 @@ describe('chart of accounts', () => {
     });
   });
 
+  describe('tax, which is where jurisdictions actually differ', () => {
+    it('gives the US no input-tax account, because sales tax is not reclaimable', async () => {
+      // The modelling error worth refusing: US sales tax is levied once, at
+      // the final sale, and a business never reclaims tax it paid on its own
+      // purchases. An input-tax asset would accumulate a receivable from the
+      // state that does not exist.
+      const names = CHART_TEMPLATE_DEFINITIONS.us_gaap.accounts.map((a) => a.name.toLowerCase());
+      expect(names.some((name) => name.includes('sales tax payable'))).toBe(true);
+      expect(names.some((name) => name.includes('tax') && name.includes('receivable'))).toBe(false);
+      expect(names.some((name) => name.includes('input tax'))).toBe(false);
+    });
+
+    it('gives Japan both halves, because consumption tax is reclaimable', async () => {
+      // 仮払消費税 paid and 仮受消費税 collected. The return is the net, which
+      // is only expressible if both exist.
+      const codes = CHART_TEMPLATE_DEFINITIONS.jp.accounts;
+      const paid = codes.find((a) => a.name.includes('仮払消費税'));
+      const received = codes.find((a) => a.name.includes('仮受消費税'));
+      expect(paid?.type).toBe('asset');
+      expect(received?.type).toBe('liability');
+    });
+
+    it('gives AU/NZ both halves too, for the same reason', async () => {
+      const names = CHART_TEMPLATE_DEFINITIONS.au_nz.accounts;
+      expect(names.find((a) => a.name.includes('GST Paid'))?.type).toBe('asset');
+      expect(names.find((a) => a.name.includes('GST Collected'))?.type).toBe('liability');
+    });
+  });
+
+  describe('every market this is aimed at', () => {
+    it.each(['generic', 'au_nz', 'us_gaap', 'jp', 'vn_tt200'] as const)(
+      'opens a usable ledger from the %s chart',
+      async (template) => {
+        const user = await createUser(`${template}@example.test`);
+        const { orgId } = await createLedger({
+          userId: user.id,
+          name: template,
+          functionalCurrency: template === 'jp' ? 'JPY' : template === 'vn_tt200' ? 'VND' : 'USD',
+          chartTemplate: template,
+        });
+
+        const chart = await servicesFor(db, orgId).accounts.list();
+        expect(chart.length).toBeGreaterThan(8);
+        // Opened through the ordinary account service, so a template with a
+        // code that contradicts its type would have been refused right here.
+        expect(chart.every((account) => account.code !== null)).toBe(true);
+      },
+    );
+  });
+
   describe('the templates themselves', () => {
     it('ships a statutory chart that satisfies its own rule', async () => {
       // A template with a wrong code would be rejected at onboarding rather
