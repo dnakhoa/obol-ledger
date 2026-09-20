@@ -53,6 +53,7 @@ export const vi: Messages = {
     webhooks: 'Webhook',
     api: 'API',
     settings: 'Cài đặt',
+    morePages: 'Các trang khác',
   },
 
   overview: {

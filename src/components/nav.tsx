@@ -42,6 +42,7 @@ export type NavLabels = {
   readonly webhooks: string;
   readonly api: string;
   readonly settings: string;
+  readonly morePages: string;
 };
 
 const LINKS = [
@@ -81,6 +82,39 @@ const DESKTOP_ONLY = new Set([
 ]);
 
 const MOBILE_LINKS = LINKS.filter((link) => !DESKTOP_ONLY.has(link.href));
+const OVERFLOW_LINKS = LINKS.filter((link) => DESKTOP_ONLY.has(link.href));
+
+/**
+ * The destinations the bottom bar could not fit, listed in the open.
+ *
+ * Rendered at the foot of every page below `lg`, as plain links rather than
+ * behind a "More" button. A menu would be tidier and would also mean five of
+ * the ten pages exist only for somebody who thinks to go looking — which for
+ * an audience that has never used the application before is the same as not
+ * existing. Nothing here toggles, expands or slides; it is a list.
+ */
+export function OverflowNav({ labels }: { labels: NavLabels }) {
+  return (
+    <nav aria-label={labels.morePages} className="border-line mt-8 border-t pt-4 lg:hidden">
+      <p className="text-ink-muted mb-2 text-[11px] font-medium tracking-wide uppercase">
+        {labels.morePages}
+      </p>
+      <ul className="flex flex-wrap gap-2">
+        {OVERFLOW_LINKS.map(({ href, key, Icon }) => (
+          <li key={href}>
+            <Link
+              href={href}
+              className="border-line bg-surface text-ink-secondary hover:bg-surface-hover hover:text-ink flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm transition-colors duration-150"
+            >
+              <Icon className="text-ink-muted shrink-0" />
+              {labels[key]}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
 
 function isActive(pathname: string, href: string, exact: boolean): boolean {
   return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);

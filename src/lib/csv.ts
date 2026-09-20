@@ -200,12 +200,32 @@ export function normaliseHeader(value: string): string {
       // accented letter being deleted along with the punctuation. Deleting it
       // turns `Mã hàng` into `mhng`, which matches nothing and reads to the
       // person who typed it as the importer not supporting Vietnamese.
-      .normalize('NFD')
-      .replaceAll(/\p{Diacritic}/gu, '')
+      //
+      // Applied to Latin runs only, which is not fussiness. Japanese voiced
+      // kana are *also* a base plus a combining mark under NFD — `ド` is `ト`
+      // plus dakuten — so decomposing the whole string and stripping marks
+      // turns 品目コード into 品目コト. Silently, and into a word that still
+      // looks like Japanese.
+      .replace(/\p{Script=Latin}+/gu, (run) => run.normalize('NFD').replace(/\p{Diacritic}/gu, ''))
       // Đ is a letter in its own right — D with a stroke — not a D with a mark
       // on it, so NFD leaves it alone and it has to be mapped by hand. Without
       // this, `Đơn vị` normalises to `nvi`.
       .replaceAll(/[đĐ]/gu, 'd')
-      .replaceAll(/[^a-z0-9]/gu, '')
+      // Latin letters, digits, and the three Japanese scripts. An `[^a-z0-9]`
+      // filter deletes 品目コード down to the empty string, and the importer
+      // then tells a Japanese user their file has no columns — the same bug
+      // the accent handling above exists to prevent, one alphabet further on.
+      //
+      // `scx` rather than `sc`: the long-vowel mark `ー` in コード belongs to
+      // no single script, so `Script=Katakana` does not match it and the word
+      // comes out as コド.
+      //
+      // Punctuation goes first and separately. CJK brackets carry
+      // Script_Extensions covering Han and the kana, so the keep-list below
+      // would preserve 「数量」 with its quotes attached. Stripping by
+      // *category* removes them while leaving `ー` and `々`, which are
+      // modifier letters rather than punctuation and are part of the word.
+      .replaceAll(/[\p{P}\p{Z}\p{S}]/gu, '')
+      .replaceAll(/[^a-z0-9\p{scx=Han}\p{scx=Hiragana}\p{scx=Katakana}]/gu, '')
   );
 }

@@ -155,7 +155,19 @@ describe('header matching across languages', () => {
     expect(parseTable('Đơn vị\nm2').headers).toEqual(['donvi']);
   });
 
-  it('handles the other languages the charts ship for', () => {
-    expect(parseTable('Menge;Béton;数量\n1;2;3').headers).toEqual(['menge', 'beton', '']);
+  it('keeps Japanese headers, which an a-z filter erases entirely', () => {
+    // 品目コード normalises to the empty string under `[^a-z0-9]`, and the
+    // importer then tells a Japanese user their file has no columns. The
+    // three Japanese scripts are kept alongside the Latin alphabet.
+    expect(parseTable('品目コード,数量,金額,日付\nA,1,2,3').headers).toEqual([
+      '品目コード',
+      '数量',
+      '金額',
+      '日付',
+    ]);
+  });
+
+  it('still drops punctuation around a Japanese header', () => {
+    expect(parseTable('「数量」 ,金額（円）\n1,2').headers).toEqual(['数量', '金額円']);
   });
 });

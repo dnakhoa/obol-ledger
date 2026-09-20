@@ -58,7 +58,27 @@ const vi: LedgerMessages = {
   importedDelivery: (reference) => withReference('Nhập kho theo dữ liệu chuyển đổi', reference),
 };
 
-const LEDGER: Record<Locale, LedgerMessages> = { en, vi };
+/**
+ * 帳簿に記帳される文言。
+ *
+ * 反対仕訳, 月次決算振替仕訳 and 売上原価 are the terms that appear on a Japanese
+ * voucher; the reference is wrapped in full-width parentheses because that is
+ * what sits correctly beside full-width text.
+ */
+const ja: LedgerMessages = {
+  reversalOf: (description) => `反対仕訳：${description}`,
+  closingEntry: (month) => `${month} 月次決算振替仕訳`,
+  reopening: (month) => `${month} の締めを解除`,
+  revaluation: (month) => `${month} 為替換算差損益の計上`,
+  stockReceived: (item, reference) =>
+    reference ? `入庫：${item}（${reference}）` : `入庫：${item}`,
+  costOfGoodsSold: (item, reference) =>
+    reference ? `売上原価：${item}（${reference}）` : `売上原価：${item}`,
+  importedDelivery: (reference) =>
+    reference ? `データ移行による入庫（${reference}）` : 'データ移行による入庫',
+};
+
+const LEDGER: Record<Locale, LedgerMessages> = { en, vi, ja };
 
 export function ledgerMessages(locale: Locale): LedgerMessages {
   return LEDGER[locale] ?? en;

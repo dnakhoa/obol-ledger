@@ -15,7 +15,7 @@
  * generates a description for itself. See `docs/adr/0014-two-locales.md`.
  */
 
-export const LOCALES = ['en', 'vi'] as const;
+export const LOCALES = ['en', 'vi', 'ja'] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
@@ -25,12 +25,14 @@ export const DEFAULT_LOCALE: Locale = 'en';
 export const LOCALE_NAMES: Record<Locale, string> = {
   en: 'English',
   vi: 'Tiếng Việt',
+  ja: '日本語',
 };
 
 /** Short label for a toggle that has to fit beside a theme switcher. */
 export const LOCALE_SHORT: Record<Locale, string> = {
   en: 'EN',
   vi: 'VI',
+  ja: 'JA',
 };
 
 export function isLocale(value: unknown): value is Locale {

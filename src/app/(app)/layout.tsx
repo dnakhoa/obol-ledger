@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { MobileNav, SidebarNav } from '@/components/nav';
+import { MobileNav, OverflowNav, SidebarNav } from '@/components/nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
 import { CommandPalette, PaletteTrigger } from '@/components/command-palette';
@@ -94,7 +94,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <CommandPalette />
 
         <main id="main" className="flex-1 px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:py-8 lg:pb-8">
-          <div className="mx-auto w-full max-w-6xl space-y-6">{children}</div>
+          <div className="mx-auto w-full max-w-6xl space-y-6">
+            {children}
+            <OverflowNav labels={t.nav} />
+          </div>
         </main>
       </div>
 

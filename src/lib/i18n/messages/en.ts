@@ -43,6 +43,7 @@ export const en = {
     webhooks: 'Webhooks',
     api: 'API',
     settings: 'Settings',
+    morePages: 'More pages',
   },
 
   overview: {

@@ -17,7 +17,7 @@ import type { Locale } from './locales';
  * January here, on screen and in the spreadsheet importer alike.
  */
 
-const TAGS: Record<Locale, string> = { en: 'en-GB', vi: 'vi-VN' };
+const TAGS: Record<Locale, string> = { en: 'en-GB', vi: 'vi-VN', ja: 'ja-JP' };
 
 const VI_MONTH = (month: number) => `Tháng ${month}`;
 
@@ -61,6 +61,26 @@ export function dateFormats(locale: Locale): DateFormats {
   });
   const year = new Intl.DateTimeFormat(tag, { year: 'numeric', ...utc });
   const number = new Intl.NumberFormat(tag);
+
+  if (locale === 'ja') {
+    // Japanese writes the largest unit first and marks each with its own
+    // character: 2026年1月10日. `Intl` gets this right, so the only thing
+    // worth pinning is that a table row uses the compact 2026/01/10 while a
+    // heading spells the units out.
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    return {
+      day: (value) =>
+        `${value.getUTCFullYear()}/${pad2(value.getUTCMonth() + 1)}/${pad2(value.getUTCDate())}`,
+      month: (value) => `${value.getUTCFullYear()}年${value.getUTCMonth() + 1}月`,
+      full: (value) =>
+        `${value.getUTCFullYear()}年${value.getUTCMonth() + 1}月${value.getUTCDate()}日`,
+      time: (value) => time.format(value),
+      year: (value) => `${value.getUTCFullYear()}年`,
+      // Japanese groups in thousands with commas, like English — the 万/億
+      // grouping people read aloud is not how a figure is written on a ledger.
+      number: (value) => number.format(value),
+    };
+  }
 
   if (locale !== 'vi') {
     return {
