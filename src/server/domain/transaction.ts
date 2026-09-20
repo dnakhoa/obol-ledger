@@ -104,7 +104,15 @@ export function validateDraft(draft: DraftTransaction): Result<DraftTransaction,
   let residual = ZERO;
 
   for (const [index, posting] of postings.entries()) {
-    if (posting.amount === 0n) {
+    /*
+     * A posting must record *something*, not necessarily a movement.
+     *
+     * A retranslation carries `amount = 0` with a non-zero functional amount:
+     * the dollars in the bank are the same dollars and only their worth in
+     * dong changed. Rejecting a zero amount outright would make that
+     * unexpressible, so the rule is that both cannot be zero.
+     */
+    if (posting.amount === 0n && (posting.baseAmount ?? 0n) === 0n) {
       return err({ code: 'zero_amount_posting', index });
     }
     // Unscaled drafts never reach here: `validateDraft` runs after the

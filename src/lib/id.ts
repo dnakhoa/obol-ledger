@@ -52,6 +52,7 @@ export const ID_PREFIXES = {
   event: 'evt',
   period: 'per',
   membership: 'mem',
+  rate: 'rate',
 } as const;
 
 export type EntityKind = keyof typeof ID_PREFIXES;

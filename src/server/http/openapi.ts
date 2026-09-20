@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   createAccountSchema,
   createApiKeySchema,
+  recordRateSchema,
   createEndpointSchema,
   createEntrySchema,
   createTransferSchema,
@@ -238,6 +239,7 @@ export function openApiDocument(): Record<string, unknown> {
         CreateEndpoint: jsonSchema(createEndpointSchema),
         UpdateEndpoint: jsonSchema(updateEndpointSchema),
         CreateApiKey: jsonSchema(createApiKeySchema),
+        RecordRate: jsonSchema(recordRateSchema),
       },
     },
     paths: {
@@ -618,6 +620,62 @@ export function openApiDocument(): Record<string, unknown> {
           responses: {
             '200': { description: 'The income statement' },
             ...problemResponses(400, 429),
+          },
+        },
+      },
+      '/rates': {
+        get: {
+          tags: ['Periods'],
+          summary: 'Exchange rates on file',
+          description:
+            'Point-in-time facts, never updated. A lookup asks for the most recent rate at or before a date, so re-running last quarter\u2019s reports uses last quarter\u2019s rates.',
+          responses: {
+            '200': { description: 'Rates, newest first' },
+            ...problemResponses(429),
+          },
+        },
+        post: {
+          tags: ['Periods'],
+          summary: 'Record a rate',
+          description:
+            'Re-recording the same pair, day and source is a correction rather than a second opinion. A rate is a decimal string with up to ten places \u2014 never a JSON number, which would already have lost precision.',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/RecordRate' } },
+            },
+          },
+          responses: {
+            '201': { description: 'Recorded' },
+            ...problemResponses(400, 401, 422, 429),
+          },
+        },
+      },
+      '/periods/{periodMonth}/revalue': {
+        post: {
+          tags: ['Periods'],
+          summary: 'Retranslate foreign monetary balances at the closing rate',
+          description:
+            'IAS 21 remeasurement: cash, receivables and payables held in a foreign currency are restated at the month-end rate and the difference goes to profit or loss. Inventory and fixed assets are not \u2014 they stay at the rate they were bought at. Cumulative rather than reversing, so running it twice posts nothing the second time. `?preview=true` computes the adjustment without posting it.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'periodMonth',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', pattern: '^\\d{4}-(0[1-9]|1[0-2])$' },
+            },
+            {
+              name: 'preview',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', enum: ['true', 'false'], default: 'false' },
+            },
+          ],
+          responses: {
+            '200': { description: 'The retranslation, posted or previewed' },
+            ...problemResponses(400, 401, 409, 422, 429),
           },
         },
       },

@@ -40,6 +40,8 @@ export type AccountDto = {
   readonly metadata: Readonly<Record<string, string>>;
   /** Structural job, if any — currently only `retained_earnings`. */
   readonly role: string | null;
+  /** Retranslated at each period end when held in a foreign currency. */
+  readonly monetary: boolean;
   readonly createdAt: string;
 };
 

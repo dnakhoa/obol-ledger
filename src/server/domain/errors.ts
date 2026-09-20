@@ -73,6 +73,11 @@ export type LedgerError =
   | { readonly code: 'rate_not_found'; readonly base: CurrencyCode; readonly quote: CurrencyCode }
   | { readonly code: 'fx_account_missing' }
   | {
+      readonly code: 'revaluation_required';
+      readonly periodMonth: string;
+      readonly accounts: readonly string[];
+    }
+  | {
       readonly code: 'amount_not_representable';
       readonly accountId: string;
       readonly amount: string;
@@ -116,6 +121,7 @@ const TITLES: Record<LedgerErrorCode, string> = {
   invalid_fx_rate: 'Exchange rate is not a positive decimal',
   rate_not_found: 'No exchange rate on file',
   fx_account_missing: 'No foreign exchange gain/loss account',
+  revaluation_required: 'Foreign balances have not been retranslated',
   amount_not_representable: 'Amount could not be interpreted',
   currency_imbalance: 'Entry does not balance within a currency',
 };
@@ -178,6 +184,8 @@ export function describe(error: LedgerError): string {
       return `No ${error.base}/${error.quote} rate is on file at or before that date. Record one, or supply the rate with the entry.`;
     case 'amount_not_representable':
       return `An amount of "${error.amount}" is not representable in ${error.currency}, which is what account ${error.accountId} holds.`;
+    case 'revaluation_required':
+      return `${error.periodMonth} holds foreign currency balances (${error.accounts.join(', ')}) that have not been retranslated at the closing rate. Closing now would seal a balance sheet stated at out-of-date rates. Revalue the period first.`;
     case 'fx_account_missing':
       return 'No account is designated as foreign exchange gain/loss, so an exchange difference has nowhere to go. Mark one revenue or expense account with the fx_gain_loss role.';
     case 'currency_imbalance':

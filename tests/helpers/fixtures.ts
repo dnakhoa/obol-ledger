@@ -6,6 +6,8 @@ import { createApiKeyService } from '@/server/services/api-keys';
 import { createJournalService } from '@/server/services/journal';
 import { createReportingService } from '@/server/services/reporting';
 import { createPeriodService } from '@/server/services/periods';
+import { createRateService } from '@/server/services/rates';
+import { createRevaluationService } from '@/server/services/revaluation';
 import { createWebhookService } from '@/server/services/webhooks';
 import type { Database } from '@/server/db/types';
 import type { AccountType } from '@/server/domain/account';
@@ -18,6 +20,8 @@ export function servicesFor(database: Database, orgId: string) {
     journal: createJournalService(database, orgId),
     reporting: createReportingService(database, orgId),
     periods: createPeriodService(database, orgId),
+    rates: createRateService(database, orgId),
+    revaluation: createRevaluationService(database, orgId),
     webhooks: createWebhookService(database, orgId),
   };
 }

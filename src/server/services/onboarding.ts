@@ -72,6 +72,7 @@ export async function createLedger(input: CreateLedgerInput): Promise<{ orgId: s
       type: account.type,
       currency: input.functionalCurrency,
       overdraftAllowed: account.overdraft ?? false,
+      ...(account.monetary === undefined ? {} : { monetary: account.monetary }),
       ...(account.role ? { role: account.role } : {}),
     });
   }

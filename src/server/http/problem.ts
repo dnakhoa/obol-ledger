@@ -56,6 +56,7 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   invalid_fx_rate: 422,
   rate_not_found: 422,
   fx_account_missing: 409,
+  revaluation_required: 409,
   amount_not_representable: 422,
   currency_imbalance: 422,
 };

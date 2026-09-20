@@ -308,6 +308,16 @@ export const accounts = pgTable(
     pendingOutflowMinor: bigint('pending_outflow_minor', { mode: 'bigint' })
       .notNull()
       .default(sql`0`),
+    /**
+     * Whether this account holds a fixed number of currency units.
+     *
+     * IAS 21's distinction, and the one our five account types cannot make:
+     * cash, receivables and payables are *monetary* and are retranslated at
+     * each period end; inventory and fixed assets are not, and stay at the
+     * rate they were bought at. One credit purchase of stock produces both
+     * treatments at once.
+     */
+    monetary: boolean('monetary').notNull().default(true),
     /** Optimistic-concurrency token, incremented on every balance change. */
     version: integer('version').notNull().default(0),
     /**
@@ -581,6 +591,9 @@ export const accountingPeriods = pgTable(
     periodMonth: date('period_month').notNull(),
     status: periodStatus('status').notNull().default('open'),
     closedAt: timestamp('closed_at', { withTimezone: true }),
+    /** When foreign monetary balances were retranslated for this month. */
+    revaluedAt: timestamp('revalued_at', { withTimezone: true }),
+    revaluationTransactionId: text('revaluation_transaction_id'),
     /** The entry that zeroed revenue and expense. Null while open. */
     closingTransactionId: text('closing_transaction_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

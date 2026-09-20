@@ -69,6 +69,11 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
   invalid_fx_rate: { code: 'invalid_fx_rate', accountId: 'acct_x', rate: 'abc' },
   rate_not_found: { code: 'rate_not_found', base: 'USD', quote: 'VND' },
   fx_account_missing: { code: 'fx_account_missing' },
+  revaluation_required: {
+    code: 'revaluation_required',
+    periodMonth: '2026-08-01',
+    accounts: ['Vietcombank USD'],
+  },
   amount_not_representable: {
     code: 'amount_not_representable',
     accountId: 'acct_x',

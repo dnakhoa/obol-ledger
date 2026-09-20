@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { err, ok, type Result } from '@/lib/result';
 import { newId } from '@/lib/id';
 import type { MinorUnits, CurrencyCode } from '@/lib/money';
@@ -10,7 +10,13 @@ import {
   TEMPORARY_ACCOUNT_TYPES,
   type PeriodStatus,
 } from '@/server/domain/period';
-import { accountingPeriods, accounts, postings, transactions } from '@/server/db/schema';
+import {
+  accountingPeriods,
+  accounts,
+  organizations,
+  postings,
+  transactions,
+} from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
 import type { Database, Transactional } from '@/server/db/types';
 import type { TransactionDto } from './dto';
@@ -153,6 +159,24 @@ export function createPeriodService(database: Database, orgId: string) {
           return err({ code: 'earlier_period_open', periodMonth, open: earliestOpen.month });
         }
 
+        /*
+         * The gate.
+         *
+         * A month holding foreign currency has to be retranslated before it
+         * is sealed, or the balance sheet it produces is stated at rates that
+         * were out of date when it was signed. Refusing is the point: an
+         * automatic revaluation inside the close would hide a policy decision
+         * — which rate, which accounts — inside an operation nobody reviews,
+         * and a warning would be a warning people learn to click past.
+         *
+         * "We retranslated and nothing had moved" satisfies this, because the
+         * period carries a timestamp for it. "Nobody retranslated" does not.
+         */
+        const unrevalued = await foreignBalancesAwaitingRevaluation(tx, existing);
+        if (unrevalued.length > 0) {
+          return err({ code: 'revaluation_required', periodMonth, accounts: unrevalued });
+        }
+
         const retained = await retainedEarnings(tx);
         if (!retained) return err({ code: 'retained_earnings_missing' });
 
@@ -234,6 +258,42 @@ export function createPeriodService(database: Database, orgId: string) {
       });
     },
   };
+
+  /**
+   * Foreign monetary balances this month has not had retranslated.
+   *
+   * Empty when the period carries a revaluation timestamp, and empty when
+   * there is nothing foreign to retranslate — a single-currency ledger never
+   * meets this gate at all.
+   */
+  async function foreignBalancesAwaitingRevaluation(
+    tx: Transactional,
+    period: PeriodRow | undefined,
+  ): Promise<string[]> {
+    if (period?.revaluedAt) return [];
+
+    const [org] = await tx
+      .select({ functional: organizations.functionalCurrency })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+    const functional = org?.functional ?? 'USD';
+
+    const rows = await tx
+      .select({ name: accounts.name })
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.monetary, true),
+          ne(accounts.currency, functional),
+          ne(accounts.balanceMinor, 0n),
+          sql`${accounts.type} in ('asset', 'liability')`,
+        ),
+      )
+      .orderBy(accounts.code, accounts.name);
+
+    return rows.map((row) => row.name);
+  }
 
   async function retainedEarnings(
     tx: Transactional,
