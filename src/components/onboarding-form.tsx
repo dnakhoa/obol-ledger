@@ -11,10 +11,12 @@ const INITIAL: OnboardingState = { status: 'idle' };
 export function OnboardingForm({
   action,
   currencies,
+  templates,
   suggestedName,
 }: {
   action: (state: OnboardingState, formData: FormData) => Promise<OnboardingState>;
   currencies: readonly string[];
+  templates: readonly { id: string; label: string; summary: string; statutory: boolean }[];
   suggestedName: string;
 }) {
   const [state, submit, pending] = useActionState(action, INITIAL);
@@ -44,6 +46,40 @@ export function OnboardingForm({
           <Field label="Name" htmlFor="name" hint="Only you will see this.">
             <Input id="name" name="name" required maxLength={80} defaultValue={suggestedName} />
           </Field>
+
+          <fieldset className="space-y-2">
+            <legend className="text-ink-secondary text-xs font-medium">Chart of accounts</legend>
+            <p className="text-ink-muted text-[11px]">
+              A starting point, not a cage — except where the law says otherwise.
+            </p>
+            <div className="space-y-2">
+              {templates.map((template, index) => (
+                <label
+                  key={template.id}
+                  className="border-line hover:bg-surface-hover flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors duration-150"
+                >
+                  <input
+                    type="radio"
+                    name="chartTemplate"
+                    value={template.id}
+                    defaultChecked={index === 0}
+                    className="accent-action mt-1 size-4"
+                  />
+                  <span className="min-w-0 space-y-0.5">
+                    <span className="text-ink flex items-center gap-2 text-sm font-medium">
+                      {template.label}
+                      {template.statutory ? (
+                        <span className="border-line text-ink-muted rounded-full border px-1.5 py-0.5 text-[10px] font-normal">
+                          statutory
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="text-ink-muted block text-[11px]">{template.summary}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
           <Field
             label="Functional currency"

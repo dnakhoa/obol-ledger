@@ -5,10 +5,12 @@ import { z } from 'zod';
 import { currentViewer } from '@/server/auth/viewer';
 import { createLedger } from '@/server/services/onboarding';
 import { SUPPORTED_CURRENCIES } from '@/lib/money';
+import { CHART_TEMPLATES } from '@/server/domain/chart';
 
 const schema = z.object({
   name: z.string().trim().min(1).max(80),
   functionalCurrency: z.enum(SUPPORTED_CURRENCIES),
+  chartTemplate: z.enum(CHART_TEMPLATES).default('generic'),
 });
 
 export type OnboardingState = {
@@ -32,6 +34,7 @@ export async function createLedgerAction(
   const parsed = schema.safeParse({
     name: formData.get('name'),
     functionalCurrency: formData.get('functionalCurrency'),
+    chartTemplate: formData.get('chartTemplate') ?? 'generic',
   });
 
   if (!parsed.success) {
@@ -45,6 +48,7 @@ export async function createLedgerAction(
     userId: viewer.userId,
     name: parsed.data.name,
     functionalCurrency: parsed.data.functionalCurrency,
+    chartTemplate: parsed.data.chartTemplate,
   });
 
   redirect('/');

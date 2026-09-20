@@ -5,6 +5,7 @@ import { OnboardingForm } from '@/components/onboarding-form';
 import { createLedgerAction } from './actions';
 import { ScaleIcon } from '@/components/icons';
 import { SUPPORTED_CURRENCIES } from '@/lib/money';
+import { CHART_TEMPLATE_DEFINITIONS } from '@/server/domain/chart';
 
 export const metadata: Metadata = { title: 'Create your ledger' };
 export const dynamic = 'force-dynamic';
@@ -31,6 +32,12 @@ export default async function OnboardingPage() {
       <OnboardingForm
         action={createLedgerAction}
         currencies={SUPPORTED_CURRENCIES}
+        templates={Object.values(CHART_TEMPLATE_DEFINITIONS).map((template) => ({
+          id: template.id,
+          label: template.label,
+          summary: template.summary,
+          statutory: template.statutory,
+        }))}
         suggestedName={`${firstName}'s books`}
       />
     </main>

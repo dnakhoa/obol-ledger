@@ -19,6 +19,8 @@ export type MoneyDto = {
 
 export type AccountDto = {
   readonly id: string;
+  /** The number an accountant files this under. Absent on an uncoded chart. */
+  readonly code: string | null;
   readonly name: string;
   readonly type: AccountType;
   readonly status: AccountStatus;

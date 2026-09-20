@@ -5,7 +5,6 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema';
 import { SetupRequiredError } from '../setup-error';
 import type { Database } from './types';
-import { forgetDemoOrg } from '@/server/auth/viewer';
 
 /**
  * The production database handle.
@@ -110,7 +109,4 @@ export function db(): Database {
  */
 export function setDatabaseForTesting(database: Database | undefined): void {
   cached = database;
-  // Anything cached *from* the previous database is now an answer about a
-  // database that is no longer connected.
-  forgetDemoOrg();
 }
