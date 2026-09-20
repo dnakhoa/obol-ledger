@@ -50,24 +50,29 @@ export function createReportingService(database: Database, orgId: string) {
     /**
      * The trial balance: the ledger auditing itself.
      *
-     * Because every entry sums to zero, the signed balances of all accounts in
-     * a currency must also sum to zero. Computing this from the *cached*
-     * balances is the point — it is precisely the number that would drift if
-     * the balance trigger were ever wrong, which is why the dashboard shows it
-     * rather than hiding it in a test.
+     * Because every entry sums to zero *in the functional currency*, the
+     * signed functional balances of all accounts must also sum to zero.
+     *
+     * Stated in that currency rather than per transaction currency, and the
+     * difference is the whole of migration 0010: a dong balance added to a
+     * dollar balance is a number with no meaning, and summing per currency
+     * only looked correct while every account was USD. A cross-currency entry
+     * balances in exactly one unit.
+     *
+     * Computing it from the *cached* balances is the point — it is precisely
+     * the number that would drift if the balance trigger were ever wrong,
+     * which is why the dashboard shows it rather than hiding it in a test.
      */
     async trialBalance(): Promise<TrialBalanceRow[]> {
       return withTenant(database, orgId, async (tx) => {
         const rows = await tx
           .select({
-            currency: accounts.currency,
-            debits: sql<string>`coalesce(sum(case when ${accounts.balanceMinor} > 0 then ${accounts.balanceMinor} else 0 end), 0)`,
-            credits: sql<string>`coalesce(sum(case when ${accounts.balanceMinor} < 0 then -${accounts.balanceMinor} else 0 end), 0)`,
-            residual: sql<string>`coalesce(sum(${accounts.balanceMinor}), 0)`,
+            currency: sql<string>`(select functional_currency from organizations where id = ${orgId})`,
+            debits: sql<string>`coalesce(sum(case when ${accounts.baseBalanceMinor} > 0 then ${accounts.baseBalanceMinor} else 0 end), 0)`,
+            credits: sql<string>`coalesce(sum(case when ${accounts.baseBalanceMinor} < 0 then -${accounts.baseBalanceMinor} else 0 end), 0)`,
+            residual: sql<string>`coalesce(sum(${accounts.baseBalanceMinor}), 0)`,
           })
-          .from(accounts)
-          .groupBy(accounts.currency)
-          .orderBy(asc(accounts.currency));
+          .from(accounts);
 
         return rows.map((row) => {
           const currency = row.currency as CurrencyCode;
@@ -364,13 +369,15 @@ export function createReportingService(database: Database, orgId: string) {
       readonly reservedOutflow: { currency: string; amount: string }[];
     }> {
       return withTenant(database, orgId, async (tx) => {
+        // One gauge, in the functional currency, still with exactly one
+        // acceptable value. A per-currency breakdown would have several
+        // legitimately non-zero numbers and no alert worth writing.
         const residual = await tx
           .select({
-            currency: accounts.currency,
-            residual: sql<string>`coalesce(sum(${accounts.balanceMinor}), 0)::text`,
+            currency: sql<string>`(select functional_currency from organizations where id = ${orgId})`,
+            residual: sql<string>`coalesce(sum(${accounts.baseBalanceMinor}), 0)::text`,
           })
-          .from(accounts)
-          .groupBy(accounts.currency);
+          .from(accounts);
 
         const reserved = await tx
           .select({

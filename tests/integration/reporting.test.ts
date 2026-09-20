@@ -68,7 +68,11 @@ describe('reporting service', () => {
       });
     });
 
-    it('reports each currency separately', async () => {
+    it('still balances once a foreign account is in the mix', async () => {
+      // The trial balance is a statement about the *functional* currency, not
+      // one row per transaction currency. A euro balance added to a dollar
+      // balance is a number with no meaning; summing per currency only looked
+      // correct while every account was USD. See ADR 10.
       const euro = await openAccount(db, db.$orgId, {
         name: 'Euro cash',
         type: 'asset',
@@ -82,17 +86,20 @@ describe('reporting service', () => {
       });
       const result = await services.journal.postEntry({
         description: 'Euro sale',
-        currency: 'EUR',
+        currency: 'USD',
         postings: [
-          { accountId: euro.id, amount: usd(5_000n) },
-          { accountId: euroRevenue.id, amount: usd(-5_000n) },
+          { accountId: euro.id, amount: usd(5_000n), fxRate: '1.08' },
+          { accountId: euroRevenue.id, amount: usd(-5_000n), fxRate: '1.08' },
         ],
       });
       expect(result.ok).toBe(true);
 
       const rows = await services.reporting.trialBalance();
-      expect(rows.map((row) => row.currency)).toEqual(['EUR', 'USD']);
-      expect(rows.every((row) => row.balanced)).toBe(true);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.currency).toBe('USD');
+      expect(rows[0]?.balanced).toBe(true);
+      // 50.00 EUR at 1.08 is 54.00 USD, debited and credited.
+      expect(rows[0]?.debits.minorUnits).toBe('5400');
     });
   });
 

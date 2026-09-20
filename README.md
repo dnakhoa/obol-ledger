@@ -417,6 +417,7 @@ including the metadata filter and every problem type, are in the
 - [ADR 7](docs/adr/0007-tenant-isolation.md) — tenant isolation via row-level security
 - [ADR 8](docs/adr/0008-two-phase-entries.md) — authorisation and settlement as two phases
 - [ADR 9](docs/adr/0009-webhooks.md) — webhooks via a transactional outbox
+- [ADR 10](docs/adr/0010-multi-currency.md) — balancing in the functional currency
 
 ## Licence
 

@@ -60,6 +60,14 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
     open: '2026-07-01',
   },
   retained_earnings_missing: { code: 'retained_earnings_missing' },
+  fx_rate_required: {
+    code: 'fx_rate_required',
+    accountId: 'acct_x',
+    currency: 'USD',
+    functional: 'VND',
+  },
+  invalid_fx_rate: { code: 'invalid_fx_rate', accountId: 'acct_x', rate: 'abc' },
+  rate_not_found: { code: 'rate_not_found', base: 'USD', quote: 'VND' },
 };
 
 const variants = Object.values(EVERY_VARIANT);
