@@ -119,6 +119,37 @@ export type ShipmentSummary = {
   readonly upliftBasisPoints: number;
 };
 
+export type ShipmentLot = {
+  readonly id: string;
+  readonly reference: string | null;
+  readonly itemName: string;
+  readonly unit: string;
+  readonly quantityMinor: string;
+  readonly remainingQuantityMinor: string;
+  /** What the lot is carried at now — invoice plus everything landed on it. */
+  readonly carrying: MoneyDto;
+};
+
+export type ShipmentCharge = {
+  readonly id: string;
+  readonly kind: string;
+  readonly description: string;
+  /** What was billed, in the currency it was billed in. */
+  readonly amount: MoneyDto;
+  readonly baseAmount: MoneyDto;
+  readonly capitalise: boolean;
+  readonly toInventory: MoneyDto;
+  readonly toCogs: MoneyDto;
+  readonly transactionId: string;
+  readonly createdAt: Date;
+};
+
+export type ShipmentDetail = ShipmentSummary & {
+  readonly lots: readonly ShipmentLot[];
+  /** Named with a trailing underscore to avoid colliding with the summary's total. */
+  readonly charges_: readonly ShipmentCharge[];
+};
+
 export function createLandedCostService(database: Database, orgId: string) {
   return {
     /** Opens a shipment, which lots and charges then attach to. */
@@ -278,6 +309,62 @@ export function createLandedCostService(database: Database, orgId: string) {
         }
 
         return ok({ preview: preview.value, entry: entry.value.transaction });
+      });
+    },
+
+    /** One shipment, with what arrived on it and what it cost to land. */
+    async shipment(id: string): Promise<ShipmentDetail | null> {
+      return withTenant(database, orgId, async (tx) => {
+        const [row] = await tx.select().from(shipments).where(eq(shipments.id, id)).limit(1);
+        if (!row) return null;
+
+        const org = await organisation(tx, orgId);
+        const layers = await shipmentLayers(tx, id, { lock: false });
+        const charged = await tx
+          .select()
+          .from(landedCostCharges)
+          .where(eq(landedCostCharges.shipmentId, id))
+          .orderBy(landedCostCharges.createdAt);
+
+        const capitalised = charged
+          .filter((charge) => charge.capitalise)
+          .reduce((sum, charge) => sum + charge.baseAmountMinor, 0n);
+        const landed = layers.reduce((sum, layer) => sum + layer.baseCostMinor, 0n);
+        const goods = landed - capitalised;
+        const money = (value: bigint) => toMoneyDto(value as MinorUnits, org.functionalCurrency);
+
+        return {
+          id: row.id,
+          reference: row.reference,
+          arrivedAt: row.arrivedAt,
+          notes: row.notes,
+          layerCount: layers.length,
+          goods: money(goods),
+          charges: money(capitalised),
+          landed: money(landed),
+          upliftBasisPoints: goods > 0n ? Number((capitalised * 10_000n) / goods) : 0,
+          lots: layers.map((layer) => ({
+            id: layer.id,
+            reference: layer.reference,
+            itemName: layer.itemName,
+            unit: layer.unit,
+            quantityMinor: String(layer.quantityMinor),
+            remainingQuantityMinor: String(layer.remainingQuantityMinor),
+            carrying: money(layer.baseCostMinor),
+          })),
+          charges_: charged.map((charge) => ({
+            id: charge.id,
+            kind: charge.kind,
+            description: charge.description,
+            amount: toMoneyDto(charge.amountMinor as MinorUnits, charge.currency as CurrencyCode),
+            baseAmount: money(charge.baseAmountMinor),
+            capitalise: charge.capitalise,
+            toInventory: money(charge.toInventoryMinor),
+            toCogs: money(charge.toCogsMinor),
+            transactionId: charge.transactionId,
+            createdAt: charge.createdAt,
+          })),
+        };
       });
     },
 

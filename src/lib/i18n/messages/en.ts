@@ -361,6 +361,65 @@ export const en = {
     stepNumber: (n: number) => `Step ${n}`,
   },
 
+  shipments: {
+    title: 'Shipments',
+    description:
+      'What each container actually cost to land. Freight, duty and handling belong in the value of the stock, not in this month\u2019s expenses — and the difference is usually not small.',
+    caption: 'Shipments, most recent first',
+    reference: 'Reference',
+    arrived: 'Arrived',
+    lots: 'Lots',
+    goods: 'Goods invoiced',
+    charges: 'Freight & duty',
+    landed: 'Landed cost',
+    uplift: 'Uplift',
+    emptyTitle: 'No shipments yet',
+    emptyBody:
+      'A shipment groups the deliveries that arrived together, so a freight invoice can be spread across them when it turns up weeks later.',
+    newShipment: 'Record a shipment',
+    newShipmentHint:
+      'Give it the reference you already use — a container number or a bill of lading.',
+    create: 'Record it',
+
+    lotsTitle: 'What arrived',
+    chargesTitle: 'What it cost to get here',
+    chargesHint:
+      'Each charge is spread across the lots above and raises what they are carried at. A charge that arrives after some of the stock has sold puts that part to cost of sales instead, because it cannot be added to a lot nobody has.',
+    chargesCaption: 'Charges on this shipment',
+    noCharges: 'No charges yet',
+    noChargesBody: 'Add the freight invoice, the duty and the broker\u2019s fee as they arrive.',
+    kind: 'What it is',
+    chargeDescription: 'Description',
+    amount: 'Amount',
+    toStock: 'Onto the stock',
+    toCogs: 'To cost of sales',
+    notCapitalised: 'not part of the cost',
+
+    addCharge: 'Add a charge',
+    basis: 'Spread it by',
+    basisValue: 'Value of each lot',
+    basisQuantity: 'Quantity',
+    basisWeight: 'Weight',
+    basisHint: 'Ocean freight is usually charged by volume; duty is charged on value.',
+    kindFreight: 'Freight',
+    kindDuty: 'Import duty',
+    kindInsurance: 'Insurance',
+    kindHandling: 'Handling & haulage',
+    kindTax: 'Import tax',
+    kindOther: 'Other',
+    creditAccount: 'Owed to / paid from',
+    capitalise: 'Part of what the goods cost',
+    capitaliseHint:
+      'Yes for freight, duty and handling. No for recoverable import VAT — you get that back, so it never was a cost.',
+    capitaliseYes: 'Yes — add it to the stock',
+    capitaliseNo: 'No — it is reclaimable',
+    debitAccount: 'Account for the reclaimable part',
+    chargeDate: 'Date of the charge',
+    submit: 'Add this charge',
+    checkFirst: 'Check what it does',
+    previewTitle: 'What this charge will do',
+  },
+
   stockImport: {
     title: 'Import deliveries',
     description:
