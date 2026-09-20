@@ -265,6 +265,108 @@ export const vi: Messages = {
     nothingMovedBody: 'Các lần nhập kho và xuất kho sẽ được liệt kê ở đây.',
   },
 
+  journal: {
+    title: 'Sổ nhật ký',
+    description:
+      'Toàn bộ bút toán, mới nhất trước, kèm các dòng hạch toán. Bút toán chỉ ghi thêm: sai thì ghi bút toán điều chỉnh, không bao giờ sửa lại lịch sử.',
+    entries: 'Bút toán',
+    noMatches: 'Không có bút toán nào khớp với bộ lọc',
+    noMatchesBody:
+      'Thử từ khóa ngắn hơn, hoặc nới bộ lọc tài khoản. Bản thân sổ nhật ký không thay đổi.',
+    clearFilters: 'Xóa bộ lọc',
+    empty: 'Chưa ghi bút toán nào',
+    emptyBody:
+      'Sổ nhật ký đang trống. Hãy ghi một bút toán, hoặc chạy pnpm db:seed để nạp một tháng số liệu mẫu.',
+    postEntry: 'Ghi bút toán',
+    caption: 'Bút toán và các dòng hạch toán',
+    date: 'Ngày',
+    descriptionOrAccount: 'Nội dung / tài khoản',
+    amount: 'Số tiền',
+    debit: 'Nợ',
+    credit: 'Có',
+    reversed: 'Đã điều chỉnh',
+    reversal: 'Bút toán điều chỉnh',
+    balanced: 'Cân đối',
+  },
+
+  transfer: {
+    title: 'Ghi bút toán',
+    description:
+      'Ghi một bút toán vào sổ. Tính cân đối được kiểm tra ngay khi bạn gõ, kiểm tra lại ở tầng nghiệp vụ, và lần thứ ba do Postgres kiểm tra tại thời điểm COMMIT.',
+  },
+
+  reports: {
+    title: 'Báo cáo',
+    description:
+      'Hai báo cáo mà mọi sổ kế toán sinh ra để lập. Cả hai đều tính từ chính các bút toán đã ghi — không có kho dữ liệu báo cáo riêng để lệch nhau.',
+    sheetBalances: 'Bảng cân đối kế toán cân',
+    sheetDoesNot: 'Bảng cân đối kế toán chưa cân',
+    assets: 'Tài sản',
+    amount: 'Số tiền',
+    sectionCaption: (section) => `${section} theo tài khoản`,
+    sectionEmpty: (section) => `Không có tài khoản ${section.toLowerCase()} nào ở loại tiền này.`,
+    sectionTotal: (section) => `Cộng ${section.toLowerCase()}`,
+    equation: 'Tài sản = Nợ phải trả + Vốn chủ sở hữu + Lợi nhuận chưa phân phối',
+    liabilitiesPlusEquity: 'Nợ phải trả + vốn chủ sở hữu',
+    period30: '30 ngày',
+    period90: '90 ngày',
+    period365: '12 tháng',
+    balanceSheet: 'Bảng cân đối kế toán',
+    asAt: (date) => `Số liệu tại ngày ${date}`,
+    retainedEarnings: 'Lợi nhuận sau thuế chưa phân phối',
+    incomeStatement: 'Báo cáo kết quả hoạt động kinh doanh',
+    reportingPeriod: 'Kỳ báo cáo',
+    netIncome: 'Lợi nhuận thuần',
+    netIncomeHint: 'Doanh thu trừ chi phí trong kỳ',
+    profit: 'Lãi',
+    lossOrBreakeven: 'Lỗ hoặc hòa vốn',
+  },
+
+  monthEnd: {
+    title: 'Khóa sổ cuối tháng',
+    description:
+      'Ba việc, làm theo thứ tự, mỗi tháng một lần. Bạn cứ bấm sớm cũng được — nếu chưa tới lúc, hệ thống sẽ nói rõ lý do chứ không làm sai.',
+    open: 'Đang mở',
+    closed: 'Đã khóa',
+    entriesInMonth: (count) =>
+      `${count} bút toán. Khóa sổ theo thứ tự tháng cũ trước, nên đây là tháng cần xử lý.`,
+    allClosed:
+      'Mọi tháng có phát sinh đều đã khóa. Tháng tiếp theo sẽ hiện ra khi tháng đó kết thúc.',
+
+    step1: 'Nhập tỷ giá',
+    step1NoForeign: (functional) =>
+      `Bạn chỉ giữ ${functional} nên không có tỷ giá nào phải nhập. Bước này không cần làm gì.`,
+    step1Body: (day, currencies) =>
+      `Vào ngày ${day}, một đơn vị mỗi loại ngoại tệ đáng giá bao nhiêu? Dùng tỷ giá ngân hàng của bạn hoặc Ngân hàng Nhà nước công bố hôm đó. Bạn đang giữ ${currencies}.`,
+    step1Done: (currencies) => `Đã có tỷ giá cho ${currencies}.`,
+
+    step2: 'Đánh giá lại số dư ngoại tệ',
+    step2NoForeign: (functional) =>
+      `Không có gì phải đánh giá lại — mọi tài khoản đều đã là ${functional}.`,
+    step2Body: (currencies, functional) =>
+      `Khách hàng đang nợ bạn bằng ${currencies}. Số tiền đó quy ra ${functional} hôm nay đã khác lúc bạn xuất hóa đơn. Bước này tính ra phần chênh lệch và ghi nhận vào doanh thu hoặc chi phí.`,
+    whatWillChange: 'Bấm nút này thì những khoản sau sẽ thay đổi:',
+    step2Button: 'Đánh giá lại số dư ngoại tệ',
+    step2Pending: 'Đang xử lý…',
+
+    step3: 'Khóa sổ tháng',
+    step3Body: (month) =>
+      `Sau bước này, không ai thêm hay sửa được bút toán ghi ngày trong ${month}. Đó chính là điều làm cho số liệu của tháng trở thành số chốt. Lợi nhuận trong tháng được kết chuyển sang lợi nhuận chưa phân phối. Nếu cần, bạn vẫn mở lại được.`,
+    step3Button: 'Khóa sổ tháng',
+    step3Pending: 'Đang khóa…',
+    step3Confirm: (month) =>
+      `Khóa ${month}? Bút toán ghi ngày trong tháng này sẽ không thêm hay sửa được nữa.`,
+
+    months: 'Các tháng',
+    rateCurrency: 'Loại tiền',
+    rateWorth: (functional) => `Quy đổi ra bao nhiêu ${functional}`,
+    rateSave: 'Lưu tỷ giá',
+    rateSaving: 'Đang lưu…',
+    noMonths: 'Chưa có phát sinh nên chưa có tháng nào để khóa.',
+    reopen: 'Mở lại',
+    stepNumber: (n) => `Bước ${n}`,
+  },
+
   stockImport: {
     title: 'Nhập dữ liệu từ bảng tính',
     description:
@@ -295,6 +397,8 @@ export const vi: Messages = {
     yourRowsHint:
       'Chưa có gì được ghi vào sổ cho tới khi bạn xem hết các dòng và bấm nhập. Nếu có một dòng sai thì không dòng nào được nhập — một bộ sổ nhập dở còn tệ hơn là chưa nhập.',
     pasteLabel: 'Dán các dòng vào đây',
+    pastePlaceholder:
+      'Mã hàng\tTên hàng\tĐơn vị\tNgày\tSố lượng\tThành tiền\tSố chứng từ\nPAV-600\tĐá lát granite 600×600\tm2\t10/01/2026\t1000\t690000000\tCONT-4417',
     pasteHint:
       'Bôi đen vùng dữ liệu trong Excel rồi dán vào đây, kể cả dòng tiêu đề. Nội dung file .csv cũng dùng được.',
     chargeTo: 'Ghi Có tài khoản',
@@ -318,6 +422,7 @@ export const vi: Messages = {
       `Không tìm thấy cột ${columns}. Các dòng bên dưới hiện đúng như hệ thống đã đọc, để bạn thấy tiêu đề nào chưa khớp.`,
 
     previewCaption: 'Từng dòng, đúng như hệ thống đã đọc',
+    importFailed: 'Không có dòng nào được nhập. Hãy sửa những dòng sau rồi thử lại.',
     row: 'Dòng',
     status: 'Trạng thái',
     ready: 'Sẵn sàng',

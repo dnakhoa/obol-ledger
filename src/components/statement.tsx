@@ -14,27 +14,43 @@ import type { StatementSection } from '@/server/services/dto';
  * would be indistinguishable from the account not existing, and "we spent
  * nothing on this" is information.
  */
+export type SectionLabels = {
+  /** The section's own name, already in the reader's language. */
+  readonly name: string;
+  readonly amount: string;
+  readonly caption: string;
+  readonly empty: string;
+  readonly total: string;
+};
+
 export function StatementSectionTable({
   section,
+  labels,
   emphasis = false,
 }: {
   section: StatementSection;
+  /**
+   * Resolved by the page. `section.label` comes from the reporting service,
+   * which serves the API and has no business knowing what language anybody is
+   * reading in — the same reason `buildPosition` does not label for the UI.
+   */
+  labels: SectionLabels;
   emphasis?: boolean;
 }) {
   return (
     <TableScroll>
-      <Table caption={`${section.label} by account`}>
+      <Table caption={labels.caption}>
         <thead>
           <tr>
-            <Th>{section.label}</Th>
-            <Th align="right">Amount</Th>
+            <Th>{labels.name}</Th>
+            <Th align="right">{labels.amount}</Th>
           </tr>
         </thead>
         <tbody>
           {section.lines.length === 0 ? (
             <tr>
               <Td colSpan={2} className="text-ink-muted text-xs">
-                No {section.label.toLowerCase()} accounts in this currency.
+                {labels.empty}
               </Td>
             </tr>
           ) : (
@@ -50,7 +66,7 @@ export function StatementSectionTable({
         </tbody>
         <tfoot>
           <tr>
-            <Td className={emphasis ? 'font-semibold' : 'font-medium'}>Total {section.label}</Td>
+            <Td className={emphasis ? 'font-semibold' : 'font-medium'}>{labels.total}</Td>
             <Td align="right" numeric className={emphasis ? 'font-semibold' : 'font-medium'}>
               <Money value={section.total} />
             </Td>

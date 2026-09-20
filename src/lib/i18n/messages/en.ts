@@ -259,6 +259,108 @@ export const en = {
     nothingMovedBody: 'Deliveries and shipments will be listed here.',
   },
 
+  journal: {
+    title: 'Journal',
+    description:
+      'Every entry, newest first, with its postings. Entries are append-only: a mistake is corrected by posting a reversing entry, never by editing history.',
+    entries: 'Entries',
+    noMatches: 'No entries match those filters',
+    noMatchesBody:
+      'Try a shorter search term, or widen the account filter. The journal itself is unchanged.',
+    clearFilters: 'Clear filters',
+    empty: 'Nothing posted yet',
+    emptyBody:
+      'The journal is empty. Post an entry, or run pnpm db:seed to load a month of example books.',
+    postEntry: 'Post an entry',
+    caption: 'Journal entries with their postings',
+    date: 'Date',
+    descriptionOrAccount: 'Description / account',
+    amount: 'Amount',
+    debit: 'Debit',
+    credit: 'Credit',
+    reversed: 'Reversed',
+    reversal: 'Reversal',
+    balanced: 'Balanced',
+  },
+
+  transfer: {
+    title: 'Post an entry',
+    description:
+      'Record a journal entry. The balance is checked as you type, again in the domain layer, and a third time by Postgres at COMMIT.',
+  },
+
+  reports: {
+    title: 'Reports',
+    description:
+      'The two statements a ledger exists to produce. Both are derived from the same postings as everything else — no separate reporting store to fall out of step.',
+    sheetBalances: 'The balance sheet balances',
+    sheetDoesNot: 'The balance sheet does not balance',
+    assets: 'Assets',
+    amount: 'Amount',
+    sectionCaption: (section: string) => `${section} by account`,
+    sectionEmpty: (section: string) => `No ${section.toLowerCase()} accounts in this currency.`,
+    sectionTotal: (section: string) => `Total ${section}`,
+    equation: 'Assets = Liabilities + Equity + retained earnings',
+    liabilitiesPlusEquity: 'Liabilities + equity',
+    period30: '30 days',
+    period90: '90 days',
+    period365: '12 months',
+    balanceSheet: 'Balance sheet',
+    asAt: (date: string) => `Position as at ${date}`,
+    retainedEarnings: 'Retained earnings',
+    incomeStatement: 'Income statement',
+    reportingPeriod: 'Reporting period',
+    netIncome: 'Net income',
+    netIncomeHint: 'Revenue less expenses for the period',
+    profit: 'Profit',
+    lossOrBreakeven: 'Loss or breakeven',
+  },
+
+  monthEnd: {
+    title: 'Month end',
+    description:
+      'Three things, in order, once a month. You can press any of them early — if it is not time yet, the ledger says why instead of doing something wrong.',
+    open: 'Open',
+    closed: 'Closed',
+    entriesInMonth: (count: number) =>
+      `${count} entries. Closing happens oldest month first, so this is the one to work on.`,
+    allClosed:
+      'Every month with entries in it is closed. The next one becomes available once the month has finished.',
+
+    step1: 'Put in the exchange rates',
+    step1NoForeign: (functional: string) =>
+      `You only hold ${functional}, so there are no rates to enter. Nothing to do here.`,
+    step1Body: (day: string, currencies: string) =>
+      `On ${day}, what was one unit of each foreign currency worth? Use the rate your bank or the central bank published that day. You hold ${currencies}.`,
+    step1Done: (currencies: string) => `Rates on file for ${currencies}.`,
+
+    step2: 'Update what your foreign money is worth',
+    step2NoForeign: (functional: string) =>
+      `Nothing to update — every account is already in ${functional}.`,
+    step2Body: (currencies: string, functional: string) =>
+      `Your customers owe you in ${currencies}. Those amounts are worth a different number of ${functional} now than when you invoiced. This works out the difference and records it as income or expense.`,
+    whatWillChange: 'What will change if you press this:',
+    step2Button: 'Update foreign balances',
+    step2Pending: 'Updating…',
+
+    step3: 'Close the month',
+    step3Body: (month: string) =>
+      `After this, nobody can add or change an entry dated in ${month}. That is what makes the month's figures final. Your profit for the month moves into retained earnings. You can reopen it if you have to.`,
+    step3Button: 'Close the month',
+    step3Pending: 'Closing…',
+    step3Confirm: (month: string) =>
+      `Close ${month}? Entries dated in it can no longer be added or changed.`,
+
+    months: 'Months',
+    rateCurrency: 'Currency',
+    rateWorth: (functional: string) => `Worth this many ${functional}`,
+    rateSave: 'Save rate',
+    rateSaving: 'Saving…',
+    noMonths: 'No entries yet, so no months to close.',
+    reopen: 'Reopen',
+    stepNumber: (n: number) => `Step ${n}`,
+  },
+
   stockImport: {
     title: 'Import deliveries',
     description:
@@ -289,6 +391,8 @@ export const en = {
     yourRowsHint:
       'Nothing is written until you have seen every row and pressed import. If one row is wrong, none of them are imported — a half-imported set of books is worse than none.',
     pasteLabel: 'Paste your rows',
+    pastePlaceholder:
+      'Product Code\tName\tUnit\tDate Received\tQuantity\tTotal Cost\tContainer\nPAV-600\tGranite paver 600×600\tm2\t10/01/2026\t1000\t40000.00\tCONT-4417',
     pasteHint:
       "Select the block in Excel and paste it here, header row and all. A .csv file's contents work too.",
     chargeTo: 'Charge the deliveries to',
@@ -312,6 +416,7 @@ export const en = {
       `No ${columns} column was found. The rows below are shown as they were read, so you can see which header did not match.`,
 
     previewCaption: 'Every row as the ledger read it',
+    importFailed: 'Nothing was imported. Fix these rows and try again.',
     row: 'Row',
     status: 'Status',
     ready: 'Ready',

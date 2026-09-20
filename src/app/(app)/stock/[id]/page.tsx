@@ -18,7 +18,26 @@ import { dateFormats } from '@/lib/i18n';
 import { SUPPORTED_CURRENCIES } from '@/lib/money';
 import { toQuantityString, unitLabel } from '@/lib/quantity';
 
-export const metadata: Metadata = { title: 'Product' };
+/**
+ * The tab title is the product's own name — data, not a translated label.
+ * Somebody with six of these open is looking for the granite, not the word
+ * for "product" in their language.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const item = await (await viewerServices()).services.inventory.item(id);
+    if (item) return { title: item.name };
+  } catch {
+    // The page itself renders the setup notice; a title is not worth failing on.
+  }
+  const { t } = await translations();
+  return { title: t.stock.title };
+}
 export const dynamic = 'force-dynamic';
 
 /**

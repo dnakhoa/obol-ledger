@@ -9,9 +9,13 @@ import { ArrowLeftIcon } from '@/components/icons';
 import { StockImportForm } from '@/components/stock-import-form';
 import type { AccountOption } from '@/components/stock-forms';
 import { viewerServices } from '@/server/container';
+import { translations } from '@/server/i18n';
 import type { AccountDto } from '@/server/services/dto';
 
-export const metadata: Metadata = { title: 'Import deliveries' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await translations();
+  return { title: t.stockImport.title };
+}
 export const dynamic = 'force-dynamic';
 
 /**
@@ -25,6 +29,7 @@ export const dynamic = 'force-dynamic';
  * becomes a reason to go back to the spreadsheet.
  */
 export default async function ImportPage() {
+  const { t } = await translations();
   let accounts: AccountDto[];
   try {
     accounts = await (await viewerServices()).services.accounts.list();
@@ -52,34 +57,31 @@ export default async function ImportPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Import deliveries"
-        description="Paste the purchase history you already keep. Each row becomes a delivery with its own price, and the purchase is posted to the ledger at the same time."
+        title={t.stockImport.title}
+        description={t.stockImport.description}
         actions={
           <ButtonLink href="/stock">
             <ArrowLeftIcon />
-            All stock
+            {t.product.allStock}
           </ButtonLink>
         }
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>What the file needs</CardTitle>
-          <CardDescription>
-            A header row and four columns. Everything else is optional, and any column that is not
-            one of these is ignored rather than rejected.
-          </CardDescription>
+          <CardTitle>{t.stockImport.requirementsTitle}</CardTitle>
+          <CardDescription>{t.stockImport.requirementsHint}</CardDescription>
         </CardHeader>
         <CardBody className="space-y-3 text-sm">
           <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
             {[
-              ['Product code', 'sku, code, product code, mã hàng'],
-              ['Date received', 'date, received, arrived, ngày — 10/01/2026 is 10 January'],
-              ['Quantity', 'quantity, qty, số lượng'],
-              ['Total cost', 'cost, total, amount, thành tiền — the whole delivery, not per unit'],
-              ['Name and unit', 'Only needed for a product that does not exist yet'],
-              ['Currency', 'Defaults to the currency the books are kept in'],
-              ['Reference', 'reference, container, invoice, lot — what the costing report shows'],
+              [t.stockImport.colProductCode, t.stockImport.colProductCodeHint],
+              [t.stockImport.colDate, t.stockImport.colDateHint],
+              [t.stockImport.colQuantity, t.stockImport.colQuantityHint],
+              [t.stockImport.colCost, t.stockImport.colCostHint],
+              [t.stockImport.colNameUnit, t.stockImport.colNameUnitHint],
+              [t.stockImport.colCurrency, t.stockImport.colCurrencyHint],
+              [t.stockImport.colReference, t.stockImport.colReferenceHint],
             ].map(([term, detail]) => (
               <div key={term}>
                 <dt className="text-ink text-xs font-semibold">{term}</dt>
@@ -87,20 +89,14 @@ export default async function ImportPage() {
               </div>
             ))}
           </dl>
-          <p className="text-ink-muted text-xs">
-            Tab, comma and semicolon separators are all read — pasting straight out of Excel works,
-            and so does a file exported on a machine that uses the comma as a decimal mark.
-          </p>
+          <p className="text-ink-muted text-xs">{t.stockImport.separatorsNote}</p>
         </CardBody>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Your rows</CardTitle>
-          <CardDescription>
-            Nothing is written until you have seen every row and pressed import. If one row is
-            wrong, none of them are imported — a half-imported set of books is worse than none.
-          </CardDescription>
+          <CardTitle>{t.stockImport.yourRows}</CardTitle>
+          <CardDescription>{t.stockImport.yourRowsHint}</CardDescription>
         </CardHeader>
         <CardBody>
           {ready ? (
@@ -108,15 +104,39 @@ export default async function ImportPage() {
               assetAccounts={assetAccounts}
               expenseAccounts={expenseAccounts}
               creditAccounts={creditAccounts}
+              labels={{
+                pasteLabel: t.stockImport.pasteLabel,
+                pasteHint: t.stockImport.pasteHint,
+                pastePlaceholder: t.stockImport.pastePlaceholder,
+                chargeTo: t.stockImport.chargeTo,
+                chargeToHint: t.stockImport.chargeToHint,
+                stockAccount: t.stock.stockAccount,
+                stockAccountHint: t.stockImport.stockAccountHint,
+                cogsAccount: t.stock.cogsAccount,
+                cogsAccountHint: t.stockImport.cogsAccountHint,
+                checkButton: t.stockImport.checkButton,
+                checking: t.stockImport.checking,
+                importing: t.stockImport.importing,
+                previewCaption: t.stockImport.previewCaption,
+                row: t.stockImport.row,
+                product: t.stock.product,
+                arrived: t.product.arrived,
+                quantity: t.product.quantity,
+                cost: t.product.cost,
+                reference: t.product.reference,
+                status: t.stockImport.status,
+                ready: t.stockImport.ready,
+                newBadge: t.stockImport.newBadge,
+                fixFirst: t.stockImport.fixFirst,
+              }}
             />
           ) : (
             <p className="text-ink-secondary text-sm">
-              You need a stock asset account, a cost-of-sales expense account and something to
-              charge the deliveries to. Open them on the{' '}
+              {t.stockImport.needAccounts}{' '}
               <Link href="/accounts" className="underline underline-offset-4">
-                chart of accounts
+                {t.stock.chartOfAccountsLink}
               </Link>{' '}
-              first.
+              {t.stock.firstSuffix}
             </p>
           )}
         </CardBody>

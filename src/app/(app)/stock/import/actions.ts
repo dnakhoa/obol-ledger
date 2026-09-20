@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { viewerServices } from '@/server/container';
+import { translations } from '@/server/i18n';
+import type { Messages } from '@/lib/i18n';
 import type { ImportPreview } from '@/server/services/stock-import';
 
 export type ImportState = {
@@ -12,7 +14,22 @@ export type ImportState = {
   readonly preview?: ImportPreview;
   /** Kept so the second press does not need the file pasted again. */
   readonly text?: string;
-  readonly problems?: readonly { readonly line: number; readonly problem: string }[];
+  /** Already-formatted, one per bad row. */
+  readonly problems?: readonly string[];
+  /**
+   * The sentences that depend on the preview, formatted here.
+   *
+   * "Import 12 deliveries" and "columns not used: …" are messages that take
+   * arguments, so in the dictionary they are functions — and a function
+   * cannot cross the server/client boundary. They are resolved at the only
+   * point that has both the numbers and the dictionary: here.
+   */
+  readonly notes?: {
+    readonly separator: string;
+    readonly ignoredColumns?: string;
+    readonly missingColumns?: string;
+    readonly importButton: string;
+  };
 };
 
 /**
@@ -57,12 +74,14 @@ export async function previewImportAction(
   }
 
   const { services, viewer } = await viewerServices();
+  const { t } = await translations();
   const preview = await services.stockImport.preview(parsed.data);
   const readOnly = viewer.kind !== 'member' || !viewer.canWrite;
 
   return {
     status: 'previewed',
     preview,
+    notes: notesFor(preview, t),
     text: parsed.data.text,
     message:
       preview.missingColumns.length > 0
@@ -90,11 +109,14 @@ export async function applyImportAction(
     // `import_has_problems` is the only refusal that carries line numbers, and
     // it is the one worth rendering row by row.
     if ('problems' in result.error) {
+      const { t } = await translations();
       return {
         status: 'error',
         text: parsed.data.text,
-        problems: result.error.problems,
-        message: 'Nothing was imported. Fix these rows and try again.',
+        problems: result.error.problems.map((problem) =>
+          t.stockImport.rowProblem(problem.line, problem.problem),
+        ),
+        message: t.stockImport.importFailed,
       };
     }
     return { status: 'error', text: parsed.data.text, message: result.error.code };
@@ -103,6 +125,25 @@ export async function applyImportAction(
   return {
     status: 'done',
     message: `Imported ${result.value.lots} deliver${result.value.lots === 1 ? 'y' : 'ies'}${result.value.products > 0 ? `, opening ${result.value.products} new product${result.value.products === 1 ? '' : 's'}` : ''}. Each one has been posted to the ledger too.`,
+  };
+}
+
+const SEPARATOR_NOTE: Record<ImportPreview['separator'], keyof Messages['stockImport']> = {
+  tab: 'separatorTab',
+  semicolon: 'separatorSemicolon',
+  comma: 'separatorComma',
+};
+
+function notesFor(preview: ImportPreview, t: Messages): NonNullable<ImportState['notes']> {
+  return {
+    separator: String(t.stockImport[SEPARATOR_NOTE[preview.separator]]),
+    ...(preview.ignoredColumns.length > 0
+      ? { ignoredColumns: t.stockImport.ignoredColumns(preview.ignoredColumns.join(', ')) }
+      : {}),
+    ...(preview.missingColumns.length > 0
+      ? { missingColumns: t.stockImport.missingColumnsInline(preview.missingColumns.join(', ')) }
+      : {}),
+    importButton: t.stockImport.importButton(preview.rows.length),
   };
 }
 

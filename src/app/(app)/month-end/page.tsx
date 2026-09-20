@@ -6,25 +6,19 @@ import { ActionButton, RateForm, Step } from '@/components/month-end-steps';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
 import { viewerServices } from '@/server/container';
+import { translations } from '@/server/i18n';
+import { dateFormats } from '@/lib/i18n';
 import { closeMonthAction, recordRateAction, reopenMonthAction, revalueAction } from './actions';
 
-export const metadata: Metadata = { title: 'Month end' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await translations();
+  return { title: t.monthEnd.title };
+}
 export const dynamic = 'force-dynamic';
 
-const MONTH_LABEL = new Intl.DateTimeFormat('en-US', {
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
-const DAY_LABEL = new Intl.DateTimeFormat('en-US', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
 export default async function MonthEndPage() {
+  const { locale, t } = await translations();
+  const format = dateFormats(locale);
   let periods: Awaited<
     ReturnType<Awaited<ReturnType<typeof viewerServices>>['services']['periods']['list']>
   >;
@@ -79,16 +73,12 @@ export default async function MonthEndPage() {
 
   return (
     <>
-      <PageHeader
-        title="Month end"
-        description="Three things, in order, once a month. You can press any of them early — if it is not time yet, the ledger says why instead of doing something wrong."
-      />
+      <PageHeader title={t.monthEnd.title} description={t.monthEnd.description} />
 
       {!current ? (
         <Card>
           <CardBody className="text-ink-secondary py-8 text-center text-sm">
-            Every month with entries in it is closed. The next one becomes available once the month
-            has finished.
+            {t.monthEnd.allClosed}
           </CardBody>
         </Card>
       ) : (
@@ -96,35 +86,30 @@ export default async function MonthEndPage() {
           <Card>
             <CardHeader>
               <div className="space-y-0.5">
-                <CardTitle>
-                  {MONTH_LABEL.format(new Date(`${current.periodMonth}T00:00:00Z`))}
-                </CardTitle>
-                <CardDescription>
-                  {current.entryCount} entries. Closing happens oldest month first, so this is the
-                  one to work on.
-                </CardDescription>
+                <CardTitle>{format.month(new Date(`${current.periodMonth}T00:00:00Z`))}</CardTitle>
+                <CardDescription>{t.monthEnd.entriesInMonth(current.entryCount)}</CardDescription>
               </div>
-              <Badge tone="caution">Open</Badge>
+              <Badge tone="caution">{t.monthEnd.open}</Badge>
             </CardHeader>
           </Card>
 
           <ol className="space-y-3">
             <Step
               number={1}
-              title="Put in the exchange rates"
+              numberLabel={t.monthEnd.stepNumber(1)}
+              title={t.monthEnd.step1}
               description={
                 foreignCurrencies.length === 0
-                  ? 'You only hold ' +
-                    functional +
-                    ', so there are no rates to enter. Nothing to do here.'
-                  : `On ${
-                      monthEnd ? DAY_LABEL.format(new Date(`${monthEnd}T00:00:00Z`)) : 'month end'
-                    }, what was one ${functional === 'VND' ? 'dollar, euro or Australian dollar' : 'unit of each foreign currency'} worth? Use the rate your bank or the central bank published that day. You hold ${foreignCurrencies.join(', ')}.`
+                  ? t.monthEnd.step1NoForeign(functional)
+                  : t.monthEnd.step1Body(
+                      monthEnd ? format.full(new Date(`${monthEnd}T00:00:00Z`)) : '',
+                      foreignCurrencies.join(', '),
+                    )
               }
               done={ratesReady}
               doneLabel={
                 ratesReady && foreignCurrencies.length > 0
-                  ? `Rates on file for ${ratesAtMonthEnd.join(', ')}.`
+                  ? t.monthEnd.step1Done(ratesAtMonthEnd.join(', '))
                   : undefined
               }
             >
@@ -134,24 +119,31 @@ export default async function MonthEndPage() {
                   currencies={foreignCurrencies}
                   functional={functional}
                   asOf={monthEnd}
+                  labels={{
+                    currency: t.monthEnd.rateCurrency,
+                    worth: t.monthEnd.rateWorth(functional),
+                    save: t.monthEnd.rateSave,
+                    saving: t.monthEnd.rateSaving,
+                  }}
                 />
               ) : null}
             </Step>
 
             <Step
               number={2}
-              title="Update what your foreign money is worth"
+              numberLabel={t.monthEnd.stepNumber(2)}
+              title={t.monthEnd.step2}
               description={
                 foreignCurrencies.length === 0
-                  ? 'Nothing to update — every account is already in ' + functional + '.'
-                  : `Your customers owe you in ${foreignCurrencies.join(' and ')}. Those amounts are worth a different number of ${functional} now than when you invoiced. This works out the difference and records it as income or expense.`
+                  ? t.monthEnd.step2NoForeign(functional)
+                  : t.monthEnd.step2Body(foreignCurrencies.join(', '), functional)
               }
               done={Boolean(preview?.ok && preview.value.lines.length === 0)}
             >
               {preview?.ok && preview.value.lines.length > 0 ? (
                 <div className="border-line bg-surface-sunken rounded-lg border p-3">
                   <p className="text-ink-secondary mb-2 text-xs font-medium">
-                    What will change if you press this:
+                    {t.monthEnd.whatWillChange}
                   </p>
                   <ul className="space-y-1.5">
                     {preview.value.lines.map((line) => (
@@ -163,7 +155,7 @@ export default async function MonthEndPage() {
                           }
                         >
                           {BigInt(line.differenceMinor) >= 0n ? '+' : ''}
-                          {Number(line.differenceMinor).toLocaleString('en-US')} {functional}
+                          {format.number(BigInt(line.differenceMinor))} {functional}
                         </span>
                       </li>
                     ))}
@@ -174,27 +166,28 @@ export default async function MonthEndPage() {
               <ActionButton
                 action={revalueAction}
                 month={current.periodMonth.slice(0, 7)}
-                label="Update foreign balances"
-                pendingLabel="Updating…"
+                label={t.monthEnd.step2Button}
+                pendingLabel={t.monthEnd.step2Pending}
                 variant="secondary"
               />
             </Step>
 
             <Step
               number={3}
-              title="Close the month"
-              description={`After this, nobody can add or change an entry dated in ${MONTH_LABEL.format(
-                new Date(`${current.periodMonth}T00:00:00Z`),
-              )}. That is what makes the month's figures final. Your profit for the month moves into retained earnings. You can reopen it if you have to.`}
+              numberLabel={t.monthEnd.stepNumber(3)}
+              title={t.monthEnd.step3}
+              description={t.monthEnd.step3Body(
+                format.month(new Date(`${current.periodMonth}T00:00:00Z`)),
+              )}
             >
               <ActionButton
                 action={closeMonthAction}
                 month={current.periodMonth.slice(0, 7)}
-                label="Close the month"
-                pendingLabel="Closing…"
-                confirm={`Close ${MONTH_LABEL.format(
-                  new Date(`${current.periodMonth}T00:00:00Z`),
-                )}? Entries dated in it can no longer be added or changed.`}
+                label={t.monthEnd.step3Button}
+                pendingLabel={t.monthEnd.step3Pending}
+                confirm={t.monthEnd.step3Confirm(
+                  format.month(new Date(`${current.periodMonth}T00:00:00Z`)),
+                )}
               />
             </Step>
           </ol>
@@ -204,7 +197,7 @@ export default async function MonthEndPage() {
       <Card>
         <CardHeader>
           <div className="space-y-0.5">
-            <CardTitle>Months</CardTitle>
+            <CardTitle>{t.monthEnd.months}</CardTitle>
             <CardDescription>
               A closed month can be reopened. The original closing entry stays on the record and a
               reversing one cancels it, so there is always a trail.
@@ -213,7 +206,7 @@ export default async function MonthEndPage() {
         </CardHeader>
         <CardBody className="space-y-2">
           {periods.length === 0 ? (
-            <p className="text-ink-secondary text-sm">No entries yet, so no months to close.</p>
+            <p className="text-ink-secondary text-sm">{t.monthEnd.noMonths}</p>
           ) : (
             periods.map((period) => (
               <div
@@ -222,7 +215,7 @@ export default async function MonthEndPage() {
               >
                 <div className="min-w-0">
                   <p className="text-ink text-sm font-medium">
-                    {MONTH_LABEL.format(new Date(`${period.periodMonth}T00:00:00Z`))}
+                    {format.month(new Date(`${period.periodMonth}T00:00:00Z`))}
                   </p>
                   <p className="text-ink-muted text-xs">
                     {period.entryCount} entries
@@ -233,20 +226,20 @@ export default async function MonthEndPage() {
                 <div className="flex items-center gap-3">
                   {period.status === 'closed' ? (
                     <>
-                      <Badge tone="neutral">Closed</Badge>
+                      <Badge tone="neutral">{t.monthEnd.closed}</Badge>
                       <ActionButton
                         action={reopenMonthAction}
                         month={period.periodMonth.slice(0, 7)}
-                        label="Reopen"
+                        label={t.monthEnd.reopen}
                         pendingLabel="Reopening…"
                         variant="secondary"
-                        confirm={`Reopen ${MONTH_LABEL.format(
+                        confirm={`Reopen ${format.month(
                           new Date(`${period.periodMonth}T00:00:00Z`),
                         )}? The closing entry will be reversed.`}
                       />
                     </>
                   ) : (
-                    <Badge tone="caution">Open</Badge>
+                    <Badge tone="caution">{t.monthEnd.open}</Badge>
                   )}
                 </div>
               </div>

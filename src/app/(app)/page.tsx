@@ -14,7 +14,10 @@ import { buildPosition, loadDashboard } from '@/server/queries';
 import { translations } from '@/server/i18n';
 import { classLabel, dateFormats } from '@/lib/i18n';
 
-export const metadata: Metadata = { title: 'Overview' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await translations();
+  return { title: t.overview.title };
+}
 
 // Balances change on every posting, so nothing here may be served from a cache.
 export const dynamic = 'force-dynamic';

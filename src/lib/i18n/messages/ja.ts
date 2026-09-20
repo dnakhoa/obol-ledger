@@ -260,6 +260,106 @@ export const ja: Messages = {
     nothingMovedBody: '入庫と出庫がここに一覧で表示されます。',
   },
 
+  journal: {
+    title: '仕訳帳',
+    description:
+      'すべての仕訳を新しい順に、明細行とあわせて表示します。仕訳は追記のみ — 誤りは反対仕訳で訂正し、履歴を書き換えることはありません。',
+    entries: '仕訳',
+    noMatches: '条件に一致する仕訳はありません',
+    noMatchesBody:
+      '検索語を短くするか、勘定科目の絞り込みを広げてください。仕訳帳自体は変わりません。',
+    clearFilters: '絞り込みを解除',
+    empty: 'まだ仕訳がありません',
+    emptyBody:
+      '仕訳帳は空です。仕訳を入力するか、pnpm db:seed で 1 か月分のサンプル帳簿を読み込んでください。',
+    postEntry: '仕訳を入力',
+    caption: '仕訳と明細行',
+    date: '日付',
+    descriptionOrAccount: '摘要 / 勘定科目',
+    amount: '金額',
+    debit: '借方',
+    credit: '貸方',
+    reversed: '訂正済み',
+    reversal: '反対仕訳',
+    balanced: '貸借一致',
+  },
+
+  transfer: {
+    title: '仕訳を入力',
+    description:
+      '仕訳を記帳します。貸借の一致は入力中に検証され、ドメイン層でもう一度、そして COMMIT 時に Postgres が三度目の検証を行います。',
+  },
+
+  reports: {
+    title: '帳票',
+    description:
+      '会計帳簿が作成するために存在する 2 つの計算書です。どちらも他と同じ仕訳から計算しており、食い違う余地のある別の集計テーブルはありません。',
+    sheetBalances: '貸借対照表は一致しています',
+    sheetDoesNot: '貸借対照表が一致していません',
+    assets: '資産',
+    amount: '金額',
+    sectionCaption: (section) => `勘定科目別の${section}`,
+    sectionEmpty: (section) => `この通貨に${section}の勘定科目はありません。`,
+    sectionTotal: (section) => `${section}合計`,
+    equation: '資産 = 負債 + 純資産 + 繰越利益剰余金',
+    liabilitiesPlusEquity: '負債 + 純資産',
+    period30: '30 日',
+    period90: '90 日',
+    period365: '12 か月',
+    balanceSheet: '貸借対照表',
+    asAt: (date) => `${date} 現在の残高`,
+    retainedEarnings: '繰越利益剰余金',
+    incomeStatement: '損益計算書',
+    reportingPeriod: '対象期間',
+    netIncome: '当期純利益',
+    netIncomeHint: '当期の収益から費用を差し引いた額',
+    profit: '利益',
+    lossOrBreakeven: '損失または収支均衡',
+  },
+
+  monthEnd: {
+    title: '月次決算',
+    description:
+      '月に一度、順番に 3 つの作業を行います。早めに押しても構いません — まだその時期でなければ、誤った処理をする代わりに理由を表示します。',
+    open: '未締め',
+    closed: '締め済み',
+    entriesInMonth: (count) => `仕訳 ${count} 件。締めは古い月から行うため、この月が対象です。`,
+    allClosed: '仕訳のある月はすべて締め済みです。次の月は、その月が終わると対象になります。',
+
+    step1: '為替レートを入力',
+    step1NoForeign: (functional) =>
+      `保有通貨は ${functional} のみのため、入力するレートはありません。この手順で行うことはありません。`,
+    step1Body: (day, currencies) =>
+      `${day} 時点で、各外貨 1 単位はいくらでしたか。取引銀行または中央銀行がその日に公表したレートを使用してください。保有通貨は ${currencies} です。`,
+    step1Done: (currencies) => `${currencies} のレートを登録済みです。`,
+
+    step2: '外貨建残高を換算し直す',
+    step2NoForeign: (functional) =>
+      `換算し直すものはありません — すべての勘定が ${functional} です。`,
+    step2Body: (currencies, functional) =>
+      `得意先からの債権は ${currencies} 建です。請求時と現在とでは ${functional} 換算額が異なります。この手順でその差額を計算し、収益または費用として計上します。`,
+    whatWillChange: 'このボタンを押すと、次の金額が変わります：',
+    step2Button: '外貨建残高を更新',
+    step2Pending: '更新中…',
+
+    step3: '月次を締める',
+    step3Body: (month) =>
+      `締めた後は、${month} 付の仕訳を追加も変更もできなくなります。それによってその月の数値が確定します。当月の損益は繰越利益剰余金へ振り替えられます。必要であれば締めを解除できます。`,
+    step3Button: '月次を締める',
+    step3Pending: '締め処理中…',
+    step3Confirm: (month) =>
+      `${month} を締めますか。この月付の仕訳は追加も変更もできなくなります。`,
+
+    months: '月次一覧',
+    rateCurrency: '通貨',
+    rateWorth: (functional) => `${functional} 換算額`,
+    rateSave: 'レートを保存',
+    rateSaving: '保存中…',
+    noMonths: '仕訳がないため、締める月はまだありません。',
+    reopen: '締めを解除',
+    stepNumber: (n) => `手順 ${n}`,
+  },
+
   stockImport: {
     title: '表計算から取り込む',
     description:
@@ -290,6 +390,8 @@ export const ja: Messages = {
     yourRowsHint:
       '全行を確認して取込を押すまで、帳簿には何も書き込まれません。1 行でも誤りがあれば 1 行も取り込みません — 途中まで取り込まれた帳簿は、取り込まないより厄介です。',
     pasteLabel: 'ここに行を貼り付け',
+    pastePlaceholder:
+      '品目コード\t品名\t単位\t日付\t数量\t金額\t伝票番号\nPAV-600\t御影石平板 600×600\tm2\t10/01/2026\t1000\t4000000\tCONT-4417',
     pasteHint: 'Excel で範囲を選択し、見出し行ごと貼り付けてください。.csv の中身でも構いません。',
     chargeTo: '貸方勘定',
     chargeToHint: '未払いの仕入先、または支払った預金口座です。',
@@ -310,6 +412,7 @@ export const ja: Messages = {
       `${columns} の列が見つかりません。下の行は読み取った内容をそのまま表示しています。どの見出しが一致しなかったか確認してください。`,
 
     previewCaption: '読み取った内容を 1 行ずつ表示',
+    importFailed: '取り込みは行われませんでした。以下の行を修正して再度お試しください。',
     row: '行',
     status: '状態',
     ready: '取込可能',

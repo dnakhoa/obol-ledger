@@ -19,7 +19,10 @@ import type { ItemSummary } from '@/server/services/inventory';
 import type { AccountDto } from '@/server/services/dto';
 import type { Messages } from '@/lib/i18n';
 
-export const metadata: Metadata = { title: 'Stock' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await translations();
+  return { title: t.stock.title };
+}
 export const dynamic = 'force-dynamic';
 
 /**

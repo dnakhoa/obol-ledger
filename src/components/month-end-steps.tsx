@@ -24,6 +24,7 @@ const INITIAL: MonthEndState = { status: 'idle' };
  */
 export function Step({
   number,
+  numberLabel,
   title,
   description,
   done,
@@ -31,6 +32,8 @@ export function Step({
   children,
 }: {
   number: number;
+  /** "Step 2" / "Bước 2" / "手順 2", resolved on the server. */
+  numberLabel: string;
   title: string;
   description: string;
   done?: boolean;
@@ -52,7 +55,7 @@ export function Step({
       <div className="min-w-0 flex-1 space-y-3">
         <div className="space-y-1">
           <h3 className="text-ink text-sm font-semibold">
-            Step {number} — {title}
+            {numberLabel} — {title}
           </h3>
           <p className="text-ink-secondary text-sm">{description}</p>
           {done && doneLabel ? (
@@ -88,16 +91,26 @@ function Outcome({ state }: { state: MonthEndState }) {
   );
 }
 
+export type RateLabels = {
+  readonly currency: string;
+  /** Already carries the functional currency, so it is a plain string here. */
+  readonly worth: string;
+  readonly save: string;
+  readonly saving: string;
+};
+
 export function RateForm({
   action,
   currencies,
   functional,
   asOf,
+  labels,
 }: {
   action: (state: MonthEndState, formData: FormData) => Promise<MonthEndState>;
   currencies: readonly string[];
   functional: string;
   asOf: string;
+  labels: RateLabels;
 }) {
   const [state, submit, pending] = useActionState(action, INITIAL);
 
@@ -107,7 +120,7 @@ export function RateForm({
       <input type="hidden" name="quote" value={functional} />
 
       <div className="flex flex-wrap items-end gap-3">
-        <Field label="Currency" htmlFor="base" className="w-28">
+        <Field label={labels.currency} htmlFor="base" className="w-28">
           <Select id="base" name="base" defaultValue={currencies[0]}>
             {currencies.map((currency) => (
               <option key={currency} value={currency}>
@@ -117,16 +130,12 @@ export function RateForm({
           </Select>
         </Field>
 
-        <Field
-          label={`Worth this many ${functional}`}
-          htmlFor="rate"
-          className="min-w-[10rem] flex-1"
-        >
+        <Field label={labels.worth} htmlFor="rate" className="min-w-[10rem] flex-1">
           <Input id="rate" name="rate" inputMode="decimal" placeholder="25700" required />
         </Field>
 
         <Button type="submit" variant="secondary" disabled={pending}>
-          {pending ? 'Saving…' : 'Save rate'}
+          {pending ? labels.saving : labels.save}
         </Button>
       </div>
 

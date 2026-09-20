@@ -13,12 +13,6 @@ import { applyImportAction, previewImportAction } from '@/app/(app)/stock/import
 
 const INITIAL: ImportState = { status: 'idle' };
 
-const SEPARATOR_BLURB: Record<string, string> = {
-  tab: 'Tab separated — read straight out of Excel.',
-  semicolon: 'Semicolon separated, which is what Excel writes in most of Europe and in Vietnam.',
-  comma: 'Comma separated.',
-};
-
 /**
  * Paste, look, then import.
  *
@@ -28,14 +22,50 @@ const SEPARATOR_BLURB: Record<string, string> = {
  * container numbers, the date resolved to an unambiguous one — and nothing has
  * been written when they read it.
  */
+/**
+ * Only the labels that are plain strings.
+ *
+ * Everything that takes a number or a column list is formatted on the server
+ * and arrives in `state.notes`, because a function cannot be serialised across
+ * this boundary — and because keeping it that way is what stops three
+ * dictionaries being bundled for the browser.
+ */
+export type ImportLabels = {
+  readonly pasteLabel: string;
+  readonly pasteHint: string;
+  readonly pastePlaceholder: string;
+  readonly chargeTo: string;
+  readonly chargeToHint: string;
+  readonly stockAccount: string;
+  readonly stockAccountHint: string;
+  readonly cogsAccount: string;
+  readonly cogsAccountHint: string;
+  readonly checkButton: string;
+  readonly checking: string;
+  readonly importing: string;
+  readonly previewCaption: string;
+  readonly row: string;
+  readonly product: string;
+  readonly arrived: string;
+  readonly quantity: string;
+  readonly cost: string;
+  readonly reference: string;
+  readonly status: string;
+  readonly ready: string;
+  readonly newBadge: string;
+  readonly fixFirst: string;
+};
+
 export function StockImportForm({
   assetAccounts,
   expenseAccounts,
   creditAccounts,
+  labels,
 }: {
   assetAccounts: readonly AccountOption[];
   expenseAccounts: readonly AccountOption[];
   creditAccounts: readonly AccountOption[];
+  labels: ImportLabels;
 }) {
   const [state, action, pending] = useActionState(previewImportAction, INITIAL);
   const [applied, applyAction, applying] = useActionState(applyImportAction, INITIAL);
@@ -46,14 +76,11 @@ export function StockImportForm({
   // reports, whatever the earlier preview said.
   const outcome = applied.status === 'idle' ? state : applied;
   const preview = applied.status === 'done' ? undefined : state.preview;
+  const notes = applied.status === 'done' ? undefined : state.notes;
 
   const accountFields = (
     <div className="grid gap-4 sm:grid-cols-3">
-      <Field
-        label="Charge the deliveries to"
-        htmlFor={`${id}-credit`}
-        hint="The supplier you owe, or the bank it came out of."
-      >
+      <Field label={labels.chargeTo} htmlFor={`${id}-credit`} hint={labels.chargeToHint}>
         <Select id={`${id}-credit`} name="creditAccountId" required>
           {creditAccounts.map((account) => (
             <option key={account.id} value={account.id}>
@@ -62,7 +89,7 @@ export function StockImportForm({
           ))}
         </Select>
       </Field>
-      <Field label="Stock account" htmlFor={`${id}-stock`} hint="For any product the file opens.">
+      <Field label={labels.stockAccount} htmlFor={`${id}-stock`} hint={labels.stockAccountHint}>
         <Select id={`${id}-stock`} name="inventoryAccountId" required>
           {assetAccounts.map((account) => (
             <option key={account.id} value={account.id}>
@@ -71,7 +98,7 @@ export function StockImportForm({
           ))}
         </Select>
       </Field>
-      <Field label="Cost of sales account" htmlFor={`${id}-cogs`} hint="Where its cost goes later.">
+      <Field label={labels.cogsAccount} htmlFor={`${id}-cogs`} hint={labels.cogsAccountHint}>
         <Select id={`${id}-cogs`} name="cogsAccountId" required>
           {expenseAccounts.map((account) => (
             <option key={account.id} value={account.id}>
@@ -86,11 +113,7 @@ export function StockImportForm({
   return (
     <div className="space-y-5">
       <form action={action} className="space-y-4">
-        <Field
-          label="Paste your rows"
-          htmlFor={`${id}-text`}
-          hint="Select the block in Excel and paste it here, header row and all. A .csv file's contents work too."
-        >
+        <Field label={labels.pasteLabel} htmlFor={`${id}-text`} hint={labels.pasteHint}>
           <textarea
             id={`${id}-text`}
             name="text"
@@ -98,9 +121,7 @@ export function StockImportForm({
             onChange={(event) => setText(event.target.value)}
             rows={8}
             spellCheck={false}
-            placeholder={
-              'Product Code\tName\tUnit\tDate Received\tQuantity\tTotal Cost\tContainer\nPAV-600\tGranite paver 600×600\tm2\t10/01/2026\t1000\t40000.00\tCONT-4417'
-            }
+            placeholder={labels.pastePlaceholder}
             className="border-line bg-surface placeholder:text-ink-muted numeric w-full rounded-lg border px-3 py-2 font-mono text-xs"
           />
         </Field>
@@ -116,7 +137,7 @@ export function StockImportForm({
             nothing, so there is no reason to guard it.
           */}
           <Button type="submit" variant="secondary" disabled={pending}>
-            {pending ? 'Reading…' : 'Check the rows'}
+            {pending ? labels.checking : labels.checkButton}
           </Button>
           <Outcome state={outcome} />
         </div>
@@ -125,32 +146,24 @@ export function StockImportForm({
       {preview ? (
         <div className="space-y-4">
           <div className="text-ink-secondary flex flex-wrap items-center gap-2 text-xs">
-            <Badge>{SEPARATOR_BLURB[preview.separator] ?? preview.separator}</Badge>
-            {preview.missingColumns.length > 0 ? (
-              <span className="text-caution">
-                No {preview.missingColumns.join(', ')} column was found. The rows below are shown as
-                they were read, so you can see which header did not match.
-              </span>
+            {notes ? <Badge>{notes.separator}</Badge> : null}
+            {notes?.missingColumns ? (
+              <span className="text-caution">{notes.missingColumns}</span>
             ) : null}
-            {preview.ignoredColumns.length > 0 ? (
-              <span>
-                Columns not used: {preview.ignoredColumns.join(', ')}. Nothing was lost — they are
-                simply not part of a delivery.
-              </span>
-            ) : null}
+            {notes?.ignoredColumns ? <span>{notes.ignoredColumns}</span> : null}
           </div>
 
           <TableScroll>
-            <Table caption="Every row as the ledger read it">
+            <Table caption={labels.previewCaption}>
               <thead>
                 <tr>
-                  <Th>Row</Th>
-                  <Th>Product</Th>
-                  <Th>Arrived</Th>
-                  <Th align="right">Quantity</Th>
-                  <Th align="right">Cost</Th>
-                  <Th>Reference</Th>
-                  <Th>Status</Th>
+                  <Th>{labels.row}</Th>
+                  <Th>{labels.product}</Th>
+                  <Th>{labels.arrived}</Th>
+                  <Th align="right">{labels.quantity}</Th>
+                  <Th align="right">{labels.cost}</Th>
+                  <Th>{labels.reference}</Th>
+                  <Th>{labels.status}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -160,7 +173,7 @@ export function StockImportForm({
                     <Td>
                       {row.sku}
                       {row.createsProduct && !row.problem ? (
-                        <Badge className="ml-2">new</Badge>
+                        <Badge className="ml-2">{labels.newBadge}</Badge>
                       ) : null}
                     </Td>
                     <Td numeric>{row.date || '—'}</Td>
@@ -175,7 +188,7 @@ export function StockImportForm({
                       {row.problem ? (
                         <span className="text-caution text-xs">{row.problem}</span>
                       ) : (
-                        <span className="text-positive text-xs">Ready</span>
+                        <span className="text-positive text-xs">{labels.ready}</span>
                       )}
                     </Td>
                   </Tr>
@@ -193,15 +206,10 @@ export function StockImportForm({
                 variant="primary"
                 disabled={applying || preview.problems > 0 || preview.rows.length === 0}
               >
-                {applying
-                  ? 'Importing…'
-                  : `Import ${preview.rows.length} deliver${preview.rows.length === 1 ? 'y' : 'ies'}`}
+                {applying ? labels.importing : (notes?.importButton ?? '')}
               </Button>
               {preview.problems > 0 ? (
-                <p className="text-ink-secondary text-xs">
-                  Fix the rows marked above and check again. The import is all or nothing — it will
-                  not bring in the good rows and leave the rest.
-                </p>
+                <p className="text-ink-secondary text-xs">{labels.fixFirst}</p>
               ) : null}
             </div>
           </form>
@@ -211,9 +219,7 @@ export function StockImportForm({
       {applied.problems?.length ? (
         <ul className="text-caution space-y-1 text-xs">
           {applied.problems.map((problem) => (
-            <li key={problem.line}>
-              Row {problem.line}: {problem.problem}
-            </li>
+            <li key={problem}>{problem}</li>
           ))}
         </ul>
       ) : null}

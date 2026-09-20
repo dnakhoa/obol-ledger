@@ -5,13 +5,18 @@ import { EntryComposer } from '@/components/entry-composer';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
 import { viewerServices } from '@/server/container';
+import { translations } from '@/server/i18n';
 import { postEntryAction } from './actions';
 import type { AccountDto } from '@/server/services/dto';
 
-export const metadata: Metadata = { title: 'Post an entry' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await translations();
+  return { title: t.transfer.title };
+}
 export const dynamic = 'force-dynamic';
 
 export default async function PostEntryPage() {
+  const { t } = await translations();
   let accounts: AccountDto[];
   try {
     accounts = await (await viewerServices()).services.accounts.list();
@@ -24,10 +29,7 @@ export default async function PostEntryPage() {
 
   return (
     <>
-      <PageHeader
-        title="Post an entry"
-        description="Record a journal entry. The balance is checked as you type, again in the domain layer, and a third time by Postgres at COMMIT."
-      />
+      <PageHeader title={t.transfer.title} description={t.transfer.description} />
 
       {accounts.length === 0 ? (
         <Card>

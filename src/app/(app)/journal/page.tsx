@@ -13,27 +13,18 @@ import { SetupRequiredError } from '@/server/setup-error';
 import { ArrowRightIcon, CheckIcon, DownloadIcon } from '@/components/icons';
 import { cn } from '@/lib/cn';
 import { viewerServices } from '@/server/container';
+import { translations } from '@/server/i18n';
+import { dateFormats } from '@/lib/i18n';
 import type { AccountDto, Page, TransactionDto } from '@/server/services/dto';
 import { JournalFilters } from '@/components/journal-filters';
 
-export const metadata: Metadata = { title: 'Journal' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await translations();
+  return { title: t.journal.title };
+}
 export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 20;
-
-const ENTRY_DAY = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  timeZone: 'UTC',
-});
-
-const ENTRY_TIME = new Intl.DateTimeFormat('en-US', {
-  hour: 'numeric',
-  minute: '2-digit',
-  timeZone: 'UTC',
-});
-
-const ENTRY_YEAR = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'UTC' });
 
 type PageProps = {
   searchParams: Promise<{
@@ -48,6 +39,8 @@ type PageProps = {
 };
 
 export default async function JournalPage({ searchParams }: PageProps) {
+  const { locale, t } = await translations();
+  const format = dateFormats(locale);
   const query = await searchParams;
 
   let page: Page<TransactionDto>;
@@ -77,8 +70,8 @@ export default async function JournalPage({ searchParams }: PageProps) {
   return (
     <>
       <PageHeader
-        title="Journal"
-        description="Every entry, newest first, with its postings. Entries are append-only: a mistake is corrected by posting a reversing entry, never by editing history."
+        title={t.journal.title}
+        description={t.journal.description}
         actions={
           <>
             {/*
@@ -111,7 +104,7 @@ export default async function JournalPage({ searchParams }: PageProps) {
       <Card>
         <CardHeader>
           <div className="space-y-0.5">
-            <CardTitle>Entries</CardTitle>
+            <CardTitle>{t.journal.entries}</CardTitle>
             <CardDescription>
               Each entry&rsquo;s postings sum to zero — verified at COMMIT by a deferred database
               constraint.
@@ -131,31 +124,31 @@ export default async function JournalPage({ searchParams }: PageProps) {
         {page.items.length === 0 ? (
           query.accountId || query.search || query.metadataKey ? (
             <EmptyState
-              title="No entries match those filters"
-              description="Try a shorter search term, or widen the account filter. The journal itself is unchanged."
-              action={<ButtonLink href="/journal">Clear filters</ButtonLink>}
+              title={t.journal.noMatches}
+              description={t.journal.noMatchesBody}
+              action={<ButtonLink href="/journal">{t.journal.clearFilters}</ButtonLink>}
             />
           ) : (
             <EmptyState
-              title="Nothing posted yet"
-              description="The journal is empty. Post an entry, or run pnpm db:seed to load a month of example books."
-              action={<ButtonLink href="/transfer">Post an entry</ButtonLink>}
+              title={t.journal.empty}
+              description={t.journal.emptyBody}
+              action={<ButtonLink href="/transfer">{t.journal.postEntry}</ButtonLink>}
             />
           )
         ) : (
           <>
             <TableScroll>
-              <Table caption="Journal entries with their postings">
+              <Table caption={t.journal.caption}>
                 <thead>
                   <tr>
-                    <Th>Date</Th>
-                    <Th>Description / account</Th>
+                    <Th>{t.journal.date}</Th>
+                    <Th>{t.journal.descriptionOrAccount}</Th>
                     <Th align="right">
-                      <span className="sm:hidden">Amount</span>
-                      <span className="hidden sm:inline">Debit</span>
+                      <span className="sm:hidden">{t.journal.amount}</span>
+                      <span className="hidden sm:inline">{t.journal.debit}</span>
                     </Th>
                     <Th align="right" className="hidden sm:table-cell">
-                      Credit
+                      {t.journal.credit}
                     </Th>
                   </tr>
                 </thead>
@@ -182,13 +175,10 @@ export default async function JournalPage({ searchParams }: PageProps) {
                         entry's own page.
                       */}
                       <Td className="text-ink-muted align-top text-xs whitespace-nowrap">
-                        {ENTRY_DAY.format(new Date(entry.occurredAt))}
-                        <span className="hidden sm:inline">
-                          , {ENTRY_YEAR.format(new Date(entry.occurredAt))}
-                        </span>
+                        {format.day(new Date(entry.occurredAt))}
                         <span className="block text-[11px] sm:inline sm:text-xs">
                           <span className="hidden sm:inline">, </span>
-                          {ENTRY_TIME.format(new Date(entry.occurredAt))}
+                          {format.time(new Date(entry.occurredAt))}
                         </span>
                       </Td>
                       <Td className="font-medium">
@@ -201,13 +191,13 @@ export default async function JournalPage({ searchParams }: PageProps) {
                       </Td>
                       <Td colSpan={2} align="right">
                         {entry.reversedByTransactionId ? (
-                          <Badge tone="caution">Reversed</Badge>
+                          <Badge tone="caution">{t.journal.reversed}</Badge>
                         ) : entry.reversesTransactionId ? (
-                          <Badge tone="neutral">Reversal</Badge>
+                          <Badge tone="neutral">{t.journal.reversal}</Badge>
                         ) : (
                           <Badge tone="positive">
                             <CheckIcon width={11} height={11} />
-                            Balanced
+                            {t.journal.balanced}
                           </Badge>
                         )}
                       </Td>

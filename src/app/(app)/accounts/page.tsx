@@ -17,7 +17,10 @@ import { normalBalanceOf } from '@/server/domain/account';
 import type { AccountDto } from '@/server/services/dto';
 import { classBlurb, classLabel } from '@/lib/i18n';
 
-export const metadata: Metadata = { title: 'Chart of accounts' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await translations();
+  return { title: t.accounts.title };
+}
 export const dynamic = 'force-dynamic';
 
 export default async function AccountsPage() {
