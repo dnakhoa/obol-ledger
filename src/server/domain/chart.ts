@@ -24,7 +24,7 @@ import type { AccountType } from './account';
  * nowhere to put a rule that actually is a rule.
  */
 
-export const CHART_TEMPLATES = ['generic', 'au_nz', 'vn_tt200'] as const;
+export const CHART_TEMPLATES = ['generic', 'au_nz', 'us_gaap', 'jp', 'vn_tt200'] as const;
 export type ChartTemplate = (typeof CHART_TEMPLATES)[number];
 
 /** Whether the template's codes are prescribed by law rather than by habit. */
@@ -368,9 +368,172 @@ const VN_TT200: ChartTemplateDefinition = {
   ],
 };
 
+/**
+ * United States.
+ *
+ * Four digits, which is the convention most American small businesses and
+ * their accountants use: 1000s assets, 2000s liabilities, 3000s equity, 4000s
+ * revenue, 5000s cost of sales, 6000s operating expenses. Like every other
+ * conventional chart it is a habit rather than a rule — no US authority
+ * prescribes account numbers.
+ *
+ * The one structural difference from the other charts here is the tax
+ * treatment, and it is not cosmetic.
+ *
+ * **US sales tax is not a VAT.** It is collected from the customer and
+ * remitted to the state, and the business *never reclaims* tax it paid on its
+ * own purchases — there is no input credit, because sales tax is levied once,
+ * at the final sale. So this chart has a Sales Tax Payable liability and
+ * deliberately **no input-tax asset**. Giving it one would be a modelling
+ * error that quietly produces wrong numbers: a business would accumulate a
+ * receivable from the state that does not exist and overstate its assets by
+ * every dollar of tax it ever paid on supplies.
+ *
+ * Compare `jp` below, where consumption tax *is* reclaimable and the chart
+ * carries both halves.
+ */
+const US_GAAP: ChartTemplateDefinition = {
+  id: 'us_gaap',
+  label: 'United States',
+  summary:
+    'Four-digit convention: 1000s assets, 2000s liabilities, 4000s revenue, 5000s cost of sales. Sales tax is collected and remitted, never reclaimed — so there is no input-tax account.',
+  statutory: false,
+  accounts: [
+    { code: '1000', name: 'Cash', type: 'asset' },
+    { code: '1010', name: 'Checking Account', type: 'asset' },
+    { code: '1200', name: 'Accounts Receivable', type: 'asset' },
+    { code: '1300', name: 'Inventory', type: 'asset', monetary: false },
+    { code: '1500', name: 'Equipment', type: 'asset', monetary: false },
+    {
+      code: '1590',
+      name: 'Accumulated Depreciation',
+      type: 'asset',
+      overdraft: true,
+      monetary: false,
+      note: 'Contra-asset.',
+    },
+    { code: '2000', name: 'Accounts Payable', type: 'liability', overdraft: true },
+    {
+      code: '2200',
+      name: 'Sales Tax Payable',
+      type: 'liability',
+      overdraft: true,
+      note: 'Collected from customers and remitted to the state. There is no matching asset: sales tax paid on purchases is a cost, not a credit.',
+    },
+    { code: '2300', name: 'Payroll Liabilities', type: 'liability', overdraft: true },
+    { code: '2500', name: 'Notes Payable', type: 'liability', overdraft: true },
+    { code: '3000', name: "Owner's Equity", type: 'equity', overdraft: true },
+    {
+      code: '3900',
+      name: 'Retained Earnings',
+      type: 'equity',
+      overdraft: true,
+      role: 'retained_earnings',
+    },
+    { code: '4000', name: 'Sales', type: 'revenue', overdraft: true },
+    { code: '4900', name: 'Other Income', type: 'revenue', overdraft: true },
+    { code: '5000', name: 'Cost of Goods Sold', type: 'expense' },
+    { code: '5100', name: 'Freight and Duty', type: 'expense' },
+    { code: '6000', name: 'Salaries and Wages', type: 'expense' },
+    { code: '6200', name: 'Rent', type: 'expense' },
+    { code: '6500', name: 'General and Administrative', type: 'expense' },
+    { code: '6700', name: 'Depreciation', type: 'expense' },
+    {
+      code: '6900',
+      name: 'Foreign Exchange Gain/Loss',
+      type: 'expense',
+      overdraft: true,
+      role: 'fx_gain_loss',
+    },
+  ],
+};
+
+/**
+ * Japan.
+ *
+ * Japanese companies keep books in 勘定科目 (account titles) and, unlike
+ * Vietnam, there is no single statutory chart — the Companies Act and the
+ * financial statement rules prescribe the *shape* of the statements rather
+ * than a numbered list of accounts, so numbering is the company's own. This
+ * is a conventional chart with the titles a trading company actually uses.
+ *
+ * Consumption tax (消費税) is the opposite of US sales tax and the same
+ * shape as VAT: it is charged on sales and reclaimable on purchases, so the
+ * chart carries **both** halves — 仮払消費税, the tax paid and recoverable,
+ * as an asset, and 仮受消費税, the tax collected and owed, as a liability.
+ * The return is the net of the two.
+ */
+const JP: ChartTemplateDefinition = {
+  id: 'jp',
+  label: '日本 — Japan',
+  summary:
+    'Japanese account titles. Consumption tax is reclaimable, so the chart carries both the tax paid (仮払消費税) and the tax collected (仮受消費税) — the return is the net.',
+  statutory: false,
+  accounts: [
+    { code: '100', name: '現金 — Cash', type: 'asset' },
+    { code: '110', name: '普通預金 — Bank deposit', type: 'asset' },
+    { code: '130', name: '売掛金 — Accounts receivable', type: 'asset' },
+    {
+      code: '140',
+      name: '仮払消費税 — Consumption tax paid',
+      type: 'asset',
+      note: 'Reclaimable against tax collected, which is why it is an asset and not a cost.',
+    },
+    { code: '150', name: '商品 — Merchandise inventory', type: 'asset', monetary: false },
+    { code: '160', name: '製品 — Finished goods', type: 'asset', monetary: false },
+    { code: '200', name: '機械装置 — Machinery and equipment', type: 'asset', monetary: false },
+    {
+      code: '290',
+      name: '減価償却累計額 — Accumulated depreciation',
+      type: 'asset',
+      overdraft: true,
+      monetary: false,
+      note: 'Contra-asset.',
+    },
+    { code: '300', name: '買掛金 — Accounts payable', type: 'liability', overdraft: true },
+    { code: '310', name: '未払金 — Accrued payables', type: 'liability', overdraft: true },
+    {
+      code: '320',
+      name: '仮受消費税 — Consumption tax received',
+      type: 'liability',
+      overdraft: true,
+      note: 'Collected on sales and owed to the tax office, net of 仮払消費税.',
+    },
+    { code: '350', name: '前受金 — Advances from customers', type: 'liability', overdraft: true },
+    { code: '400', name: '資本金 — Share capital', type: 'equity', overdraft: true },
+    {
+      code: '490',
+      name: '繰越利益剰余金 — Retained earnings',
+      type: 'equity',
+      overdraft: true,
+      role: 'retained_earnings',
+    },
+    { code: '500', name: '売上高 — Sales', type: 'revenue', overdraft: true },
+    { code: '590', name: '営業外収益 — Non-operating income', type: 'revenue', overdraft: true },
+    { code: '600', name: '売上原価 — Cost of sales', type: 'expense' },
+    { code: '610', name: '荷造運賃 — Packing and freight', type: 'expense' },
+    { code: '700', name: '給料手当 — Salaries and allowances', type: 'expense' },
+    {
+      code: '750',
+      name: '販売費及び一般管理費 — Selling, general and administrative',
+      type: 'expense',
+    },
+    { code: '780', name: '減価償却費 — Depreciation expense', type: 'expense' },
+    {
+      code: '790',
+      name: '為替差損益 — Foreign exchange gain/loss',
+      type: 'expense',
+      overdraft: true,
+      role: 'fx_gain_loss',
+    },
+  ],
+};
+
 export const CHART_TEMPLATE_DEFINITIONS: Record<ChartTemplate, ChartTemplateDefinition> = {
   generic: GENERIC,
   au_nz: AU_NZ,
+  us_gaap: US_GAAP,
+  jp: JP,
   vn_tt200: VN_TT200,
 };
 
