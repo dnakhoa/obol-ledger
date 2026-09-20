@@ -46,7 +46,20 @@ export type PostingDto = {
   readonly accountId: string;
   readonly accountName: string;
   readonly direction: 'debit' | 'credit';
+  /** What moved, in the account's own currency. */
   readonly amount: MoneyDto;
+  /**
+   * The same movement in the organisation's functional currency — the unit the
+   * entry's balance is asserted in.
+   *
+   * Always present, and equal to `amount` whenever the account is already in
+   * the functional currency. Returned rather than left to be recomputed,
+   * because recomputing it needs the rate and the rate is a fact about the
+   * moment the entry was written.
+   */
+  readonly baseAmount: MoneyDto;
+  /** The rate used, as a decimal string. `"1"` for a domestic posting. */
+  readonly fxRate: string;
   readonly sequence: number;
 };
 

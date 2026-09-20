@@ -62,7 +62,15 @@ export type LedgerError =
   | { readonly code: 'period_not_closed'; readonly periodMonth: string }
   | { readonly code: 'period_not_finished'; readonly periodMonth: string }
   | { readonly code: 'earlier_period_open'; readonly periodMonth: string; readonly open: string }
-  | { readonly code: 'retained_earnings_missing' };
+  | { readonly code: 'retained_earnings_missing' }
+  | {
+      readonly code: 'fx_rate_required';
+      readonly accountId: string;
+      readonly currency: CurrencyCode;
+      readonly functional: CurrencyCode;
+    }
+  | { readonly code: 'invalid_fx_rate'; readonly accountId: string; readonly rate: string }
+  | { readonly code: 'rate_not_found'; readonly base: CurrencyCode; readonly quote: CurrencyCode };
 
 export type LedgerErrorCode = LedgerError['code'];
 
@@ -92,6 +100,9 @@ const TITLES: Record<LedgerErrorCode, string> = {
   period_not_finished: 'Period has not finished',
   earlier_period_open: 'An earlier period is still open',
   retained_earnings_missing: 'No retained earnings account',
+  fx_rate_required: 'Exchange rate required',
+  invalid_fx_rate: 'Exchange rate is not a positive decimal',
+  rate_not_found: 'No exchange rate on file',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -144,6 +155,12 @@ export function describe(error: LedgerError): string {
       return `${error.periodMonth} has not finished. Closing it would lock out entries that have not happened yet.`;
     case 'earlier_period_open':
       return `${error.open} is still open. Closing ${error.periodMonth} first would carry an unclosed month's profit into the next one, so periods close in order.`;
+    case 'fx_rate_required':
+      return `Account ${error.accountId} holds ${error.currency}, and the books are kept in ${error.functional}. Supply an fxRate or a baseAmount for that posting — a rate cannot be guessed without producing a ledger that balances and lies.`;
+    case 'invalid_fx_rate':
+      return `"${error.rate}" is not a positive decimal with at most ten places, so it cannot be an exchange rate for the posting to ${error.accountId}.`;
+    case 'rate_not_found':
+      return `No ${error.base}/${error.quote} rate is on file at or before that date. Record one, or supply the rate with the entry.`;
     case 'retained_earnings_missing':
       return 'No account is designated as retained earnings, so a period\u2019s profit has nowhere to go. Mark one equity account with the retained_earnings role.';
   }

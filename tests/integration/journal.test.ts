@@ -177,7 +177,11 @@ describe('journal service', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'account_closed' } });
   });
 
-  it('refuses to mix currencies inside one entry', async () => {
+  it('refuses a foreign posting with no rate and no base amount', async () => {
+    // Mixing currencies inside one entry is now the point — see
+    // `docs/adr/0010-multi-currency.md`. What is still refused is doing it
+    // without saying what the foreign leg was worth: guessing a rate here
+    // would produce a ledger that balances and lies.
     const euro = await openAccount(db, db.$orgId, {
       name: 'Euro cash',
       type: 'asset',
@@ -194,7 +198,7 @@ describe('journal service', () => {
 
     expect(result).toMatchObject({
       ok: false,
-      error: { code: 'currency_mismatch', expected: 'EUR', received: 'USD' },
+      error: { code: 'fx_rate_required', currency: 'EUR', functional: 'USD' },
     });
   });
 

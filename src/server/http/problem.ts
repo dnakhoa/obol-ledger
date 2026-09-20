@@ -52,6 +52,9 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   period_not_finished: 422,
   earlier_period_open: 409,
   retained_earnings_missing: 409,
+  fx_rate_required: 422,
+  invalid_fx_rate: 422,
+  rate_not_found: 422,
 };
 
 export function statusFor(error: LedgerError): number {

@@ -43,9 +43,16 @@ export function toAccountDto(row: AccountRow): AccountDto {
   };
 }
 
-export function toPostingDto(row: PostingRow, accountName: string): PostingDto {
+export function toPostingDto(
+  row: PostingRow,
+  accountName: string,
+  functionalCurrency: CurrencyCode = row.currency as CurrencyCode,
+): PostingDto {
   const currency = row.currency as CurrencyCode;
   const amount = row.amountMinor as MinorUnits;
+  const baseAmount = row.baseAmountMinor as MinorUnits;
+  const magnitude = (value: MinorUnits) => (value < 0n ? -value : value) as MinorUnits;
+
   return {
     id: row.id,
     accountId: row.accountId,
@@ -53,7 +60,11 @@ export function toPostingDto(row: PostingRow, accountName: string): PostingDto {
     // Storage is debit-positive; the DTO names the side explicitly so no
     // consumer has to re-derive the convention.
     direction: amount >= 0n ? 'debit' : 'credit',
-    amount: toMoneyDto((amount < 0n ? -amount : amount) as MinorUnits, currency),
+    amount: toMoneyDto(magnitude(amount), currency),
+    baseAmount: toMoneyDto(magnitude(baseAmount), functionalCurrency),
+    // Trimmed of the trailing zeros `numeric(20, 10)` pads it with, so a
+    // domestic posting reads "1" rather than "1.0000000000".
+    fxRate: String(row.fxRate).replace(/\.?0+$/u, '') || '1',
     sequence: row.sequence,
   };
 }
