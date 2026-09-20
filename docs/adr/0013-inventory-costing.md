@@ -111,13 +111,13 @@ can be pasted in, and the care is all in the reading rather than in anything
 clever:
 
 - **What arrives is usually not a CSV file.** Somebody selects a block in Excel
-  and presses copy, and what lands is *tab*-separated.
+  and presses copy, and what lands is _tab_-separated.
 - **A comma is not the separator everywhere.** Excel writes CSV with the system
   list separator, which in Vietnamese, German and French locales is a
   **semicolon**, because the comma is the decimal mark.
 - **Headers are in the user's language.** `Mã hàng` is a product code. Stripping
   everything but `a–z` turns it into `mhng`; the accents have to be
-  *decomposed* and their marks removed instead — and `đ` is a letter in its own
+  _decomposed_ and their marks removed instead — and `đ` is a letter in its own
   right, which NFD does not touch, so it is mapped by hand.
 - **`10/01/2026` is the tenth of January**, in every market this ledger ships
   charts for. The preview prints the resolved date back beside the row, because
