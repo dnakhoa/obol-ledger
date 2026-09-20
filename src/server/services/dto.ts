@@ -76,6 +76,9 @@ export type PostingDto = {
 };
 
 export type TransactionDto = {
+  /** Who entered it, when anybody did. Absent on entries the ledger wrote itself. */
+  readonly createdBy: string | null;
+  readonly createdVia: 'ui' | 'api' | 'system' | 'import' | 'unknown';
   readonly id: string;
   readonly description: string;
   readonly currency: CurrencyCode;

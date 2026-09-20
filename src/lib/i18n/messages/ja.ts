@@ -282,6 +282,12 @@ export const ja: Messages = {
     reversed: '訂正済み',
     reversal: '反対仕訳',
     balanced: '貸借一致',
+    enteredBy: '入力者',
+    viaUi: '手入力',
+    viaApi: 'API 経由',
+    viaSystem: 'システムが記帳',
+    viaImport: '表計算から取込',
+    viaUnknown: '記録なし',
   },
 
   transfer: {

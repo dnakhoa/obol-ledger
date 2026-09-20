@@ -44,6 +44,18 @@ export type PostEntryInput = {
   /** Caller-supplied annotation; opaque to the ledger. */
   readonly metadata?: Record<string, string> | undefined;
   /**
+   * Who is posting this, and by what route.
+   *
+   * Passed in rather than looked up. A service that reached for
+   * `currentViewer()` would need `next/headers`, which would make it
+   * unusable from a script, a cron and a test — and would put a transport
+   * concern inside the domain. The layer that knows who the request belongs
+   * to is the layer that tells it.
+   */
+  readonly actor?:
+    | { readonly userId?: string | undefined; readonly via: 'ui' | 'api' | 'system' | 'import' }
+    | undefined;
+  /**
    * Absorb a functional-currency difference into the FX gain/loss account.
    *
    * Opt-in, because an adjustment applied by default is how a ledger hides
@@ -279,6 +291,15 @@ export function createJournalService(database: Database, orgId: string) {
         // status, so they are set together rather than backfilled later.
         ...(status === 'posted' ? { postedAt: new Date() } : {}),
         ...(reversesTransactionId ? { reversesTransactionId } : {}),
+        // A person only exists on the routes a person uses. A cron-driven
+        // close and an API key have no user behind them, and claiming one
+        // would be the invention these columns exist to avoid.
+        ...(input.actor
+          ? {
+              createdVia: input.actor.via,
+              ...(input.actor.userId ? { createdBy: input.actor.userId } : {}),
+            }
+          : {}),
       })
       .returning();
     if (!transactionRow) throw new Error('INSERT ... RETURNING produced no transaction row');

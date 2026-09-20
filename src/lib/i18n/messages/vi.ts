@@ -287,6 +287,12 @@ export const vi: Messages = {
     reversed: 'Đã điều chỉnh',
     reversal: 'Bút toán điều chỉnh',
     balanced: 'Cân đối',
+    enteredBy: 'Người nhập',
+    viaUi: 'Nhập thủ công',
+    viaApi: 'Qua API',
+    viaSystem: 'Hệ thống tự ghi',
+    viaImport: 'Nhập từ bảng tính',
+    viaUnknown: 'Không ghi nhận',
   },
 
   transfer: {

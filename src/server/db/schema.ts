@@ -424,6 +424,20 @@ export const transactions = pgTable(
      * concurrent reversal requests resolve in the database rather than in a
      * check either of them could win.
      */
+    /**
+     * Who entered this, and by what route.
+     *
+     * Nullable because every entry written before this column existed has no
+     * author, and inventing one would be inventing evidence. No foreign key
+     * to `user`: deleting a person must not be blocked by, or cascade into,
+     * the entries they posted — those are the accounting record and they
+     * outlive the account.
+     */
+    createdBy: text('created_by'),
+    createdVia: text('created_via')
+      .$type<'ui' | 'api' | 'system' | 'import' | 'unknown'>()
+      .notNull()
+      .default('unknown'),
     reversesTransactionId: text('reverses_transaction_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

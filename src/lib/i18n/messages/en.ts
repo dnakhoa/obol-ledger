@@ -281,6 +281,12 @@ export const en = {
     reversed: 'Reversed',
     reversal: 'Reversal',
     balanced: 'Balanced',
+    enteredBy: 'Entered by',
+    viaUi: 'Entered by hand',
+    viaApi: 'Through the API',
+    viaSystem: 'Written by the ledger',
+    viaImport: 'From a spreadsheet',
+    viaUnknown: 'Not recorded',
   },
 
   transfer: {
