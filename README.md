@@ -441,6 +441,7 @@ including the metadata filter and every problem type, are in the
 - [ADR 9](docs/adr/0009-webhooks.md) — webhooks via a transactional outbox
 - [ADR 10](docs/adr/0010-multi-currency.md) — balancing in the functional currency
 - [ADR 11](docs/adr/0011-chart-of-accounts.md) — account codes, convention versus law
+- [ADR 12](docs/adr/0012-fx-revaluation.md) — unrealized FX as a remeasurement
 
 ## Licence
 

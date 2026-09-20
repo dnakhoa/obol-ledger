@@ -40,6 +40,7 @@ export function toAccountDto(row: AccountRow): AccountDto {
     version: row.version,
     metadata: row.metadata,
     role: row.role,
+    monetary: row.monetary,
     createdAt: row.createdAt.toISOString(),
   };
 }

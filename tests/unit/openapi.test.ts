@@ -109,6 +109,8 @@ describe('OpenAPI document', () => {
       // A close names its month in the path and derives everything else.
       '/periods/{periodMonth}/close',
       '/periods/{periodMonth}/reopen',
+      // Names its month in the path; the rest is derived from the rates on file.
+      '/periods/{periodMonth}/revalue',
     ];
 
     for (const { path, method, operation } of operations) {

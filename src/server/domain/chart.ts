@@ -38,6 +38,14 @@ export type TemplateAccount = {
   readonly type: AccountType;
   /** Contra accounts and accumulators legitimately hold the "wrong" sign. */
   readonly overdraft?: boolean;
+  /**
+   * Whether the account holds a fixed number of currency units.
+   *
+   * Only set where it differs from the default for the type — assets and
+   * liabilities are monetary unless said otherwise, which is right for cash,
+   * receivables and payables and wrong for inventory and fixed assets.
+   */
+  readonly monetary?: boolean;
   readonly role?: 'retained_earnings' | 'fx_gain_loss';
   /** Shown in the UI for a code whose purpose is not obvious from its name. */
   readonly note?: string;
@@ -68,8 +76,8 @@ const GENERIC: ChartTemplateDefinition = {
     { code: '100', name: 'Cash', type: 'asset' },
     { code: '110', name: 'Bank Account', type: 'asset' },
     { code: '120', name: 'Accounts Receivable', type: 'asset' },
-    { code: '130', name: 'Inventory', type: 'asset' },
-    { code: '150', name: 'Equipment', type: 'asset' },
+    { code: '130', name: 'Inventory', type: 'asset', monetary: false },
+    { code: '150', name: 'Equipment', type: 'asset', monetary: false },
     {
       code: '160',
       name: 'Accumulated Depreciation',
@@ -132,19 +140,20 @@ const AU_NZ: ChartTemplateDefinition = {
     { code: '100', name: 'Cash on Hand', type: 'asset' },
     { code: '110', name: 'Business Bank Account', type: 'asset' },
     { code: '120', name: 'Accounts Receivable', type: 'asset' },
-    { code: '130', name: 'Inventory', type: 'asset' },
+    { code: '130', name: 'Inventory', type: 'asset', monetary: false },
     {
       code: '140',
       name: 'GST Paid (Input Tax Credits)',
       type: 'asset',
       note: 'Tax paid on purchases, reclaimable from the revenue authority.',
     },
-    { code: '150', name: 'Plant and Equipment', type: 'asset' },
+    { code: '150', name: 'Plant and Equipment', type: 'asset', monetary: false },
     {
       code: '160',
       name: 'Accumulated Depreciation',
       type: 'asset',
       overdraft: true,
+      monetary: false,
       note: 'Contra-asset.',
     },
     { code: '200', name: 'Accounts Payable', type: 'liability', overdraft: true },
@@ -233,12 +242,25 @@ const VN_TT200: ChartTemplateDefinition = {
       note: 'Deductible input VAT — reclaimable, which is why it is an asset',
     },
     { code: '141', name: 'Tạm ứng', type: 'asset', note: 'Advances to employees' },
-    { code: '152', name: 'Nguyên liệu, vật liệu', type: 'asset', note: 'Raw materials' },
-    { code: '156', name: 'Hàng hóa', type: 'asset', note: 'Merchandise inventory' },
+    {
+      code: '152',
+      name: 'Nguyên liệu, vật liệu',
+      type: 'asset',
+      monetary: false,
+      note: 'Raw materials',
+    },
+    {
+      code: '156',
+      name: 'Hàng hóa',
+      type: 'asset',
+      monetary: false,
+      note: 'Merchandise inventory',
+    },
     {
       code: '211',
       name: 'Tài sản cố định hữu hình',
       type: 'asset',
+      monetary: false,
       note: 'Tangible fixed assets',
     },
     {

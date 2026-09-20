@@ -21,6 +21,13 @@ export type CreateAccountInput = {
   readonly role?: 'retained_earnings' | 'fx_gain_loss' | undefined;
   /** The number this is filed under. Required on a statutory chart. */
   readonly code?: string | undefined;
+  /**
+   * Whether the account holds a fixed number of currency units, and so is
+   * retranslated at each period end. Defaults to true for assets and
+   * liabilities, which is right for cash, receivables and payables and wrong
+   * for inventory — so the chart templates set it explicitly.
+   */
+  readonly monetary?: boolean | undefined;
 };
 
 /**
@@ -78,6 +85,7 @@ export function createAccountService(database: Database, orgId: string) {
             overdraftAllowed: input.overdraftAllowed ?? false,
             metadata: input.metadata ?? {},
             ...(input.code ? { code: input.code } : {}),
+            monetary: input.monetary ?? (input.type === 'asset' || input.type === 'liability'),
             ...(input.role ? { role: input.role } : {}),
           })
           .returning();

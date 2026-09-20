@@ -239,3 +239,24 @@ export const createApiKeySchema = z.object({
 export const monthSchema = z
   .string()
   .regex(/^\d{4}-(0[1-9]|1[0-2])$/u, { message: 'Expected a month as YYYY-MM' });
+
+export const recordRateSchema = z.object({
+  base: currencySchema,
+  quote: currencySchema,
+  /** Ten decimal places, matching `numeric(20, 10)`. Never a JSON number. */
+  rate: z
+    .string()
+    .trim()
+    .regex(/^\d+(\.\d{1,10})?$/u, { message: 'Expected a positive decimal with up to 10 places' }),
+  /** The date this rate was in force, as YYYY-MM-DD. */
+  asOf: z.iso.date(),
+  source: z.string().trim().min(1).max(60).default('manual'),
+});
+
+export const revaluationQuerySchema = z.object({
+  /** Compute the adjustment without posting it. */
+  preview: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+});
