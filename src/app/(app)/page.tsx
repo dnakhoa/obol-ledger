@@ -12,20 +12,12 @@ import { SetupNotice } from '@/components/setup-notice';
 import { CheckIcon, AlertIcon, ArrowRightIcon } from '@/components/icons';
 import { buildPosition, loadDashboard } from '@/server/queries';
 import { translations } from '@/server/i18n';
-import { classLabel } from '@/lib/i18n';
+import { classLabel, dateFormats } from '@/lib/i18n';
 
 export const metadata: Metadata = { title: 'Overview' };
 
 // Balances change on every posting, so nothing here may be served from a cache.
 export const dynamic = 'force-dynamic';
-
-const ENTRY_DATE = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-  timeZone: 'UTC',
-});
 
 export default async function OverviewPage() {
   let model;
@@ -43,6 +35,7 @@ export default async function OverviewPage() {
   // nothing else, because that is the only unit it means anything in.
   const books = trialBalance[0];
   const { locale, t } = await translations();
+  const format = dateFormats(locale);
   const position = buildPosition(accounts);
   const allBalanced = trialBalance.every((row) => row.balanced);
 
@@ -143,9 +136,9 @@ export default async function OverviewPage() {
         />
         <StatTile
           label={t.overview.entriesPosted}
-          value={summary.entryCount.toLocaleString(locale)}
+          value={format.number(summary.entryCount)}
           detail={t.overview.entriesDetail(
-            summary.postingCount.toLocaleString(locale),
+            format.number(summary.postingCount),
             summary.accountCount,
           )}
         />
@@ -278,7 +271,7 @@ export default async function OverviewPage() {
                   return (
                     <Tr key={entry.id}>
                       <Td className="text-ink-muted whitespace-nowrap">
-                        {ENTRY_DATE.format(new Date(entry.occurredAt))}
+                        {format.day(new Date(entry.occurredAt))}
                       </Td>
                       <Td className="font-medium">
                         <Link href={`/journal?highlight=${entry.id}`} className="hover:underline">

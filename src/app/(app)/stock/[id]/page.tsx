@@ -14,6 +14,7 @@ import { ArrowLeftIcon } from '@/components/icons';
 import { IssueForm, ReceiveForm, type AccountOption } from '@/components/stock-forms';
 import { viewerServices } from '@/server/container';
 import { translations } from '@/server/i18n';
+import { dateFormats } from '@/lib/i18n';
 import { SUPPORTED_CURRENCIES } from '@/lib/money';
 import { toQuantityString, unitLabel } from '@/lib/quantity';
 
@@ -31,16 +32,10 @@ export const dynamic = 'force-dynamic';
  * sorts a column.
  */
 
-const DATE = new Intl.DateTimeFormat('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { t } = await translations();
+  const { locale, t } = await translations();
+  const DATE = dateFormats(locale);
 
   let item, lots, movements, accounts, functional;
   try {
@@ -86,7 +81,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const lotOptions = lots.map((lot) => ({
     id: lot.id,
     label: t.product.lotOption(
-      lot.reference ?? DATE.format(lot.acquiredAt),
+      lot.reference ?? DATE.day(lot.acquiredAt),
       `${quantity(lot.remainingQuantityMinor)} ${unitLabel(item.unit)}`,
     ),
   }));
@@ -199,7 +194,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                         (lot.reference ?? t.product.openingBalance)
                       )}
                     </Td>
-                    <Td>{DATE.format(lot.acquiredAt)}</Td>
+                    <Td>{DATE.day(lot.acquiredAt)}</Td>
                     <Td align="right" numeric>
                       {quantity(lot.remainingQuantityMinor)}
                       <span className="text-ink-muted ml-1 text-[11px]">
@@ -294,7 +289,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               <tbody>
                 {movements.map((movement) => (
                   <Tr key={movement.id}>
-                    <Td>{DATE.format(movement.occurredAt)}</Td>
+                    <Td>{DATE.day(movement.occurredAt)}</Td>
                     <Td>
                       <Link
                         href={`/journal/${movement.transactionId}`}
