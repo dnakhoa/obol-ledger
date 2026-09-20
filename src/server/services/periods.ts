@@ -387,6 +387,8 @@ export function createPeriodService(database: Database, orgId: string) {
     const residual = legs.reduce((total, leg) => total + BigInt(leg.amount), 0n);
 
     const result = await journalIn(tx).postEntry({
+      // Written by the ledger itself; there is no person to name.
+      actor: { via: 'system' },
       description: ledgerMessages(await booksLocale(tx)).closingEntry(
         input.periodMonth.slice(0, 7),
       ),

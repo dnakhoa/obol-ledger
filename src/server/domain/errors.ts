@@ -118,6 +118,20 @@ export type LedgerError =
       readonly accountId: string;
       readonly expected: string;
       readonly actual: string;
+    }
+  | { readonly code: 'shipment_reference_taken'; readonly reference: string }
+  | { readonly code: 'shipment_not_found'; readonly shipmentId: string }
+  | { readonly code: 'shipment_has_no_stock'; readonly shipmentId: string }
+  | { readonly code: 'mixed_units'; readonly units: readonly string[] }
+  | { readonly code: 'weight_missing'; readonly layerIds: readonly string[] }
+  | { readonly code: 'debit_account_required' }
+  | { readonly code: 'tax_code_name_taken'; readonly name: string }
+  | { readonly code: 'tax_code_not_found'; readonly taxCodeId: string }
+  | { readonly code: 'sales_tax_is_not_reclaimable' }
+  | {
+      readonly code: 'tax_account_missing';
+      readonly treatment: string;
+      readonly side: 'input' | 'output';
     };
 
 export type LedgerErrorCode = LedgerError['code'];
@@ -164,6 +178,16 @@ const TITLES: Record<LedgerErrorCode, string> = {
   costing_method_not_permitted: 'That costing method is not permitted here',
   inventory_account_not_functional: 'Inventory must be held in the functional currency',
   account_wrong_type: 'Account is of the wrong type for this use',
+  shipment_reference_taken: 'That shipment reference is already in use',
+  shipment_not_found: 'Shipment not found',
+  shipment_has_no_stock: 'Shipment has no stock to charge against',
+  mixed_units: 'Those lots are not measured in the same unit',
+  weight_missing: 'Some lots have no weight recorded',
+  debit_account_required: 'A charge that is not part of the cost of goods needs an account',
+  tax_code_name_taken: 'That tax code name is already in use',
+  tax_code_not_found: 'Tax code not found',
+  sales_tax_is_not_reclaimable: 'Sales tax cannot have a reclaimable account',
+  tax_account_missing: 'The tax code has no account for that side',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -250,6 +274,26 @@ export function describe(error: LedgerError): string {
       return `Account ${error.accountId} is held in ${error.currency}, and inventory must be held in ${error.functional}. Stock is a non-monetary item: its carrying amount is fixed at the rate on the day it arrived, so denominating the account itself in a foreign currency would mean retranslating a figure that must never move.`;
     case 'account_wrong_type':
       return `Account ${error.accountId} is ${error.actual}, and this needs ${error.expected}.`;
+    case 'shipment_reference_taken':
+      return `Another shipment already uses the reference ${error.reference}. References are how a freight invoice finds the container it belongs to, so they have to be unique.`;
+    case 'shipment_not_found':
+      return `No shipment with id ${error.shipmentId}.`;
+    case 'shipment_has_no_stock':
+      return `Shipment ${error.shipmentId} has no deliveries booked against it, so there is nothing for this charge to land on. Book the deliveries in first.`;
+    case 'mixed_units':
+      return `These lots are measured in ${error.units.join(' and ')}, so a charge cannot be spread by quantity across them — that would be adding one to the other. Spread it by value or by weight instead.`;
+    case 'weight_missing':
+      return `${error.layerIds.length} of the lots on this shipment have no weight recorded, and treating them as weightless would push the whole charge onto the rest. Record the weights, or spread the charge by value.`;
+    case 'debit_account_required':
+      return 'A charge that is not part of the cost of the goods — recoverable import VAT, for instance — needs an account of its own to be debited to.';
+    case 'tax_code_name_taken':
+      return `Another tax code is already called ${error.name}.`;
+    case 'tax_code_not_found':
+      return `No active tax code with id ${error.taxCodeId}.`;
+    case 'sales_tax_is_not_reclaimable':
+      return 'United States sales tax is never reclaimable on a purchase, so a sales-tax code has no input account. A business given one accumulates a receivable from a state that does not owe it, and the accounts balance perfectly while the asset is fictional.';
+    case 'tax_account_missing':
+      return `This ${error.treatment} code has no ${error.side} tax account, so it cannot post that side of the entry.`;
   }
 }
 

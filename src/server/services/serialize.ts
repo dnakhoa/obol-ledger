@@ -87,6 +87,8 @@ export function toTransactionDto(
   reversedByTransactionId: string | null = null,
 ): TransactionDto {
   return {
+    createdBy: row.createdBy,
+    createdVia: row.createdVia,
     id: row.id,
     description: row.description,
     currency: row.currency as CurrencyCode,

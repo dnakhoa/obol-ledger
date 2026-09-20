@@ -46,6 +46,8 @@ export type TemplateAccount = {
    * receivables and payables and wrong for inventory and fixed assets.
    */
   readonly monetary?: boolean;
+  /** Managed as a set of unsettled documents, so an aged report means something. */
+  readonly openItems?: boolean;
   readonly role?: 'retained_earnings' | 'fx_gain_loss';
   /** Shown in the UI for a code whose purpose is not obvious from its name. */
   readonly note?: string;
@@ -75,7 +77,7 @@ const GENERIC: ChartTemplateDefinition = {
   accounts: [
     { code: '100', name: 'Cash', type: 'asset' },
     { code: '110', name: 'Bank Account', type: 'asset' },
-    { code: '120', name: 'Accounts Receivable', type: 'asset' },
+    { code: '120', name: 'Accounts Receivable', type: 'asset', openItems: true },
     { code: '130', name: 'Inventory', type: 'asset', monetary: false },
     { code: '150', name: 'Equipment', type: 'asset', monetary: false },
     {
@@ -85,7 +87,7 @@ const GENERIC: ChartTemplateDefinition = {
       overdraft: true,
       note: 'Contra-asset: holds a credit balance against the equipment above.',
     },
-    { code: '200', name: 'Accounts Payable', type: 'liability', overdraft: true },
+    { code: '200', name: 'Accounts Payable', type: 'liability', overdraft: true, openItems: true },
     { code: '210', name: 'Accrued Expenses', type: 'liability', overdraft: true },
     { code: '250', name: 'Loans Payable', type: 'liability', overdraft: true },
     { code: '300', name: "Owner's Capital", type: 'equity', overdraft: true },
@@ -139,7 +141,7 @@ const AU_NZ: ChartTemplateDefinition = {
   accounts: [
     { code: '100', name: 'Cash on Hand', type: 'asset' },
     { code: '110', name: 'Business Bank Account', type: 'asset' },
-    { code: '120', name: 'Accounts Receivable', type: 'asset' },
+    { code: '120', name: 'Accounts Receivable', type: 'asset', openItems: true },
     { code: '130', name: 'Inventory', type: 'asset', monetary: false },
     {
       code: '140',
@@ -156,7 +158,7 @@ const AU_NZ: ChartTemplateDefinition = {
       monetary: false,
       note: 'Contra-asset.',
     },
-    { code: '200', name: 'Accounts Payable', type: 'liability', overdraft: true },
+    { code: '200', name: 'Accounts Payable', type: 'liability', overdraft: true, openItems: true },
     {
       code: '210',
       name: 'GST Collected',
@@ -234,7 +236,13 @@ const VN_TT200: ChartTemplateDefinition = {
   accounts: [
     { code: '111', name: 'Tiền mặt', type: 'asset', note: 'Cash on hand' },
     { code: '112', name: 'Tiền gửi Ngân hàng', type: 'asset', note: 'Bank deposits' },
-    { code: '131', name: 'Phải thu của khách hàng', type: 'asset', note: 'Trade receivables' },
+    {
+      code: '131',
+      name: 'Phải thu của khách hàng',
+      type: 'asset',
+      note: 'Trade receivables',
+      openItems: true,
+    },
     {
       code: '133',
       name: 'Thuế GTGT được khấu trừ',
@@ -276,6 +284,7 @@ const VN_TT200: ChartTemplateDefinition = {
       type: 'liability',
       overdraft: true,
       note: 'Trade payables',
+      openItems: true,
     },
     {
       code: '333',
@@ -401,7 +410,7 @@ const US_GAAP: ChartTemplateDefinition = {
   accounts: [
     { code: '1000', name: 'Cash', type: 'asset' },
     { code: '1010', name: 'Checking Account', type: 'asset' },
-    { code: '1200', name: 'Accounts Receivable', type: 'asset' },
+    { code: '1200', name: 'Accounts Receivable', type: 'asset', openItems: true },
     { code: '1300', name: 'Inventory', type: 'asset', monetary: false },
     { code: '1500', name: 'Equipment', type: 'asset', monetary: false },
     {
@@ -412,7 +421,7 @@ const US_GAAP: ChartTemplateDefinition = {
       monetary: false,
       note: 'Contra-asset.',
     },
-    { code: '2000', name: 'Accounts Payable', type: 'liability', overdraft: true },
+    { code: '2000', name: 'Accounts Payable', type: 'liability', overdraft: true, openItems: true },
     {
       code: '2200',
       name: 'Sales Tax Payable',

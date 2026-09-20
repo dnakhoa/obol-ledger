@@ -141,6 +141,34 @@
       "when": 1789912000000,
       "tag": "0019_japanese_books",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789920000000,
+      "tag": "0020_landed_cost",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1789925000000,
+      "tag": "0021_open_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1789930000000,
+      "tag": "0022_tax_codes",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789935000000,
+      "tag": "0023_audit_actor",
+      "breakpoints": true
     }
   ]
 }

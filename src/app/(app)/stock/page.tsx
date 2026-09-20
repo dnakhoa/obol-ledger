@@ -88,10 +88,13 @@ export default async function StockPage() {
         title={t.stock.title}
         description={t.stock.description}
         actions={
-          <ButtonLink href="/stock/import" variant="primary">
-            {t.stock.importButton}
-            <ArrowRightIcon />
-          </ButtonLink>
+          <>
+            <ButtonLink href="/stock/shipments">{t.shipments.title}</ButtonLink>
+            <ButtonLink href="/stock/import" variant="primary">
+              {t.stock.importButton}
+              <ArrowRightIcon />
+            </ButtonLink>
+          </>
         }
       />
 

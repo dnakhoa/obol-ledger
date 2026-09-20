@@ -70,6 +70,16 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   costing_method_not_permitted: 422,
   inventory_account_not_functional: 422,
   account_wrong_type: 422,
+  shipment_reference_taken: 409,
+  shipment_not_found: 404,
+  shipment_has_no_stock: 409,
+  mixed_units: 422,
+  weight_missing: 422,
+  debit_account_required: 422,
+  tax_code_name_taken: 409,
+  tax_code_not_found: 404,
+  sales_tax_is_not_reclaimable: 422,
+  tax_account_missing: 422,
 };
 
 export function statusFor(error: LedgerError): number {

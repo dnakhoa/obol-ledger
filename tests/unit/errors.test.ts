@@ -111,6 +111,16 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
     expected: 'asset',
     actual: 'revenue',
   },
+  shipment_reference_taken: { code: 'shipment_reference_taken', reference: 'CONT-4417' },
+  shipment_not_found: { code: 'shipment_not_found', shipmentId: 'ship_x' },
+  shipment_has_no_stock: { code: 'shipment_has_no_stock', shipmentId: 'ship_x' },
+  mixed_units: { code: 'mixed_units', units: ['m2', 'tonne'] },
+  weight_missing: { code: 'weight_missing', layerIds: ['layer_a'] },
+  debit_account_required: { code: 'debit_account_required' },
+  tax_code_name_taken: { code: 'tax_code_name_taken', name: 'GTGT 10%' },
+  tax_code_not_found: { code: 'tax_code_not_found', taxCodeId: 'tax_x' },
+  sales_tax_is_not_reclaimable: { code: 'sales_tax_is_not_reclaimable' },
+  tax_account_missing: { code: 'tax_account_missing', treatment: 'vat', side: 'input' },
 };
 
 const variants = Object.values(EVERY_VARIANT);

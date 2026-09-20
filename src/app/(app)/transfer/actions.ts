@@ -97,6 +97,8 @@ export async function postEntryAction(
   }
 
   const result = await writer.services.journal.postEntry({
+    // The layer that knows whose request this is, is the layer that says so.
+    actor: { userId: writer.viewer.userId, via: 'ui' },
     description: parsed.data.description,
     currency: parsed.data.currency,
     postings: converted.postings,

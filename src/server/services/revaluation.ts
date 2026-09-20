@@ -132,6 +132,8 @@ export function createRevaluationService(database: Database, orgId: string) {
         const total = lines.reduce((sum, line) => sum + BigInt(line.differenceMinor), 0n);
 
         const entry = await createJournalService(tx, orgId).postEntry({
+          // Written by the ledger itself; there is no person to name.
+          actor: { via: 'system' },
           description: ledgerMessages(await booksLocale(tx, orgId)).revaluation(
             periodMonth.slice(0, 7),
           ),

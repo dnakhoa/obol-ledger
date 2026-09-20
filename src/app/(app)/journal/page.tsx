@@ -14,7 +14,7 @@ import { ArrowRightIcon, CheckIcon, DownloadIcon } from '@/components/icons';
 import { cn } from '@/lib/cn';
 import { viewerServices } from '@/server/container';
 import { translations } from '@/server/i18n';
-import { dateFormats } from '@/lib/i18n';
+import { dateFormats, type Messages } from '@/lib/i18n';
 import type { AccountDto, Page, TransactionDto } from '@/server/services/dto';
 import { JournalFilters } from '@/components/journal-filters';
 
@@ -37,6 +37,22 @@ type PageProps = {
     metadataValue?: string;
   }>;
 };
+
+/** How an entry came to exist, in the reader's language. */
+function viaLabel(via: string, t: Messages): string {
+  switch (via) {
+    case 'ui':
+      return t.journal.viaUi;
+    case 'api':
+      return t.journal.viaApi;
+    case 'system':
+      return t.journal.viaSystem;
+    case 'import':
+      return t.journal.viaImport;
+    default:
+      return t.journal.viaUnknown;
+  }
+}
 
 export default async function JournalPage({ searchParams }: PageProps) {
   const { locale, t } = await translations();
@@ -187,6 +203,14 @@ export default async function JournalPage({ searchParams }: PageProps) {
                         </Link>
                         <span className="text-ink-muted ml-2 text-[11px] font-normal">
                           {entry.currency}
+                        </span>
+                        {/*
+                          Who wrote it. Shown on the row rather than only on
+                          the entry's own page, because "who posted this" is
+                          asked while scanning a list, not after opening one.
+                        */}
+                        <span className="text-ink-muted block text-[11px] font-normal">
+                          {viaLabel(entry.createdVia, t)}
                         </span>
                       </Td>
                       <Td colSpan={2} align="right">

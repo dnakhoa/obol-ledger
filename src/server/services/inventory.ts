@@ -63,6 +63,15 @@ export type ReceiveInput = {
   readonly reference?: string | undefined;
   readonly description?: string | undefined;
   readonly metadata?: Record<string, string> | undefined;
+  /**
+   * The shipment this lot arrived on, when it arrived on one.
+   *
+   * What lets freight and duty find it six weeks later — a charge is spread
+   * across the lots of one shipment. See `docs/adr/0015-landed-cost.md`.
+   */
+  readonly shipmentId?: string | undefined;
+  /** Grams. Only needed if a charge will be apportioned by weight. */
+  readonly weightGrams?: bigint | undefined;
 };
 
 export type IssueInput = {
@@ -269,6 +278,8 @@ export function createInventoryService(database: Database, orgId: string) {
           remainingQuantityMinor: input.quantity,
           costMinor: input.cost,
           remainingCostMinor: input.cost,
+          ...(input.shipmentId ? { shipmentId: input.shipmentId } : {}),
+          ...(input.weightGrams === undefined ? {} : { weightGrams: input.weightGrams }),
           baseCostMinor: base.value.amount,
           remainingBaseCostMinor: base.value.amount,
         });

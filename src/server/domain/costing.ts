@@ -1,3 +1,4 @@
+import { apportion } from '@/lib/apportion';
 import { divideRounding } from '@/lib/fx';
 import { err, ok, type Result } from '@/lib/result';
 
@@ -112,7 +113,7 @@ export function allocate(
 
   const draws =
     method === 'weighted_average'
-      ? proRata(open, quantity, available)
+      ? proRata(open, quantity)
       : sequential(ordered(open, method), quantity);
 
   return ok(total(draws));
@@ -188,31 +189,17 @@ function sequential(layers: readonly CostLayer[], quantity: bigint): LayerDraw[]
  * was asked for; a naive round-per-layer loses or gains units, and the unit it
  * loses is the one that later makes a layer impossible to close.
  */
-function proRata(layers: readonly CostLayer[], quantity: bigint, available: bigint): LayerDraw[] {
-  const shares = layers.map((layer) => {
-    const exact = layer.remainingQuantity * quantity;
-    return { layer, floor: exact / available, remainder: exact % available };
-  });
-
-  let assigned = shares.reduce((sum, share) => sum + share.floor, 0n);
-  // Hand the leftover units to the layers with the largest fractional claim —
-  // the same apportionment a parliament uses for seats, and for the same
-  // reason: it is the allocation nobody can argue is unfair to them.
-  const byClaim = [...shares].sort((a, b) =>
-    a.remainder === b.remainder ? 0 : a.remainder < b.remainder ? 1 : -1,
-  );
-  const extra = new Map<string, bigint>();
-  for (const share of byClaim) {
-    if (assigned >= quantity) break;
-    if (share.floor + (extra.get(share.layer.id) ?? 0n) >= share.layer.remainingQuantity) continue;
-    extra.set(share.layer.id, (extra.get(share.layer.id) ?? 0n) + 1n);
-    assigned += 1n;
-  }
-
-  return shares
-    .map((share) => ({ layer: share.layer, take: share.floor + (extra.get(share.layer.id) ?? 0n) }))
-    .filter((share) => share.take > 0n)
-    .map((share) => draw(share.layer, share.take));
+function proRata(layers: readonly CostLayer[], quantity: bigint): LayerDraw[] {
+  // The apportionment itself is `lib/apportion`: dividing a whole number
+  // across shares so the pieces add back up is the same operation whether the
+  // thing being divided is a quantity coming out of lots or a freight invoice
+  // going into them, and one implementation is one place for it to be wrong.
+  return apportion(
+    quantity,
+    layers.map((layer) => ({ weight: layer.remainingQuantity, layer })),
+  )
+    .filter((allocation) => allocation.amount > 0n)
+    .map((allocation) => draw(allocation.share.layer, allocation.amount));
 }
 
 function total(draws: readonly LayerDraw[]): Allocation {

@@ -4,6 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import * as schema from '../src/server/db/schema';
 import { createAccountService } from '../src/server/services/accounts';
 import { createInventoryService } from '../src/server/services/inventory';
+import { createLandedCostService } from '../src/server/services/landed-cost';
 import { digestToken } from '../src/server/services/authentication';
 import { newId } from '../src/lib/id';
 import { createJournalService } from '../src/server/services/journal';
@@ -73,6 +74,7 @@ const ACCOUNTS: {
   currency: 'VND' | 'USD' | 'EUR' | 'AUD';
   overdraft?: boolean;
   monetary?: boolean;
+  openItems?: boolean;
   role?: 'retained_earnings' | 'fx_gain_loss';
 }[] = [
   { key: 'cash', code: '111', name: 'Tiền mặt', type: 'asset', currency: 'VND' },
@@ -93,6 +95,8 @@ const ACCOUNTS: {
   },
   {
     key: 'arUsd',
+    // A claim on somebody, so it is managed as open items and ages.
+    openItems: true,
     code: '1311',
     name: 'Phải thu của khách hàng — USD',
     type: 'asset',
@@ -101,6 +105,8 @@ const ACCOUNTS: {
   },
   {
     key: 'arEur',
+    // A claim on somebody, so it is managed as open items and ages.
+    openItems: true,
     code: '1312',
     name: 'Phải thu của khách hàng — EUR',
     type: 'asset',
@@ -109,6 +115,8 @@ const ACCOUNTS: {
   },
   {
     key: 'arAud',
+    // A claim on somebody, so it is managed as open items and ages.
+    openItems: true,
     code: '1313',
     name: 'Phải thu của khách hàng — AUD',
     type: 'asset',
@@ -165,6 +173,8 @@ const ACCOUNTS: {
   },
   {
     key: 'payable',
+    // A claim on somebody, so it is managed as open items and ages.
+    openItems: true,
     code: '331',
     name: 'Phải trả cho người bán',
     type: 'liability',
@@ -295,7 +305,20 @@ const PRODUCTS: {
     unit: 'm3',
     unitCost: 5_600_000,
   },
+  // Bought in rather than made. An exporter of its own granite that also
+  // imports marble to resell is the ordinary shape of this business, and it
+  // is the half of it that has freight and duty attached.
+  {
+    key: 'marble',
+    sku: 'MRB-CAR',
+    name: 'Đá marble trắng Carrara',
+    unit: 'm2',
+    unitCost: 1_850_000,
+  },
 ];
+
+/** The three that come off the factory line, as opposed to the one imported. */
+const MADE = PRODUCTS.filter((product) => product.key !== 'marble');
 
 const random = mulberry32(20260919);
 
@@ -402,6 +425,7 @@ async function main(): Promise<void> {
         code: account.code,
         overdraftAllowed: account.overdraft ?? false,
         ...(account.monetary === undefined ? {} : { monetary: account.monetary }),
+        ...(account.openItems === undefined ? {} : { openItems: account.openItems }),
         ...(account.role ? { role: account.role } : {}),
       });
       ids[account.key] = created.id;
@@ -534,6 +558,7 @@ async function main(): Promise<void> {
     // quantity behind it and 632 is derived from the lots rather than from a
     // percentage somebody chose.
     const inventory = createInventoryService(database, orgId);
+    const landedCost = createLandedCostService(database, orgId);
     const itemIds: Record<string, string> = {};
     for (const product of PRODUCTS) {
       const created = await inventory.createItem({
@@ -574,7 +599,7 @@ async function main(): Promise<void> {
       // that was posted before — debit 155, credit 154 — but it now opens a
       // cost layer at the same time, in the same transaction, so the stock
       // records and the account cannot come apart.
-      const product = PRODUCTS[run % PRODUCTS.length];
+      const product = MADE[run % MADE.length];
       if (!product) throw new Error('no product for run');
       const cost = processed + labour;
       const perUnit = Math.round(product.unitCost * (0.9 + run * 0.035));
@@ -593,6 +618,104 @@ async function main(): Promise<void> {
       if (!received.ok) throw new Error(`receipt failed: ${received.error.code}`);
       entries += 1;
       produced[product.key] = (produced[product.key] ?? 0n) + quantity;
+    }
+
+    // ---- A container coming the other way -----------------------------------
+    //
+    // The company exports its own granite and imports marble to resell, which
+    // is the ordinary shape of this business and the half that has freight and
+    // duty attached. A supplier invoice is not what the stone cost: IAS 2 puts
+    // the cost of purchase at the price *plus* import duties and transport.
+    //
+    // Booking those as expenses would understate the stock and make every
+    // subsequent cost of goods sold wrong by the same margin — here, a fifth
+    // of the invoice. See docs/adr/0015-landed-cost.md.
+
+    const shipment = await landedCost.record({
+      reference: 'CONT-IT-2207',
+      arrivedAt: daysAgo(46, 9),
+      notes: 'Marble trắng Carrara, nhập từ Ý qua cảng Cát Lái',
+    });
+    if (!shipment.ok) throw new Error(`shipment failed: ${shipment.error.code}`);
+
+    // 800 m² invoiced at 48,000 USD.
+    const marbleQuantity = 800n * (SCALE['m2'] ?? 1n);
+    const marbleReceipt = await inventory.receive({
+      itemId: itemIds['marble'] ?? '',
+      quantity: marbleQuantity as never,
+      cost: BigInt(48_000_00),
+      currency: 'USD',
+      creditAccountId: ids['payable'] ?? '',
+      occurredAt: daysAgo(46, 9),
+      reference: 'CONT-IT-2207',
+      description: 'Nhập khẩu đá marble Carrara',
+      shipmentId: shipment.value.id,
+      // 24.6 tonnes, so a charge could be spread by weight as well as value.
+      weightGrams: 24_600_000n,
+    });
+    if (!marbleReceipt.ok) throw new Error(`marble receipt failed: ${marbleReceipt.error.code}`);
+    entries += 1;
+    produced['marble'] = marbleQuantity;
+
+    // Everything else on the customs declaration. Three of these belong in the
+    // cost of the stone; the fourth does not, and the difference is the whole
+    // point of modelling them separately.
+    const CHARGES: {
+      kind: 'freight' | 'duty' | 'handling' | 'tax';
+      description: string;
+      amount: number;
+      currency: 'USD' | 'VND';
+      capitalise?: boolean;
+      debit?: string;
+    }[] = [
+      {
+        kind: 'freight',
+        description: 'Cước tàu biển Genoa — Cát Lái',
+        amount: 3_400_00,
+        currency: 'USD',
+      },
+      {
+        kind: 'duty',
+        // Not recoverable, so it is part of what the stone cost.
+        description: 'Thuế nhập khẩu 5%',
+        amount: 62_000_000,
+        currency: 'VND',
+      },
+      {
+        kind: 'handling',
+        description: 'Phí dịch vụ hải quan và vận chuyển nội địa',
+        amount: 18_400_000,
+        currency: 'VND',
+      },
+      {
+        kind: 'tax',
+        // Reclaimed from the tax authority, so it never was a cost. IAS 2
+        // excludes taxes "subsequently recoverable by the entity" — this is
+        // an asset against the state, not part of the marble.
+        description: 'Thuế GTGT hàng nhập khẩu 8% (được khấu trừ)',
+        amount: 104_000_000,
+        currency: 'VND',
+        capitalise: false,
+        debit: 'vatIn',
+      },
+    ];
+
+    for (const charge of CHARGES) {
+      const applied = await landedCost.addCharge({
+        shipmentId: shipment.value.id,
+        kind: charge.kind,
+        description: charge.description,
+        amount: BigInt(charge.amount),
+        currency: charge.currency,
+        basis: 'value',
+        creditAccountId: ids['payable'] ?? '',
+        occurredAt: daysAgo(44, 11),
+        ...(charge.capitalise === false
+          ? { capitalise: false, debitAccountId: ids[charge.debit ?? ''] ?? '' }
+          : {}),
+      });
+      if (!applied.ok) throw new Error(`charge failed (${charge.kind}): ${applied.error.code}`);
+      entries += 1;
     }
 
     const CONTAINERS: {
