@@ -14,6 +14,17 @@ import { ScaleIcon } from '@/components/icons';
  * JavaScript. The two client islands it renders — the navigation, which reads
  * the current path, and the theme control — are as small as they can be.
  */
+/**
+ * Never prerendered.
+ *
+ * The shell reads the session to say whose books these are, and a session is
+ * per-request by definition — so there is no build-time answer. Without this,
+ * `next build` tries to prerender the one page under this layout that has no
+ * `dynamic` of its own and fails on a machine with no database, which is
+ * every CI runner.
+ */
+export const dynamic = 'force-dynamic';
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const viewer = await currentViewer();
   // An unenrolled account has no ledger to render a shell around, so the
