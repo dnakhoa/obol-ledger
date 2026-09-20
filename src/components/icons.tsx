@@ -158,3 +158,10 @@ export const DownloadIcon = (props: IconProps) => (
     <path d="M4 19h16" />
   </Icon>
 );
+
+export const CalendarIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <path d="M3 10h18M8 3v4M16 3v4" />
+  </Icon>
+);
