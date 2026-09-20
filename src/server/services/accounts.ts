@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import { err, ok, type Result } from '@/lib/result';
 import { newId } from '@/lib/id';
 import type { CurrencyCode } from '@/lib/money';
@@ -19,6 +19,8 @@ export type CreateAccountInput = {
   readonly metadata?: Record<string, string> | undefined;
   /** Structural job, currently only `retained_earnings`. At most one per tenant. */
   readonly role?: 'retained_earnings' | 'fx_gain_loss' | undefined;
+  /** The number this is filed under. Required on a statutory chart. */
+  readonly code?: string | undefined;
 };
 
 /**
@@ -35,7 +37,20 @@ export function createAccountService(database: Database, orgId: string) {
   return {
     async list(): Promise<AccountDto[]> {
       return withTenant(database, orgId, async (tx) => {
-        const rows = await tx.select().from(accounts).orderBy(asc(accounts.name));
+        /*
+         * By code, then by name.
+         *
+         * Alphabetical was nobody's chart of accounts: an accountant reads
+         * one in code order, and "Accounts Payable" sorting above "Cash"
+         * above "Sales" tells them nothing about which is an asset. Codes are
+         * optional, and `NULLS LAST` keeps an uncoded account out of the way
+         * of the coded ones rather than sorting it to the top, which is where
+         * Postgres puts NULLs in ascending order by default.
+         */
+        const rows = await tx
+          .select()
+          .from(accounts)
+          .orderBy(sql`${accounts.code} asc nulls last`, asc(accounts.name));
         return rows.map(toAccountDto);
       });
     },
@@ -62,6 +77,7 @@ export function createAccountService(database: Database, orgId: string) {
             currency: input.currency,
             overdraftAllowed: input.overdraftAllowed ?? false,
             metadata: input.metadata ?? {},
+            ...(input.code ? { code: input.code } : {}),
             ...(input.role ? { role: input.role } : {}),
           })
           .returning();

@@ -66,6 +66,14 @@ export const organizations = pgTable('organizations', {
    */
   functionalCurrency: char('functional_currency', { length: 3 }).notNull().default('USD'),
   /**
+   * Which chart of accounts this tenant keeps.
+   *
+   * Carried onto every account row and pinned there by a composite foreign
+   * key, so a statutory chart's rules can be a CHECK on the account rather
+   * than a trigger that reads this table.
+   */
+  chartTemplate: text('chart_template').notNull().default('generic'),
+  /**
    * The one ledger a signed-out visitor may read.
    *
    * A column rather than a slug compared against an environment variable,
@@ -245,6 +253,16 @@ export const accounts = pgTable(
     id: text('id').primaryKey(),
     orgId: text('org_id').notNull(),
     name: text('name').notNull(),
+    /**
+     * The number an accountant actually files this under.
+     *
+     * Nullable: every account that predates this had none, and a
+     * conventional-chart tenant may genuinely not want one. A statutory chart
+     * is different, and a CHECK says so.
+     */
+    code: text('code'),
+    /** Denormalised from the organisation and pinned by a composite key. */
+    chartTemplate: text('chart_template').notNull().default('generic'),
     type: accountType('type').notNull(),
     currency: char('currency', { length: 3 }).notNull(),
     status: accountStatus('status').notNull().default('open'),
@@ -314,6 +332,8 @@ export const accounts = pgTable(
     unique('accounts_org_name_currency_key').on(table.orgId, table.name, table.currency),
     unique('accounts_id_org_key').on(table.id, table.orgId),
     index('accounts_org_idx').on(table.orgId, table.name),
+    // The chart is read in code order, so it is indexed in code order.
+    index('accounts_org_code_idx').on(table.orgId, table.code),
   ],
 );
 

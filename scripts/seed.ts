@@ -23,35 +23,53 @@ import { describeTarget, schemaConnectionString, sslFor } from './connection';
 
 type Seeded = Record<string, string>;
 
+/*
+ * The demo roastery's chart, numbered in the AU/NZ convention.
+ *
+ * 100s assets, 200s liabilities, 300s equity, 400s revenue, 500s expenses,
+ * with gaps of ten — the scheme Xero teaches, and the one the primary market
+ * reads. Codes are what an accountant files by, and a demo that sorted
+ * alphabetically was showing them a chart nobody keeps.
+ */
 const ACCOUNTS: {
   key: string;
+  code: string;
   name: string;
   type: AccountType;
   overdraft?: boolean;
-  role?: 'retained_earnings';
+  role?: 'retained_earnings' | 'fx_gain_loss';
 }[] = [
-  { key: 'cash', name: 'Operating Cash', type: 'asset' },
-  { key: 'receivable', name: 'Accounts Receivable', type: 'asset' },
-  { key: 'inventory', name: 'Green Coffee Inventory', type: 'asset' },
-  { key: 'equipment', name: 'Roasting Equipment', type: 'asset' },
-  { key: 'payable', name: 'Accounts Payable', type: 'liability', overdraft: true },
-  { key: 'loan', name: 'Equipment Loan', type: 'liability', overdraft: true },
-  { key: 'capital', name: 'Owner Capital', type: 'equity', overdraft: true },
+  { key: 'cash', code: '110', name: 'Operating Cash', type: 'asset' },
+  { key: 'receivable', code: '120', name: 'Accounts Receivable', type: 'asset' },
+  { key: 'inventory', code: '130', name: 'Green Coffee Inventory', type: 'asset' },
+  { key: 'equipment', code: '150', name: 'Roasting Equipment', type: 'asset' },
+  { key: 'payable', code: '200', name: 'Accounts Payable', type: 'liability', overdraft: true },
+  { key: 'loan', code: '250', name: 'Equipment Loan', type: 'liability', overdraft: true },
+  { key: 'capital', code: '300', name: 'Owner Capital', type: 'equity', overdraft: true },
   // Where a closed month's profit lands. Designated by role rather than found
   // by name, so renaming it does not silently break the close.
   {
     key: 'retained',
+    code: '310',
     name: 'Retained Earnings',
     type: 'equity',
     overdraft: true,
     role: 'retained_earnings',
   },
-  { key: 'wholesale', name: 'Wholesale Revenue', type: 'revenue', overdraft: true },
-  { key: 'retail', name: 'Retail Revenue', type: 'revenue', overdraft: true },
-  { key: 'cogs', name: 'Cost of Goods Sold', type: 'expense', overdraft: true },
-  { key: 'rent', name: 'Rent', type: 'expense', overdraft: true },
-  { key: 'wages', name: 'Wages', type: 'expense', overdraft: true },
-  { key: 'utilities', name: 'Utilities', type: 'expense', overdraft: true },
+  { key: 'wholesale', code: '400', name: 'Wholesale Revenue', type: 'revenue', overdraft: true },
+  { key: 'retail', code: '410', name: 'Retail Revenue', type: 'revenue', overdraft: true },
+  { key: 'cogs', code: '500', name: 'Cost of Goods Sold', type: 'expense', overdraft: true },
+  { key: 'rent', code: '540', name: 'Rent', type: 'expense', overdraft: true },
+  { key: 'wages', code: '520', name: 'Wages', type: 'expense', overdraft: true },
+  { key: 'utilities', code: '560', name: 'Utilities', type: 'expense', overdraft: true },
+  {
+    key: 'fx',
+    code: '590',
+    name: 'Foreign Exchange Gain/Loss',
+    type: 'expense',
+    overdraft: true,
+    role: 'fx_gain_loss',
+  },
 ];
 
 /**
@@ -110,7 +128,15 @@ async function main(): Promise<void> {
       // Marked as *the* demo: that column, not the slug, is what makes a
       // ledger readable to a signed-out visitor. A partial unique index
       // allows exactly one, so "the demo" is never ambiguous.
-      .values({ id: orgId, name: 'Demo Roastery', slug: demoSlug, isDemo: true });
+      .values({
+        id: orgId,
+        name: 'Demo Roastery',
+        slug: demoSlug,
+        isDemo: true,
+        // The primary market reads this convention, and the demo is the first
+        // chart most visitors will ever see here.
+        chartTemplate: 'au_nz',
+      });
 
     // A second tenant with its own books exists purely so the isolation is
     // real rather than theoretical: there is something on the other side of
@@ -148,6 +174,7 @@ async function main(): Promise<void> {
         name: account.name,
         type: account.type,
         currency: 'USD',
+        code: account.code,
         overdraftAllowed: account.overdraft ?? false,
         ...(account.role ? { role: account.role } : {}),
       });

@@ -7,7 +7,11 @@ import { memberships, organizations } from '@/server/db/schema';
 import { db } from '@/server/db/client';
 import type { Transactional } from '@/server/db/types';
 import { createAccountService } from './accounts';
-import type { AccountType } from '@/server/domain/account';
+import {
+  CHART_TEMPLATE_DEFINITIONS,
+  CHART_TEMPLATES,
+  type ChartTemplate,
+} from '@/server/domain/chart';
 
 /**
  * Creating a ledger for a person who has just signed in.
@@ -18,41 +22,18 @@ import type { AccountType } from '@/server/domain/account';
  * front, is better than offering a settings toggle that would have to refuse.
  */
 
-const STARTER_ACCOUNTS: {
-  name: string;
-  type: AccountType;
-  overdraft?: boolean;
-  role?: 'retained_earnings' | 'fx_gain_loss';
-}[] = [
-  { name: 'Cash', type: 'asset' },
-  { name: 'Accounts Receivable', type: 'asset' },
-  { name: 'Accounts Payable', type: 'liability', overdraft: true },
-  { name: 'Owner Capital', type: 'equity', overdraft: true },
-  // Designated now rather than later: a period close has nowhere to put the
-  // profit without it, and discovering that at year end is a bad time.
-  { name: 'Retained Earnings', type: 'equity', overdraft: true, role: 'retained_earnings' },
-  { name: 'Sales', type: 'revenue', overdraft: true },
-  { name: 'General Expenses', type: 'expense' },
-  // Present from the start for the same reason: an entry that crosses
-  // currencies needs somewhere for the difference to land, and a business
-  // that needs one usually needs it on its first foreign invoice.
-  {
-    name: 'Foreign Exchange Gain/Loss',
-    type: 'expense',
-    overdraft: true,
-    role: 'fx_gain_loss',
-  },
-];
-
 export type CreateLedgerInput = {
   readonly userId: string;
   readonly name: string;
   readonly functionalCurrency: CurrencyCode;
+  /** Which chart of accounts to open with. Defaults to the generic one. */
+  readonly chartTemplate?: ChartTemplate;
 };
 
 export async function createLedger(input: CreateLedgerInput): Promise<{ orgId: string }> {
   const orgId = newId('organization');
   const database = db();
+  const template = CHART_TEMPLATE_DEFINITIONS[input.chartTemplate ?? 'generic'];
 
   // The organisation and the membership are written together: an organisation
   // nobody belongs to is invisible to every query in the application, and a
@@ -67,6 +48,7 @@ export async function createLedger(input: CreateLedgerInput): Promise<{ orgId: s
       // which on a single connection is an immediate deadlock.
       slug: await uniqueSlug(tx, input.name, orgId),
       functionalCurrency: input.functionalCurrency,
+      chartTemplate: template.id,
     });
 
     await tx.insert(memberships).values({
@@ -78,12 +60,15 @@ export async function createLedger(input: CreateLedgerInput): Promise<{ orgId: s
   });
 
   // Opened through the ordinary account service, so the starter chart obeys
-  // the same rules — including the one-per-tenant role indexes — as anything
-  // a person opens by hand.
+  // the same rules as anything a person opens by hand — the one-per-tenant
+  // role indexes, and on a statutory chart the constraint that the leading
+  // digit agrees with the type. A template that got a code wrong would be
+  // rejected here rather than shipped.
   const accounts = createAccountService(database, orgId);
-  for (const account of STARTER_ACCOUNTS) {
+  for (const account of template.accounts) {
     await accounts.create({
       name: account.name,
+      code: account.code,
       type: account.type,
       currency: input.functionalCurrency,
       overdraftAllowed: account.overdraft ?? false,
@@ -96,6 +81,10 @@ export async function createLedger(input: CreateLedgerInput): Promise<{ orgId: s
 
 export function supportedCurrencies(): readonly CurrencyCode[] {
   return SUPPORTED_CURRENCIES;
+}
+
+export function chartTemplates(): readonly ChartTemplate[] {
+  return CHART_TEMPLATES;
 }
 
 /**

@@ -29,6 +29,7 @@ export function toAccountDto(row: AccountRow): AccountDto {
 
   return {
     id: row.id,
+    code: row.code,
     name: row.name,
     type: row.type,
     status: row.status,

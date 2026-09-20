@@ -85,8 +85,15 @@ export default async function AccountsPage() {
                 <Table caption={`${group.label} accounts and balances`}>
                   <thead>
                     <tr>
+                      {/*
+                        The code leads, because this is how an accountant
+                        reads a chart: down the numbers. It is narrow, fixed
+                        and monospaced so the column scans as a column rather
+                        than as ragged text.
+                      */}
+                      <Th className="w-20">Code</Th>
                       <Th>Account</Th>
-                      <Th className="hidden lg:table-cell">Identifier</Th>
+                      <Th className="hidden xl:table-cell">Identifier</Th>
                       <Th align="right" className="hidden sm:table-cell">
                         Overdraft
                       </Th>
@@ -99,6 +106,9 @@ export default async function AccountsPage() {
                   <tbody>
                     {members.map((account) => (
                       <Tr key={account.id}>
+                        <Td className="text-ink-secondary font-mono text-xs tabular-nums">
+                          {account.code ?? <span className="text-ink-muted">—</span>}
+                        </Td>
                         <Td>
                           <Link
                             href={`/accounts/${account.id}`}
@@ -112,7 +122,7 @@ export default async function AccountsPage() {
                             </Badge>
                           ) : null}
                         </Td>
-                        <Td className="text-ink-muted hidden font-mono text-xs lg:table-cell">
+                        <Td className="text-ink-muted hidden font-mono text-xs xl:table-cell">
                           {account.id}
                         </Td>
                         <Td align="right" className="text-ink-muted hidden text-xs sm:table-cell">

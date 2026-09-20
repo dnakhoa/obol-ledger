@@ -129,19 +129,20 @@ export function canWriteTo(viewer: Viewer, orgId: string): boolean {
   return viewer.kind === 'member' && viewer.canWrite && viewer.orgId === orgId;
 }
 
-let cachedDemoOrgId: string | undefined;
-
 /**
  * The published demo tenant.
  *
  * Identified by a column, not by comparing a slug to an environment variable
- * — that is how a tenant becomes publicly readable by renaming itself. Cached
- * per process because it changes approximately never and is read on every
- * signed-out request.
+ * — that is how a tenant becomes publicly readable by renaming itself.
+ *
+ * Deliberately not cached. It was, and the cache bought one indexed lookup of
+ * a one-row table while costing a stale identity for the lifetime of the
+ * process: re-seeding recreates the organisation with a new id, and every
+ * signed-out request afterwards resolved to a tenant that no longer existed —
+ * silently, because an id nobody can see returns an empty ledger rather than
+ * an error.
  */
 export async function demoOrgId(): Promise<string> {
-  if (cachedDemoOrgId) return cachedDemoOrgId;
-
   const [demo] = await db()
     .select({ id: organizations.id })
     .from(organizations)
@@ -154,20 +155,7 @@ export async function demoOrgId(): Promise<string> {
     );
   }
 
-  cachedDemoOrgId = demo.id;
   return demo.id;
-}
-
-/**
- * Forgets which organisation is the demo.
- *
- * The cache belongs to a database, so it has to be dropped when the database
- * underneath changes — which happens in tests, and would happen in a process
- * that reconnected somewhere else. Leaving it would answer a question about
- * one database using a row from another.
- */
-export function forgetDemoOrg(): void {
-  cachedDemoOrgId = undefined;
 }
 
 export class DemoUnavailableError extends Error {
