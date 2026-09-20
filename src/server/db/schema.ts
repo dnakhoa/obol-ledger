@@ -2,6 +2,7 @@ import {
   bigint,
   boolean,
   char,
+  date,
   foreignKey,
   index,
   integer,
@@ -18,6 +19,7 @@ import { relations, sql } from 'drizzle-orm';
 import { ACCOUNT_STATUSES, ACCOUNT_TYPES } from '@/server/domain/account';
 import { TRANSACTION_STATUSES } from '@/server/domain/transaction-status';
 import { DELIVERY_STATUSES } from '@/server/domain/webhook';
+import { ACCOUNT_ROLES, PERIOD_STATUSES } from '@/server/domain/period';
 
 /**
  * The ledger schema.
@@ -91,6 +93,8 @@ export const apiKeys = pgTable(
 export const accountType = pgEnum('account_type', ACCOUNT_TYPES);
 export const accountStatus = pgEnum('account_status', ACCOUNT_STATUSES);
 export const transactionStatus = pgEnum('transaction_status', TRANSACTION_STATUSES);
+export const periodStatus = pgEnum('period_status', PERIOD_STATUSES);
+export const accountRole = pgEnum('account_role', ACCOUNT_ROLES);
 
 export const accounts = pgTable(
   'accounts',
@@ -103,6 +107,15 @@ export const accounts = pgTable(
     status: accountStatus('status').notNull().default('open'),
     /** When false, the account's presented balance may never go below zero. */
     overdraftAllowed: boolean('overdraft_allowed').notNull().default(false),
+    /**
+     * A structural job this account does, beyond its class.
+     *
+     * Only retained earnings so far, and designated by a column rather than
+     * found by name — "Retained Earnings" is a string a tenant may rename or
+     * translate, and a closing routine matching on it breaks silently the day
+     * somebody does. A partial unique index allows one per tenant.
+     */
+    role: accountRole('role'),
     /**
      * Signed cache of the account's *posted* postings; debit-positive.
      * Trigger-maintained. Pending entries are not included here.
@@ -364,6 +377,33 @@ export const webhookDeliveries = pgTable(
     index('webhook_deliveries_claim_idx').on(table.status, table.nextAttemptAt),
     index('webhook_deliveries_endpoint_idx').on(table.endpointId, table.createdAt),
     index('webhook_deliveries_org_idx').on(table.orgId, table.createdAt),
+  ],
+);
+
+/**
+ * A month of the ledger, and whether it still accepts entries.
+ *
+ * Monthly rather than an arbitrary date range: overlap becomes a unique
+ * constraint instead of needing an exclusion constraint over `daterange`,
+ * whose `btree_gist` dependency the embedded Postgres the tests run against
+ * does not carry. See `drizzle/0009_period_close.sql`.
+ */
+export const accountingPeriods = pgTable(
+  'accounting_periods',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    /** The first day of the month covered; a CHECK enforces that. */
+    periodMonth: date('period_month').notNull(),
+    status: periodStatus('status').notNull().default('open'),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    /** The entry that zeroed revenue and expense. Null while open. */
+    closingTransactionId: text('closing_transaction_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('accounting_periods_org_month_key').on(table.orgId, table.periodMonth),
+    index('accounting_periods_org_idx').on(table.orgId, table.periodMonth),
   ],
 );
 

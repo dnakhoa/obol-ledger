@@ -47,6 +47,11 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   endpoint_not_found: 404,
   endpoint_url_taken: 409,
   delivery_not_found: 404,
+  period_already_closed: 409,
+  period_not_closed: 409,
+  period_not_finished: 422,
+  earlier_period_open: 409,
+  retained_earnings_missing: 409,
 };
 
 export function statusFor(error: LedgerError): number {

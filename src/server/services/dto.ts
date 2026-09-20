@@ -36,6 +36,8 @@ export type AccountDto = {
   readonly version: number;
   /** Caller-supplied annotation. Always present, empty when unset. */
   readonly metadata: Readonly<Record<string, string>>;
+  /** Structural job, if any — currently only `retained_earnings`. */
+  readonly role: string | null;
   readonly createdAt: string;
 };
 

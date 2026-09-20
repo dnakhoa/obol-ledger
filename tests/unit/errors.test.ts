@@ -51,6 +51,15 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
   endpoint_not_found: { code: 'endpoint_not_found', endpointId: 'whe_x' },
   endpoint_url_taken: { code: 'endpoint_url_taken', url: 'https://hooks.example.com/ledger' },
   delivery_not_found: { code: 'delivery_not_found', deliveryId: 'whd_x' },
+  period_already_closed: { code: 'period_already_closed', periodMonth: '2026-08-01' },
+  period_not_closed: { code: 'period_not_closed', periodMonth: '2026-08-01' },
+  period_not_finished: { code: 'period_not_finished', periodMonth: '2026-09-01' },
+  earlier_period_open: {
+    code: 'earlier_period_open',
+    periodMonth: '2026-08-01',
+    open: '2026-07-01',
+  },
+  retained_earnings_missing: { code: 'retained_earnings_missing' },
 };
 
 const variants = Object.values(EVERY_VARIANT);

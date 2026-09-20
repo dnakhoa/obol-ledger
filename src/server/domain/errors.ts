@@ -57,7 +57,12 @@ export type LedgerError =
     }
   | { readonly code: 'endpoint_not_found'; readonly endpointId: string }
   | { readonly code: 'endpoint_url_taken'; readonly url: string }
-  | { readonly code: 'delivery_not_found'; readonly deliveryId: string };
+  | { readonly code: 'delivery_not_found'; readonly deliveryId: string }
+  | { readonly code: 'period_already_closed'; readonly periodMonth: string }
+  | { readonly code: 'period_not_closed'; readonly periodMonth: string }
+  | { readonly code: 'period_not_finished'; readonly periodMonth: string }
+  | { readonly code: 'earlier_period_open'; readonly periodMonth: string; readonly open: string }
+  | { readonly code: 'retained_earnings_missing' };
 
 export type LedgerErrorCode = LedgerError['code'];
 
@@ -82,6 +87,11 @@ const TITLES: Record<LedgerErrorCode, string> = {
   endpoint_not_found: 'Webhook endpoint not found',
   endpoint_url_taken: 'Webhook endpoint already registered',
   delivery_not_found: 'Webhook delivery not found',
+  period_already_closed: 'Period is already closed',
+  period_not_closed: 'Period is not closed',
+  period_not_finished: 'Period has not finished',
+  earlier_period_open: 'An earlier period is still open',
+  retained_earnings_missing: 'No retained earnings account',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -126,5 +136,15 @@ export function describe(error: LedgerError): string {
       return `${error.url} is already registered. Update that endpoint's subscription instead of adding a second one, or every event would be delivered twice.`;
     case 'delivery_not_found':
       return `No webhook delivery with id ${error.deliveryId}.`;
+    case 'period_already_closed':
+      return `${error.periodMonth} is already closed. Reopen it before closing it again.`;
+    case 'period_not_closed':
+      return `${error.periodMonth} is not closed, so there is nothing to reopen.`;
+    case 'period_not_finished':
+      return `${error.periodMonth} has not finished. Closing it would lock out entries that have not happened yet.`;
+    case 'earlier_period_open':
+      return `${error.open} is still open. Closing ${error.periodMonth} first would carry an unclosed month's profit into the next one, so periods close in order.`;
+    case 'retained_earnings_missing':
+      return 'No account is designated as retained earnings, so a period\u2019s profit has nowhere to go. Mark one equity account with the retained_earnings role.';
   }
 }

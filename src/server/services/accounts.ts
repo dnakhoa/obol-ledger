@@ -17,6 +17,8 @@ export type CreateAccountInput = {
   readonly currency: CurrencyCode;
   readonly overdraftAllowed?: boolean;
   readonly metadata?: Record<string, string> | undefined;
+  /** Structural job, currently only `retained_earnings`. At most one per tenant. */
+  readonly role?: 'retained_earnings' | undefined;
 };
 
 /**
@@ -60,6 +62,7 @@ export function createAccountService(database: Database, orgId: string) {
             currency: input.currency,
             overdraftAllowed: input.overdraftAllowed ?? false,
             metadata: input.metadata ?? {},
+            ...(input.role ? { role: input.role } : {}),
           })
           .returning();
 
