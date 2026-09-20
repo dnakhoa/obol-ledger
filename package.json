@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "tsx scripts/migrate-on-deploy.ts && next build",
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write .",
@@ -21,7 +21,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test",
     "test:concurrency": "vitest run tests/concurrency",
-    "benchmark": "tsx scripts/benchmark.ts"
+    "benchmark": "tsx scripts/benchmark.ts",
+    "db:status": "tsx scripts/migrate-status.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",

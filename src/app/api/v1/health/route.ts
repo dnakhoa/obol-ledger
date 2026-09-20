@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { db } from '@/server/db/client';
 import { checkTenantIsolation } from '@/server/db/tenancy';
+import { checkSchemaVersion } from '@/server/db/schema-version';
 import { defineRoute, json } from '@/server/http/route';
 
 /**
@@ -37,17 +38,27 @@ export const GET = defineRoute(
       // degraded state rather than waiting for someone to notice.
       const isolation = await checkTenantIsolation(db());
 
+      // Schema drift is reported for the same reason isolation is: the
+      // failure is silent from here and catastrophic from outside. Code that
+      // reads a column the database lacks answers 500 with a Postgres error
+      // naming the column, which says nothing about *why* it is missing. This
+      // says the migration has not run, which is the actionable fact.
+      const schema = await checkSchemaVersion(db());
+
+      const healthy = isolation.enforced && schema.upToDate;
+
       return json(
         {
-          status: isolation.enforced ? 'ok' : 'degraded',
+          status: healthy ? 'ok' : 'degraded',
           database: {
             configured,
             reachable: true,
             latencyMs: Math.round(performance.now() - startedAt),
           },
           tenantIsolation: isolation,
+          schema,
         },
-        isolation.enforced ? {} : { status: 503 },
+        healthy ? {} : { status: 503 },
       );
     } catch (error) {
       logger.error('health.database_unreachable', { error });
