@@ -9,6 +9,7 @@ import {
   GaugeIcon,
   JournalIcon,
   ReportsIcon,
+  CalendarIcon,
   SettingsIcon,
   TransferIcon,
   WebhookIcon,
@@ -25,6 +26,7 @@ const LINKS = [
   { href: '/accounts', label: 'Accounts', Icon: AccountsIcon, exact: false },
   { href: '/journal', label: 'Journal', Icon: JournalIcon, exact: false },
   { href: '/reports', label: 'Reports', Icon: ReportsIcon, exact: false },
+  { href: '/month-end', label: 'Month end', Icon: CalendarIcon, exact: false },
   { href: '/transfer', label: 'New entry', Icon: TransferIcon, exact: false },
   { href: '/webhooks', label: 'Webhooks', Icon: WebhookIcon, exact: false },
   { href: '/api-reference', label: 'API', Icon: ApiIcon, exact: false },
@@ -37,7 +39,7 @@ const LINKS = [
  * ones nobody does on a phone: reading an API reference, wiring up a webhook,
  * or copying a freshly issued key into a config file.
  */
-const DESKTOP_ONLY = new Set(['/api-reference', '/webhooks', '/settings']);
+const DESKTOP_ONLY = new Set(['/api-reference', '/webhooks', '/settings', '/month-end']);
 
 const MOBILE_LINKS = LINKS.filter((link) => !DESKTOP_ONLY.has(link.href));
 

@@ -28,6 +28,8 @@ export type PeriodDto = {
   readonly status: PeriodStatus;
   readonly closedAt: string | null;
   readonly closingTransactionId: string | null;
+  /** When foreign balances were last retranslated for this month. */
+  readonly revaluedAt: string | null;
   /** Entries dated inside this month, whatever its status. */
   readonly entryCount: number;
 };
@@ -41,6 +43,7 @@ function toDto(row: PeriodRow, entryCount: number): PeriodDto {
     status: row.status,
     closedAt: row.closedAt?.toISOString() ?? null,
     closingTransactionId: row.closingTransactionId,
+    revaluedAt: row.revaluedAt?.toISOString() ?? null,
     entryCount,
   };
 }
@@ -105,6 +108,7 @@ export function createPeriodService(database: Database, orgId: string) {
                   status: 'open' as const,
                   closedAt: null,
                   closingTransactionId: null,
+                  revaluedAt: null,
                   entryCount: counts.get(month) ?? 0,
                 };
           });
