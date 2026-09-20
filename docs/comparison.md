@@ -1,32 +1,46 @@
 # What a real ledger API has, and what this has
 
-Obol is a portfolio project, not a product with customers. That makes it easy
-to accidentally build a demo — something that looks right in a screenshot and
-falls apart the moment anyone asks it a second question. The defence is to
+Obol is a non-commercial project, not a product with customers. That makes it
+easy to accidentally build a demo — something that looks right in a screenshot
+and falls apart the moment anyone asks it a second question. The defence is to
 measure it against the systems it is imitating and to be specific about where
 it stops.
 
-The comparison is against **Modern Treasury Ledgers** and **Increase**, the two
-most credible hosted double-entry ledgers, plus **Stripe** for API conventions.
+This document is written for someone who could tell. If you work in accounting
+or finance systems, the useful thing you can do with twenty minutes here is
+find the place where the model stops matching how you actually work — and the
+list below is meant to make that quick rather than to flatter the project.
+
+The comparison is against **Modern Treasury Ledgers** and **Increase** for the
+ledger primitives, and against **Xero** and **MYOB** for what a practitioner
+expects a set of books to have.
 
 ## Present, and to the same standard
 
-| Capability                                 | Obol | Notes                                                                                                                              |
-| ------------------------------------------ | ---- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Double-entry with an enforced balance rule | ✅   | Enforced by a `DEFERRABLE INITIALLY DEFERRED` constraint trigger, so it holds against `psql` too, not just against the application |
-| Signed, debit-positive postings            | ✅   | One representation; presentation flips by account class                                                                            |
-| Money as integer minor units               | ✅   | Strings on the wire — a JSON number has already lost the cent                                                                      |
-| Pending / posted / archived entries        | ✅   | Three balances, and the overdraft rule consults _available_                                                                        |
-| Immutable history, reversals               | ✅   | `UPDATE`/`DELETE` rejected at the table; a partial unique index allows one reversal per entry                                      |
-| Idempotency keys                           | ✅   | Claim-first, fingerprinted over the canonicalised body                                                                             |
-| Cursor pagination                          | ✅   | Keyset, bidirectional. 25 rows and 6 buffers at page 5,000, against 125,025 rows and 3,015 buffers for `OFFSET`                    |
-| Optimistic concurrency                     | ✅   | `version` per account, checked on write                                                                                            |
-| Multi-tenancy                              | ✅   | `FORCE`d row-level security, plus a runtime probe that the connection is actually subject to it                                    |
-| Webhooks                                   | ✅   | Transactional outbox, Standard Webhooks signatures, backoff with jitter, circuit breaker, delivery log                             |
-| API key management                         | ✅   | Digest-stored, scannable prefix, revocation that keeps the row                                                                     |
-| RFC 9457 problem responses                 | ✅   | One table maps every domain error to a status                                                                                      |
-| OpenAPI document                           | ✅   | Generated from the same Zod schemas the routes validate with                                                                       |
-| Metrics and alerting                       | ✅   | Prometheus text format; `obol_ledger_residual_minor` has exactly one correct value                                                 |
+| Capability                                 | Notes                                                                                                                                                                       |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Double-entry with an enforced balance rule | A `DEFERRABLE INITIALLY DEFERRED` constraint trigger, so it holds against `psql` too, not only against the application                                                      |
+| Signed, debit-positive postings            | One representation; presentation flips by account class                                                                                                                     |
+| Money as integer minor units               | Strings on the wire — a JSON number has already lost the cent                                                                                                               |
+| Pending / posted / archived entries        | Three balances, and the overdraft rule consults _available_                                                                                                                 |
+| Immutable history, reversals               | `UPDATE`/`DELETE` rejected at the table; a partial unique index allows one reversal per entry                                                                               |
+| **Multi-currency entries**                 | An entry balances in the organisation's functional currency; each posting keeps what moved _and_ what it was worth. [ADR 10](adr/0010-multi-currency.md)                    |
+| **Realized FX gain and loss**              | Absorbed into a designated account, and only when each transaction currency already balances — so the adjustment cannot hide a typo                                         |
+| **Period close**                           | Locks the month and zeroes revenue and expense into retained earnings. The lock is a trigger, because back-dating arrives through import scripts that never see the service |
+| Financial statements                       | Trial balance, balance sheet, income statement, from the same postings                                                                                                      |
+| Metadata on accounts and entries           | `GIN (metadata jsonb_path_ops)`; the containment lookup is 33× the `->>` form most people write first, with plans in [benchmarks](benchmarks.md)                            |
+| CSV export                                 | Streamed, RFC 4180, UTF-8 BOM, and cells beginning `=` neutralised against spreadsheet formula injection                                                                    |
+| Idempotency keys                           | Claim-first, fingerprinted over the canonicalised body                                                                                                                      |
+| Cursor pagination                          | Keyset, bidirectional. 25 rows and 6 buffers at page 5,000, against 125,025 rows and 3,015 buffers for `OFFSET`                                                             |
+| Optimistic concurrency                     | `version` per account, checked on write                                                                                                                                     |
+| Multi-tenancy                              | `FORCE`d row-level security, plus a runtime probe that the connection is actually subject to it                                                                             |
+| **Accounts and sign-in**                   | OAuth only. Authorisation is a membership row the policies key off, not the auth library's own organisation model                                                           |
+| Rate limiting across instances             | Sliding window counted in Postgres, with the in-process window kept as a pre-check that can only reject                                                                     |
+| Webhooks                                   | Transactional outbox, Standard Webhooks signatures, backoff with jitter, circuit breaker, delivery log                                                                      |
+| API key management                         | Digest-stored, scannable prefix, revocation that keeps the row                                                                                                              |
+| RFC 9457 problem responses                 | One table maps every domain error to a status                                                                                                                               |
+| OpenAPI document                           | Generated from the same Zod schemas the routes validate with, and a test reads the routes off disk to prove nothing is undocumented                                         |
+| Metrics and alerting                       | Prometheus text format; `obol_ledger_residual_minor` has exactly one correct value                                                                                          |
 
 ## Present here, absent there
 
@@ -38,14 +52,27 @@ complete enough to close a book with.
 
 ## Deliberately absent
 
-| Capability                                       | Why not                                                                                                                                                                                                          |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ledger account categories (hierarchical rollups) | Real need at scale; a closure table and recursive balance rollups are a week of work whose interesting decisions are all in the _first_ week — which this project already spent on the balance model             |
-| Balance locks / settlement objects               | Modern Treasury's answer to a problem this solves with `available` and an overdraft `CHECK`. The shapes differ; the guarantee does not                                                                           |
-| Multi-currency entries in one transaction        | Requires an FX rate model and a rounding policy with real consequences. The composite foreign key makes single-currency entries _unrepresentable_ otherwise, which is a deliberate floor rather than an omission |
-| Test mode / sandbox                              | Meaningful when customers have production data to protect. Here the deployment _is_ the sandbox                                                                                                                  |
-| SDKs                                             | The OpenAPI document generates them; hand-writing five is volume, not evidence                                                                                                                                   |
-| SOC 2, audit logging to a WORM store             | Organisational, not architectural                                                                                                                                                                                |
+| Capability                           | Why not                                                                                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Balance locks / settlement objects   | Modern Treasury's answer to a problem this solves with `available` and an overdraft `CHECK`. The shapes differ; the guarantee does not |
+| SDKs                                 | The OpenAPI document generates them; hand-writing five is volume, not evidence                                                         |
+| SOC 2, audit logging to a WORM store | Organisational, not architectural                                                                                                      |
+
+## Not yet, and next
+
+Named rather than omitted, because a gap a reader finds for themselves reads
+as an oversight and a gap you have already written down reads as a plan.
+
+| Capability                                           | Status                                                                                                                                                                                                                                                                     |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Account codes and chart-of-accounts templates**    | Next. Accounts currently have names and no numbers, and the chart sorts by name — which is not how anybody reads one. A conventional chart (AU/NZ/US) is a starting point the tenant edits; a statutory one (Vietnam's Thông tư 200) is a constraint the database enforces |
+| **Unrealized FX revaluation**                        | Realized gain and loss ships; restating open foreign _monetary_ balances at a period-end rate does not. It hangs off the period close and off the rates table, which exists and is not yet read from                                                                       |
+| **Consumption tax**                                  | GST/VAT with input credits, EU reverse charge, and US sales tax are three different mechanisms, and modelling them as one is wrong in a way that only surfaces when you try to produce a return                                                                            |
+| **Documents**                                        | The invoice, customs declaration and bill of lading attached to the entry they justify                                                                                                                                                                                     |
+| **Audit trail by user**                              | Who entered this. Cheap now that sessions exist                                                                                                                                                                                                                            |
+| **Invites and roles**                                | An organisation has exactly one member today                                                                                                                                                                                                                               |
+| **Ledger account categories (hierarchical rollups)** | A closure table and recursive balance rollups. Real at scale, and a different week of work                                                                                                                                                                                 |
+| **Test mode / sandbox**                              | Meaningful when customers have production data to protect. Here the deployment _is_ the sandbox                                                                                                                                                                            |
 
 ## Honest limitations
 

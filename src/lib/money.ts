@@ -19,6 +19,7 @@ const CURRENCY_EXPONENTS = {
   EUR: 2,
   GBP: 2,
   AUD: 2,
+  NZD: 2,
   SGD: 2,
   JPY: 0,
   VND: 0,
