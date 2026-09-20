@@ -57,6 +57,9 @@ export const ID_PREFIXES = {
   costLayer: 'layer',
   inventoryMovement: 'move',
   layerConsumption: 'draw',
+  shipment: 'ship',
+  landedCharge: 'chrg',
+  landedAllocation: 'alloc',
 } as const;
 
 export type EntityKind = keyof typeof ID_PREFIXES;

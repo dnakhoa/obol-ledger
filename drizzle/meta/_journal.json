@@ -141,6 +141,13 @@
       "when": 1789912000000,
       "tag": "0019_japanese_books",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789920000000,
+      "tag": "0020_landed_cost",
+      "breakpoints": true
     }
   ]
 }

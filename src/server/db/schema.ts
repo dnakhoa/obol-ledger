@@ -22,6 +22,7 @@ import { TRANSACTION_STATUSES } from '@/server/domain/transaction-status';
 import { DELIVERY_STATUSES } from '@/server/domain/webhook';
 import { ACCOUNT_ROLES, PERIOD_STATUSES } from '@/server/domain/period';
 import type { CostingMethod } from '@/server/domain/costing';
+import type { AllocationBasis } from '@/server/domain/landed-cost';
 import type { Unit } from '@/lib/quantity';
 import type { Locale } from '@/lib/i18n/locales';
 
@@ -762,6 +763,15 @@ export const costLayers = pgTable(
      */
     baseCostMinor: bigint('base_cost_minor', { mode: 'bigint' }).notNull(),
     remainingBaseCostMinor: bigint('remaining_base_cost_minor', { mode: 'bigint' }).notNull(),
+    /** The shipment this lot arrived on, when it arrived on one. */
+    shipmentId: text('shipment_id'),
+    /**
+     * Grams, so a tonne is 1,000,000 and nothing is lost to a float.
+     *
+     * Null because most stock is never weighed; a charge apportioned by weight
+     * refuses rather than treating an unweighed lot as weightless.
+     */
+    weightGrams: bigint('weight_grams', { mode: 'bigint' }),
     metadata: jsonb('metadata')
       .$type<Record<string, string>>()
       .notNull()
@@ -780,6 +790,135 @@ export const costLayers = pgTable(
       name: 'cost_layers_transaction_fk',
       columns: [table.transactionId, table.orgId],
       foreignColumns: [transactions.id, transactions.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/**
+ * The lots that arrived together, and the charges that attach to them.
+ *
+ * `reference` is what the business already calls it — a bill of lading, a
+ * container number, a customs declaration — because that is what they will
+ * search for when the freight invoice turns up six weeks later.
+ */
+export const shipments = pgTable(
+  'shipments',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    reference: text('reference').notNull(),
+    arrivedAt: timestamp('arrived_at', { withTimezone: true }).notNull(),
+    notes: text('notes'),
+    metadata: jsonb('metadata')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('shipments_id_org_key').on(table.id, table.orgId),
+    uniqueIndex('shipments_org_reference_key').on(table.orgId, table.reference),
+    index('shipments_org_arrived_idx').on(table.orgId, table.arrivedAt),
+  ],
+);
+
+/**
+ * One charge on one shipment: a freight invoice, a duty assessment, a
+ * broker's fee. Append-only, like every other record of something that
+ * happened.
+ */
+export const landedCostCharges = pgTable(
+  'landed_cost_charges',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    shipmentId: text('shipment_id').notNull(),
+    kind: text('kind')
+      .$type<'freight' | 'duty' | 'insurance' | 'handling' | 'tax' | 'other'>()
+      .notNull(),
+    description: text('description').notNull(),
+    /** What was billed, in the currency it was billed in. */
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+    currency: char('currency', { length: 3 }).notNull(),
+    fxRate: numeric('fx_rate', { precision: 20, scale: 10 }).notNull().default('1'),
+    /** The same charge in the books' own currency, which is what the lots carry. */
+    baseAmountMinor: bigint('base_amount_minor', { mode: 'bigint' }).notNull(),
+    basis: text('basis').$type<AllocationBasis>().notNull(),
+    /**
+     * Whether this charge belongs in the cost of the goods.
+     *
+     * Recoverable import VAT does not — it is reclaimed, so it never was a
+     * cost. Customs duty is not recoverable and does. Getting those two the
+     * wrong way round is the commonest landed-cost mistake, so it is a column
+     * rather than something inferred from the account somebody picked.
+     */
+    capitalise: boolean('capitalise').notNull().default(true),
+    /** Where a non-capitalising charge is debited: the input-tax asset. */
+    debitAccountId: text('debit_account_id'),
+    toInventoryMinor: bigint('to_inventory_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    toCogsMinor: bigint('to_cogs_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    transactionId: text('transaction_id').notNull(),
+    metadata: jsonb('metadata')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('landed_cost_charges_id_org_key').on(table.id, table.orgId),
+    index('landed_cost_charges_shipment_idx').on(table.orgId, table.shipmentId, table.createdAt),
+    foreignKey({
+      name: 'landed_cost_charges_shipment_fk',
+      columns: [table.shipmentId, table.orgId],
+      foreignColumns: [shipments.id, shipments.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'landed_cost_charges_transaction_fk',
+      columns: [table.transactionId, table.orgId],
+      foreignColumns: [transactions.id, transactions.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'landed_cost_charges_debit_account_fk',
+      columns: [table.debitAccountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/**
+ * Which lots a charge landed on, and how much each took.
+ *
+ * The answer to "why is this container carried at more than we paid for it",
+ * which is the question the spreadsheet was keeping.
+ */
+export const landedCostAllocations = pgTable(
+  'landed_cost_allocations',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    chargeId: text('charge_id').notNull(),
+    layerId: text('layer_id').notNull(),
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+    toInventoryMinor: bigint('to_inventory_minor', { mode: 'bigint' }).notNull(),
+    toCogsMinor: bigint('to_cogs_minor', { mode: 'bigint' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('landed_cost_allocations_charge_layer_key').on(table.chargeId, table.layerId),
+    index('landed_cost_allocations_layer_idx').on(table.orgId, table.layerId),
+    foreignKey({
+      name: 'landed_cost_allocations_charge_fk',
+      columns: [table.chargeId, table.orgId],
+      foreignColumns: [landedCostCharges.id, landedCostCharges.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'landed_cost_allocations_layer_fk',
+      columns: [table.layerId, table.orgId],
+      foreignColumns: [costLayers.id, costLayers.orgId],
     }).onDelete('restrict'),
   ],
 );
@@ -882,3 +1021,5 @@ export type NewPostingRow = typeof postings.$inferInsert;
 export type InventoryItemRow = typeof inventoryItems.$inferSelect;
 export type CostLayerRow = typeof costLayers.$inferSelect;
 export type InventoryMovementRow = typeof inventoryMovements.$inferSelect;
+export type ShipmentRow = typeof shipments.$inferSelect;
+export type LandedCostChargeRow = typeof landedCostCharges.$inferSelect;

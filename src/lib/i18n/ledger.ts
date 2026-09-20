@@ -23,6 +23,8 @@ export type LedgerMessages = {
   readonly stockReceived: (item: string, reference?: string | undefined) => string;
   readonly costOfGoodsSold: (item: string, reference?: string | undefined) => string;
   readonly importedDelivery: (reference?: string | undefined) => string;
+  /** Freight, duty and handling put into the cost of the goods. */
+  readonly landedCost: (description: string) => string;
 };
 
 const withReference = (base: string, reference?: string | undefined): string =>
@@ -36,6 +38,7 @@ const en: LedgerMessages = {
   stockReceived: (item, reference) => withReference(`Stock received: ${item}`, reference),
   costOfGoodsSold: (item, reference) => withReference(`Cost of goods sold: ${item}`, reference),
   importedDelivery: (reference) => withReference('Imported delivery', reference),
+  landedCost: (description) => `Landed cost: ${description}`,
 };
 
 /**
@@ -56,6 +59,7 @@ const vi: LedgerMessages = {
   stockReceived: (item, reference) => withReference(`Nhập kho: ${item}`, reference),
   costOfGoodsSold: (item, reference) => withReference(`Giá vốn hàng bán: ${item}`, reference),
   importedDelivery: (reference) => withReference('Nhập kho theo dữ liệu chuyển đổi', reference),
+  landedCost: (description) => `Chi phí thu mua: ${description}`,
 };
 
 /**
@@ -76,6 +80,7 @@ const ja: LedgerMessages = {
     reference ? `売上原価：${item}（${reference}）` : `売上原価：${item}`,
   importedDelivery: (reference) =>
     reference ? `データ移行による入庫（${reference}）` : 'データ移行による入庫',
+  landedCost: (description) => `仕入諸掛：${description}`,
 };
 
 const LEDGER: Record<Locale, LedgerMessages> = { en, vi, ja };

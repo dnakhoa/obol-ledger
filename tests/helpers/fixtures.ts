@@ -10,6 +10,7 @@ import { createRateService } from '@/server/services/rates';
 import { createRevaluationService } from '@/server/services/revaluation';
 import { createInventoryService } from '@/server/services/inventory';
 import { createStockImportService } from '@/server/services/stock-import';
+import { createLandedCostService } from '@/server/services/landed-cost';
 import { createWebhookService } from '@/server/services/webhooks';
 import type { Database } from '@/server/db/types';
 import type { AccountType } from '@/server/domain/account';
@@ -27,6 +28,7 @@ export function servicesFor(database: Database, orgId: string) {
     webhooks: createWebhookService(database, orgId),
     inventory: createInventoryService(database, orgId),
     stockImport: createStockImportService(database, orgId),
+    landedCost: createLandedCostService(database, orgId),
   };
 }
 

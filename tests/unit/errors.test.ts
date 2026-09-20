@@ -111,6 +111,12 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
     expected: 'asset',
     actual: 'revenue',
   },
+  shipment_reference_taken: { code: 'shipment_reference_taken', reference: 'CONT-4417' },
+  shipment_not_found: { code: 'shipment_not_found', shipmentId: 'ship_x' },
+  shipment_has_no_stock: { code: 'shipment_has_no_stock', shipmentId: 'ship_x' },
+  mixed_units: { code: 'mixed_units', units: ['m2', 'tonne'] },
+  weight_missing: { code: 'weight_missing', layerIds: ['layer_a'] },
+  debit_account_required: { code: 'debit_account_required' },
 };
 
 const variants = Object.values(EVERY_VARIANT);

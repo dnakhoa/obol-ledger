@@ -445,6 +445,7 @@ including the metadata filter and every problem type, are in the
 - [ADR 12](docs/adr/0012-fx-revaluation.md) — unrealized FX as a remeasurement
 - [ADR 13](docs/adr/0013-inventory-costing.md) — inventory as layers, costing as a policy
 - [ADR 14](docs/adr/0014-two-locales.md) — the viewer's language is not the books' language
+- [ADR 15](docs/adr/0015-landed-cost.md) — freight and duty belong in the cost of the goods
 
 ## Licence
 
