@@ -65,8 +65,103 @@ export const organizations = pgTable('organizations', {
    * `docs/adr/0010-multi-currency.md`.
    */
   functionalCurrency: char('functional_currency', { length: 3 }).notNull().default('USD'),
+  /**
+   * The one ledger a signed-out visitor may read.
+   *
+   * A column rather than a slug compared against an environment variable,
+   * because that is how a tenant becomes publicly readable by renaming
+   * itself. A partial unique index allows exactly one.
+   */
+  isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/*
+ * Authentication tables.
+ *
+ * Shaped by the auth library rather than by this project's conventions —
+ * camel-case column names and singular table names included — because a
+ * schema the library does not recognise is a schema it cannot migrate. They
+ * carry no row-level security policy, for the same reason `api_keys` does
+ * not: resolving a session happens before a tenant is known.
+ */
+export const users = pgTable('user', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('emailVerified').notNull().default(false),
+  image: text('image'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const sessions = pgTable('session', {
+  id: text('id').primaryKey(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  token: text('token').notNull().unique(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+  ipAddress: text('ipAddress'),
+  userAgent: text('userAgent'),
+  userId: text('userId')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+});
+
+export const authAccounts = pgTable('account', {
+  id: text('id').primaryKey(),
+  accountId: text('accountId').notNull(),
+  providerId: text('providerId').notNull(),
+  userId: text('userId')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  accessToken: text('accessToken'),
+  refreshToken: text('refreshToken'),
+  idToken: text('idToken'),
+  accessTokenExpiresAt: timestamp('accessTokenExpiresAt', { withTimezone: true }),
+  refreshTokenExpiresAt: timestamp('refreshTokenExpiresAt', { withTimezone: true }),
+  scope: text('scope'),
+  password: text('password'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const verifications = pgTable('verification', {
+  id: text('id').primaryKey(),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * The join that authorises.
+ *
+ * Authentication is delegated; this is not. A membership row is what turns a
+ * session into an `org_id`, and every row-level security policy in the schema
+ * takes it from there — which is why this is the project's own table rather
+ * than the auth library's organisation plugin. Two organisation tables would
+ * be two answers to the one question the policies key off.
+ */
+export const memberships = pgTable(
+  'memberships',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    orgId: text('org_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().default('owner'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('memberships_user_org_key').on(table.userId, table.orgId),
+    index('memberships_user_idx').on(table.userId, table.createdAt),
+  ],
+);
 
 /**
  * Rates as point-in-time facts, never updated.

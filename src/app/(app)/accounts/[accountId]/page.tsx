@@ -10,7 +10,7 @@ import { CompactAmount, DirectionalAmount, Money } from '@/components/money';
 import { CursorPagination } from '@/components/pagination';
 import { ArrowLeftIcon, DownloadIcon } from '@/components/icons';
 import { ButtonLink } from '@/components/ui/button';
-import { demoServices } from '@/server/container';
+import { viewerServices } from '@/server/container';
 import { normalBalanceOf, type AccountType } from '@/server/domain/account';
 
 type PageProps = {
@@ -29,7 +29,7 @@ const LINE_DATE = new Intl.DateTimeFormat('en-US', {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { accountId } = await params;
-  const account = await (await demoServices()).accounts.byId(accountId);
+  const account = await (await viewerServices()).services.accounts.byId(accountId);
   return { title: account.ok ? account.value.name : 'Account' };
 }
 
@@ -38,9 +38,8 @@ export const dynamic = 'force-dynamic';
 export default async function AccountStatementPage({ params, searchParams }: PageProps) {
   const [{ accountId }, query] = await Promise.all([params, searchParams]);
 
-  const statement = await (
-    await demoServices()
-  ).reporting.statement(accountId, {
+  const { services } = await viewerServices();
+  const statement = await services.reporting.statement(accountId, {
     limit: PAGE_SIZE,
     cursor: query.cursor,
     direction: query.direction === 'backward' ? 'backward' : 'forward',

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { demoServices } from '@/server/container';
+import { servicesFor } from '@/server/container';
+import { viewerFor } from '@/server/auth/viewer';
 import { SetupRequiredError } from '@/server/setup-error';
 import { rateLimit } from '@/server/http/rate-limit';
 
@@ -35,7 +36,11 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const services = await demoServices();
+    // Resolved from this request rather than from `next/headers`, which is
+    // Server-Component-only and throws anywhere else.
+    const viewer = await viewerFor(request);
+    if (viewer.kind === 'unenrolled') return NextResponse.json({ accounts: [], entries: [] });
+    const services = servicesFor(viewer.orgId);
     const needle = query.toLowerCase();
 
     // Accounts are filtered in memory: a chart of accounts is dozens of rows,

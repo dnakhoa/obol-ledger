@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { MobileNav, SidebarNav } from '@/components/nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { CommandPalette, PaletteTrigger } from '@/components/command-palette';
+import { ViewerMenu } from '@/components/viewer-menu';
+import { currentViewer, orgName } from '@/server/auth/viewer';
 import { ScaleIcon } from '@/components/icons';
 
 /**
@@ -12,7 +14,14 @@ import { ScaleIcon } from '@/components/icons';
  * JavaScript. The two client islands it renders — the navigation, which reads
  * the current path, and the theme control — are as small as they can be.
  */
-export default function AppLayout({ children }: { children: ReactNode }) {
+export default async function AppLayout({ children }: { children: ReactNode }) {
+  const viewer = await currentViewer();
+  // An unenrolled account has no ledger to render a shell around, so the
+  // pages send it to onboarding; the shell still needs a name for the header.
+  const ledgerName = viewer.kind === 'unenrolled' ? 'Your ledger' : await orgName(viewer.orgId);
+  const identity =
+    viewer.kind === 'guest' ? {} : { name: viewer.name, email: viewer.email, image: viewer.image };
+
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr]">
       {/*
@@ -41,7 +50,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <div className="flex-1 overflow-y-auto p-3">
           <SidebarNav />
         </div>
-        <div className="border-line border-t p-3">
+        <div className="border-line space-y-3 border-t p-3">
+          <ViewerMenu {...identity} orgName={ledgerName} />
           <ThemeToggle />
         </div>
       </aside>

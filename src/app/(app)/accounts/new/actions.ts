@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import { demoServices } from '@/server/container';
+import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { createAccountSchema } from '@/server/http/schemas';
 import { rateLimit } from '@/server/http/rate-limit';
 import { logger } from '@/server/observability/logger';
@@ -48,7 +48,12 @@ export async function createAccountAction(
 
   let accountId: string;
   try {
-    const account = await (await demoServices()).accounts.create(parsed.data);
+    const writer = await requireWriter();
+    if (!writer.allowed) {
+      return { status: 'error', message: refusalMessage(writer.reason) };
+    }
+
+    const account = await writer.services.accounts.create(parsed.data);
     accountId = account.id;
   } catch (error) {
     // `(org_id, name, currency)` is unique so a tenant cannot end up with two

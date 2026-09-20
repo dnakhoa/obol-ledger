@@ -7,7 +7,7 @@ import { Table, TableScroll, Td, Th, Tr } from '@/components/ui/table';
 import { DirectionalAmount, Money } from '@/components/money';
 import { ReverseEntry } from '@/components/reverse-entry';
 import { ArrowLeftIcon, CheckIcon } from '@/components/icons';
-import { demoServices } from '@/server/container';
+import { viewerServices } from '@/server/container';
 import { toMoneyDto } from '@/server/services/serialize';
 import type { MinorUnits } from '@/lib/money';
 import { reverseEntryAction } from './actions';
@@ -26,13 +26,13 @@ const FULL_DATE = new Intl.DateTimeFormat('en-US', {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { entryId } = await params;
-  const entry = await (await demoServices()).journal.byId(entryId);
+  const entry = await (await viewerServices()).services.journal.byId(entryId);
   return { title: entry?.description ?? 'Entry' };
 }
 
 export default async function EntryPage({ params }: PageProps) {
   const { entryId } = await params;
-  const entry = await (await demoServices()).journal.byId(entryId);
+  const entry = await (await viewerServices()).services.journal.byId(entryId);
   if (!entry) notFound();
 
   // Summed in bigint and formatted by the same function the API uses. Going

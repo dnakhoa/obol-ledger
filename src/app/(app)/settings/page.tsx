@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/page-header';
 import { ApiKeyForm } from '@/components/api-key-form';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
-import { demoServices } from '@/server/container';
+import { viewerServices } from '@/server/container';
 import type { ApiKeyDto } from '@/server/services/api-keys';
 import { issueApiKeyAction, revokeApiKeyAction } from './actions';
 
@@ -26,7 +26,7 @@ const WHEN = new Intl.DateTimeFormat('en-US', {
 export default async function SettingsPage() {
   let keys: ApiKeyDto[];
   try {
-    keys = await (await demoServices()).apiKeys.list();
+    keys = await (await viewerServices()).services.apiKeys.list();
   } catch (error) {
     if (error instanceof SetupRequiredError) return <SetupNotice detail={error.message} />;
     throw error;

@@ -51,6 +51,7 @@ export const ID_PREFIXES = {
   webhookDelivery: 'whd',
   event: 'evt',
   period: 'per',
+  membership: 'mem',
 } as const;
 
 export type EntityKind = keyof typeof ID_PREFIXES;

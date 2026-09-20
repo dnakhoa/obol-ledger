@@ -10,7 +10,7 @@ import { Money } from '@/components/money';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
 import { ArrowRightIcon } from '@/components/icons';
-import { demoServices } from '@/server/container';
+import { viewerServices } from '@/server/container';
 import { buildPosition } from '@/server/queries';
 import { normalBalanceOf } from '@/server/domain/account';
 import type { AccountDto } from '@/server/services/dto';
@@ -29,7 +29,7 @@ const CLASS_BLURB: Record<string, string> = {
 export default async function AccountsPage() {
   let accounts: AccountDto[];
   try {
-    accounts = await (await demoServices()).accounts.list();
+    accounts = await (await viewerServices()).services.accounts.list();
   } catch (error) {
     if (error instanceof SetupRequiredError) {
       return <SetupNotice detail={error.message} />;

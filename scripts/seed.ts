@@ -107,7 +107,10 @@ async function main(): Promise<void> {
     const orgId = newId('organization');
     await database
       .insert(schema.organizations)
-      .values({ id: orgId, name: 'Demo Roastery', slug: demoSlug });
+      // Marked as *the* demo: that column, not the slug, is what makes a
+      // ledger readable to a signed-out visitor. A partial unique index
+      // allows exactly one, so "the demo" is never ambiguous.
+      .values({ id: orgId, name: 'Demo Roastery', slug: demoSlug, isDemo: true });
 
     // A second tenant with its own books exists purely so the isolation is
     // real rather than theoretical: there is something on the other side of
