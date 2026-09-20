@@ -40,12 +40,28 @@ of decision: partly convention, partly law.
 | `specific`         | The layer is named on the movement | Required for items that are not interchangeable |
 | `lifo`             | Newest layer first                 | **US only**                                     |
 
+Japan's statutory default, absent an election, is 最終仕入原価法 — the last
+purchase price. This model does not implement it, which is a real gap rather
+than a disagreement, and it is recorded here rather than left to be discovered.
+
 ### LIFO is the second convention-versus-law case
 
-LIFO is permitted under US GAAP and **prohibited** under IFRS — and under
-Vietnamese accounting, where Thông tư 200 does not include it. A ledger that
-offered it to every tenant would be offering some of them a way to produce
-accounts their auditor must reject.
+LIFO is permitted under US GAAP and **prohibited** under IFRS. The national
+picture is worth stating precisely rather than waving at, because it is
+checkable:
+
+- **Vietnam.** VAS 02 as written still lists LIFO, but
+  [Thông tư 200 removed it](https://sme.misa.vn/63109/tong-hop-cac-phuong-phap-xac-dinh-gia-xuat-kho-moi-nhat-theo-thong-tu-200/),
+  leaving the three methods IAS 2 allows — _nhập trước, xuất trước_, _bình
+  quân gia quyền_, _thực tế đích danh_.
+- **Japan.** 後入先出法 was removed from Japanese GAAP in 2008 to converge with
+  IAS 2, and the National Tax Agency's
+  [list of permitted valuation methods](https://www.nta.go.jp/law/tsutatsu/kihon/hojin/05/05_02_01.htm)
+  — 個別法, 先入先出法, 総平均法, 移動平均法, 最終仕入原価法, 売価還元法 — does not
+  include it.
+
+A ledger that offered LIFO to every tenant would be offering most of them a
+way to produce accounts their auditor must reject.
 
 So the same technique that enforces the Thông tư 200 digit rule enforces this:
 the costing method is carried on the tenant beside the chart template, and a

@@ -444,6 +444,7 @@ including the metadata filter and every problem type, are in the
 - [ADR 11](docs/adr/0011-chart-of-accounts.md) — account codes, convention versus law
 - [ADR 12](docs/adr/0012-fx-revaluation.md) — unrealized FX as a remeasurement
 - [ADR 13](docs/adr/0013-inventory-costing.md) — inventory as layers, costing as a policy
+- [ADR 14](docs/adr/0014-two-locales.md) — the viewer's language is not the books' language
 
 ## Licence
 
