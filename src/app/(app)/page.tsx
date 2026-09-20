@@ -11,19 +11,16 @@ import { VolumeChart } from '@/components/volume-chart';
 import { SetupNotice } from '@/components/setup-notice';
 import { CheckIcon, AlertIcon, ArrowRightIcon } from '@/components/icons';
 import { buildPosition, loadDashboard } from '@/server/queries';
+import { translations } from '@/server/i18n';
+import { classLabel, dateFormats } from '@/lib/i18n';
 
-export const metadata: Metadata = { title: 'Overview' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await translations();
+  return { title: t.overview.title };
+}
 
 // Balances change on every posting, so nothing here may be served from a cache.
 export const dynamic = 'force-dynamic';
-
-const ENTRY_DATE = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-  timeZone: 'UTC',
-});
 
 export default async function OverviewPage() {
   let model;
@@ -40,6 +37,8 @@ export default async function OverviewPage() {
   // One row: the trial balance is stated in the functional currency and
   // nothing else, because that is the only unit it means anything in.
   const books = trialBalance[0];
+  const { locale, t } = await translations();
+  const format = dateFormats(locale);
   const position = buildPosition(accounts);
   const allBalanced = trialBalance.every((row) => row.balanced);
 
@@ -47,13 +46,11 @@ export default async function OverviewPage() {
     <>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-xl font-semibold tracking-tight">Overview</h1>
-          <p className="text-ink-muted text-sm">
-            Every figure below is derived from postings that are balanced by construction.
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight">{t.overview.title}</h1>
+          <p className="text-ink-muted text-sm">{t.overview.description}</p>
         </div>
         <ButtonLink href="/transfer" variant="primary">
-          Post an entry
+          {t.overview.postEntry}
           <ArrowRightIcon />
         </ButtonLink>
       </header>
@@ -79,12 +76,10 @@ export default async function OverviewPage() {
             </span>
             <div>
               <p className="text-sm font-semibold">
-                {allBalanced ? 'The books balance' : 'The books do not balance'}
+                {allBalanced ? t.overview.balanced : t.overview.notBalanced}
               </p>
               <p className="text-ink-muted text-xs">
-                {allBalanced
-                  ? 'Debits equal credits across every currency, with a residual of exactly zero.'
-                  : 'A residual other than zero means cached balances no longer match their postings.'}
+                {allBalanced ? t.overview.balancedBody : t.overview.notBalancedBody}
               </p>
             </div>
           </div>
@@ -93,19 +88,25 @@ export default async function OverviewPage() {
             {books ? (
               <>
                 <div>
-                  <dt className="text-ink-muted text-[11px] tracking-wide uppercase">Debits</dt>
+                  <dt className="text-ink-muted text-[11px] tracking-wide uppercase">
+                    {t.overview.debits}
+                  </dt>
                   <dd className="numeric text-sm font-medium">
                     <Money value={books.debits} showCurrency />
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-ink-muted text-[11px] tracking-wide uppercase">Credits</dt>
+                  <dt className="text-ink-muted text-[11px] tracking-wide uppercase">
+                    {t.overview.credits}
+                  </dt>
                   <dd className="numeric text-sm font-medium">
                     <Money value={books.credits} showCurrency />
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-ink-muted text-[11px] tracking-wide uppercase">Residual</dt>
+                  <dt className="text-ink-muted text-[11px] tracking-wide uppercase">
+                    {t.overview.residual}
+                  </dt>
                   <dd className="numeric text-sm font-medium">
                     <Money value={books.residual} />
                   </dd>
@@ -118,28 +119,31 @@ export default async function OverviewPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
-          label="Cash & assets"
+          label={t.overview.cashAndAssets}
           value={<Money value={position.totalFor('asset')} />}
           unit={position.currency}
-          detail="Debit-normal balances"
+          detail={t.overview.debitNormalBalances}
           emphasis
         />
         <StatTile
-          label="Revenue"
+          label={t.overview.revenue}
           value={<Money value={position.totalFor('revenue')} />}
           unit={position.currency}
-          detail="Credit-normal, shown positive"
+          detail={t.overview.revenueDetail}
         />
         <StatTile
-          label="Expenses"
+          label={t.overview.expenses}
           value={<Money value={position.totalFor('expense')} />}
           unit={position.currency}
-          detail="Debit-normal balances"
+          detail={t.overview.debitNormalBalances}
         />
         <StatTile
-          label="Entries posted"
-          value={summary.entryCount.toLocaleString('en-US')}
-          detail={`${summary.postingCount.toLocaleString('en-US')} postings across ${summary.accountCount} accounts`}
+          label={t.overview.entriesPosted}
+          value={format.number(summary.entryCount)}
+          detail={t.overview.entriesDetail(
+            format.number(summary.postingCount),
+            summary.accountCount,
+          )}
         />
       </div>
 
@@ -147,10 +151,8 @@ export default async function OverviewPage() {
         <Card>
           <CardHeader>
             <div className="space-y-0.5">
-              <CardTitle>Daily posting volume</CardTitle>
-              <CardDescription>
-                Debit side only, last 30 days — every entry has an equal credit.
-              </CardDescription>
+              <CardTitle>{t.overview.volumeTitle}</CardTitle>
+              <CardDescription>{t.overview.volumeHint}</CardDescription>
             </div>
             <Badge>{chart.currency}</Badge>
           </CardHeader>
@@ -168,8 +170,8 @@ export default async function OverviewPage() {
         <Card>
           <CardHeader>
             <div className="space-y-0.5">
-              <CardTitle>Position by class</CardTitle>
-              <CardDescription>Assets + Expenses = Liabilities + Equity + Revenue</CardDescription>
+              <CardTitle>{t.overview.positionTitle}</CardTitle>
+              <CardDescription>{t.overview.positionHint}</CardDescription>
             </div>
             <Link
               href="/accounts"
@@ -180,24 +182,24 @@ export default async function OverviewPage() {
           </CardHeader>
           {accounts.length === 0 ? (
             <EmptyState
-              title="No accounts yet"
-              description="Open an account to start recording entries."
+              title={t.overview.positionEmpty}
+              description={t.overview.positionEmptyBody}
             />
           ) : (
             <>
               <TableScroll>
-                <Table caption="Total balance by account class">
+                <Table caption={t.overview.positionCaption}>
                   <thead>
                     <tr>
-                      <Th>Class</Th>
-                      <Th align="right">Accounts</Th>
-                      <Th align="right">Balance (USD)</Th>
+                      <Th>{t.overview.klass}</Th>
+                      <Th align="right">{t.overview.accountCount}</Th>
+                      <Th align="right">{t.overview.balanceIn(position.currency)}</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {position.rows.map((row) => (
                       <Tr key={row.type}>
-                        <Td className="font-medium">{row.label}</Td>
+                        <Td className="font-medium">{classLabel(row.type, t)}</Td>
                         <Td align="right" numeric className="text-ink-muted">
                           {row.accountCount}
                         </Td>
@@ -213,13 +215,13 @@ export default async function OverviewPage() {
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
                 <dl className="flex items-center gap-6 text-xs">
                   <div>
-                    <dt className="text-ink-muted">Debit side</dt>
+                    <dt className="text-ink-muted">{t.overview.debitSide}</dt>
                     <dd className="numeric font-medium">
                       <Money value={position.debitSide} />
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-ink-muted">Credit side</dt>
+                    <dt className="text-ink-muted">{t.overview.creditSide}</dt>
                     <dd className="numeric font-medium">
                       <Money value={position.creditSide} />
                     </dd>
@@ -231,7 +233,7 @@ export default async function OverviewPage() {
                   ) : (
                     <AlertIcon width={12} height={12} />
                   )}
-                  {position.balanced ? 'Equation holds' : 'Equation broken'}
+                  {position.balanced ? t.overview.equationHolds : t.overview.equationBroken}
                 </Badge>
               </div>
             </>
@@ -241,29 +243,29 @@ export default async function OverviewPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent entries</CardTitle>
+          <CardTitle>{t.overview.recentTitle}</CardTitle>
           <Link
             href="/journal"
             className="text-ink-muted hover:text-ink text-xs transition-colors duration-150"
           >
-            Full journal
+            {t.overview.fullJournal}
           </Link>
         </CardHeader>
         {recent.length === 0 ? (
           <EmptyState
-            title="The journal is empty"
-            description="Post your first entry to see it appear here."
-            action={<ButtonLink href="/transfer">Post an entry</ButtonLink>}
+            title={t.overview.journalEmpty}
+            description={t.overview.journalEmptyBody}
+            action={<ButtonLink href="/transfer">{t.overview.postEntry}</ButtonLink>}
           />
         ) : (
           <TableScroll>
-            <Table caption="The six most recent journal entries">
+            <Table caption={t.overview.recentCaption}>
               <thead>
                 <tr>
-                  <Th>Date</Th>
-                  <Th>Description</Th>
-                  <Th>Accounts</Th>
-                  <Th align="right">Amount</Th>
+                  <Th>{t.overview.date}</Th>
+                  <Th>{t.overview.entryDescription}</Th>
+                  <Th>{t.overview.accounts}</Th>
+                  <Th align="right">{t.overview.amount}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -272,7 +274,7 @@ export default async function OverviewPage() {
                   return (
                     <Tr key={entry.id}>
                       <Td className="text-ink-muted whitespace-nowrap">
-                        {ENTRY_DATE.format(new Date(entry.occurredAt))}
+                        {format.day(new Date(entry.occurredAt))}
                       </Td>
                       <Td className="font-medium">
                         <Link href={`/journal?highlight=${entry.id}`} className="hover:underline">

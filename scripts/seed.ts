@@ -94,7 +94,7 @@ const ACCOUNTS: {
   {
     key: 'arUsd',
     code: '1311',
-    name: 'Phải thu khách hàng — USD',
+    name: 'Phải thu của khách hàng — USD',
     type: 'asset',
     currency: 'USD',
     overdraft: true,
@@ -102,7 +102,7 @@ const ACCOUNTS: {
   {
     key: 'arEur',
     code: '1312',
-    name: 'Phải thu khách hàng — EUR',
+    name: 'Phải thu của khách hàng — EUR',
     type: 'asset',
     currency: 'EUR',
     overdraft: true,
@@ -110,7 +110,7 @@ const ACCOUNTS: {
   {
     key: 'arAud',
     code: '1313',
-    name: 'Phải thu khách hàng — AUD',
+    name: 'Phải thu của khách hàng — AUD',
     type: 'asset',
     currency: 'AUD',
     overdraft: true,
@@ -125,7 +125,7 @@ const ACCOUNTS: {
   {
     key: 'blocks',
     code: '152',
-    name: 'Nguyên liệu — đá khối',
+    name: 'Nguyên vật liệu — đá khối',
     type: 'asset',
     currency: 'VND',
     monetary: false,
@@ -277,21 +277,21 @@ const PRODUCTS: {
   {
     key: 'pavers',
     sku: 'PAV-600',
-    name: 'Đá lát granite 600×600 — granite pavers',
+    name: 'Đá lát granite 600×600',
     unit: 'm2',
     unitCost: 690_000,
   },
   {
     key: 'cladding',
     sku: 'CLD-PNL',
-    name: 'Tấm ốp tường — wall cladding panels',
+    name: 'Tấm ốp tường bằng đá',
     unit: 'm2',
     unitCost: 845_000,
   },
   {
     key: 'kerbs',
     sku: 'BLK-STR',
-    name: 'Đá bậc và bó vỉa — stair and kerb blocks',
+    name: 'Đá bậc và bó vỉa',
     unit: 'm3',
     unitCost: 5_600_000,
   },
@@ -359,6 +359,7 @@ async function main(): Promise<void> {
         // codes, so the demo is on the statutory chart rather than a
         // convention — and the database enforces the digit rule.
         chartTemplate: 'vn_tt200',
+        locale: 'vi',
       });
 
     // A second tenant with its own books exists purely so the isolation is
@@ -502,18 +503,18 @@ async function main(): Promise<void> {
     // ships, and these entries are an order of magnitude larger than a week of
     // trading. Dated well back so they do not flatten the dashboard's chart.
 
-    await post('Góp vốn chủ sở hữu — owner capital contribution', daysAgo(104, 9), [
+    await post('Góp vốn của chủ sở hữu', daysAgo(104, 9), [
       { account: 'bankVnd', amount: dong(32_000_000_000) },
       { account: 'capital', amount: dong(-32_000_000_000) },
     ]);
 
-    await post('Mua máy cắt và máy mài đá — cutting and polishing line', daysAgo(102, 10), [
+    await post('Mua dây chuyền cắt và mài đá', daysAgo(102, 10), [
       { account: 'plant', amount: dong(18_400_000_000) },
       { account: 'payable', amount: dong(-12_000_000_000) },
       { account: 'bankVnd', amount: dong(-6_400_000_000) },
     ]);
 
-    await post('Tồn kho đá khối đầu kỳ — opening granite block stock', daysAgo(100, 8), [
+    await post('Tồn kho đá khối đầu kỳ', daysAgo(100, 8), [
       { account: 'blocks', amount: dong(4_800_000_000) },
       { account: 'payable', amount: dong(-4_800_000_000) },
     ]);
@@ -553,18 +554,18 @@ async function main(): Promise<void> {
     // Quarry blocks bought, and the factory turning them into product.
     for (const [run, day] of [95, 80, 65, 50, 35, 20, 6].entries()) {
       const blocks = between(1_400_000_000, 2_900_000_000);
-      await post('Mua đá khối từ mỏ — granite blocks from the quarry', daysAgo(day, 8), [
+      await post('Mua đá khối từ mỏ', daysAgo(day, 8), [
         { account: 'blocks', amount: dong(blocks) },
         { account: 'payable', amount: dong(-blocks) },
       ]);
 
       const processed = Math.round(blocks * 0.94);
       const labour = Math.round(processed * 0.38);
-      await post('Đưa đá khối vào sản xuất — blocks into production', daysAgo(day - 1, 8), [
+      await post('Xuất đá khối vào sản xuất', daysAgo(day - 1, 8), [
         { account: 'wip', amount: dong(processed) },
         { account: 'blocks', amount: dong(-processed) },
       ]);
-      await post('Chi phí nhân công phân xưởng — factory wages', daysAgo(day - 1, 17), [
+      await post('Chi phí nhân công phân xưởng', daysAgo(day - 1, 17), [
         { account: 'wip', amount: dong(labour) },
         { account: 'payroll', amount: dong(-labour) },
       ]);
@@ -587,7 +588,7 @@ async function main(): Promise<void> {
         creditAccountId: ids['wip'] ?? '',
         occurredAt: daysAgo(day - 2, 16),
         reference: `LOT-${String(run + 1).padStart(3, '0')}`,
-        description: 'Nhập kho thành phẩm — finished goods to store',
+        description: 'Nhập kho thành phẩm',
       });
       if (!received.ok) throw new Error(`receipt failed: ${received.error.code}`);
       entries += 1;
@@ -619,7 +620,7 @@ async function main(): Promise<void> {
         amount: 58_400,
         rate: '16420',
         buyer: 'Southern Landscape Supplies, Brisbane',
-        product: 'Granite pavers 400x400x30',
+        product: 'Đá lát granite 400×400×30',
         item: 'pavers',
         share: 0.17,
         invoice: 'INV-2601',
@@ -631,7 +632,7 @@ async function main(): Promise<void> {
         amount: 41_250,
         rate: '27450',
         buyer: 'Steinhandel Nord, Hamburg',
-        product: 'Basalt cubes 100x100x100',
+        product: 'Đá bazan lập phương 100×100×100',
         item: 'kerbs',
         share: 0.15,
         invoice: 'INV-2602',
@@ -643,7 +644,7 @@ async function main(): Promise<void> {
         amount: 63_900,
         rate: '16510',
         buyer: 'Kerb & Co, Melbourne',
-        product: 'Kerbstones 1000x300x150',
+        product: 'Bó vỉa đá 1000×300×150',
         item: 'kerbs',
         share: 0.16,
         invoice: 'INV-2603',
@@ -655,7 +656,7 @@ async function main(): Promise<void> {
         amount: 37_800,
         rate: '25510',
         buyer: 'Pacific Stone Imports, Seattle',
-        product: 'Flagstones, bush hammered',
+        product: 'Đá lát phiến, bề mặt băm',
         item: 'cladding',
         share: 0.19,
         invoice: 'INV-2604',
@@ -667,7 +668,7 @@ async function main(): Promise<void> {
         amount: 71_200,
         rate: '16610',
         buyer: 'Auckland Paving Centre',
-        product: 'Granite pavers 600x300x30',
+        product: 'Đá lát granite 600×300×30',
         item: 'pavers',
         share: 0.18,
         invoice: 'INV-2605',
@@ -679,7 +680,7 @@ async function main(): Promise<void> {
         amount: 48_600,
         rate: '27780',
         buyer: 'Pierre Naturelle SA, Lyon',
-        product: 'Palisades 100x100x1000',
+        product: 'Trụ đá 100×100×1000',
         item: 'kerbs',
         share: 0.14,
         invoice: 'INV-2606',
@@ -691,7 +692,7 @@ async function main(): Promise<void> {
         amount: 66_500,
         rate: '16700',
         buyer: 'Southern Landscape Supplies, Brisbane',
-        product: 'Wall cladding panels',
+        product: 'Tấm ốp tường bằng đá',
         item: 'cladding',
         share: 0.21,
         invoice: 'INV-2607',
@@ -703,7 +704,7 @@ async function main(): Promise<void> {
         amount: 44_150,
         rate: '25580',
         buyer: 'Pacific Stone Imports, Seattle',
-        product: 'Stair blocks, 5 sides chiselled',
+        product: 'Đá bậc, đục 5 mặt',
         item: 'kerbs',
         share: 0.13,
         invoice: 'INV-2608',
@@ -715,7 +716,7 @@ async function main(): Promise<void> {
         amount: 74_800,
         rate: '16780',
         buyer: 'Kerb & Co, Melbourne',
-        product: 'Kerbstones, saw cut',
+        product: 'Bó vỉa đá, cắt máy',
         item: 'kerbs',
         share: 0.12,
         invoice: 'INV-2609',
@@ -727,7 +728,7 @@ async function main(): Promise<void> {
         amount: 52_300,
         rate: '28040',
         buyer: 'Steinhandel Nord, Hamburg',
-        product: 'Basalt cubes, split face',
+        product: 'Đá bazan lập phương, mặt chẻ',
         item: 'cladding',
         share: 0.18,
         invoice: 'INV-2610',
@@ -739,7 +740,7 @@ async function main(): Promise<void> {
         amount: 69_900,
         rate: '16880',
         buyer: 'Auckland Paving Centre',
-        product: 'Garden landscaping sets',
+        product: 'Bộ đá trang trí sân vườn',
         item: 'pavers',
         share: 0.16,
         invoice: 'INV-2611',
@@ -751,7 +752,7 @@ async function main(): Promise<void> {
         amount: 77_400,
         rate: '16950',
         buyer: 'Southern Landscape Supplies, Brisbane',
-        product: 'Granite pavers 450x900x60',
+        product: 'Đá lát granite 450×900×60',
         item: 'pavers',
         share: 0.19,
         invoice: 'INV-2612',
@@ -922,25 +923,25 @@ async function main(): Promise<void> {
 
     for (const day of [90, 60, 30]) {
       const wages = between(1_900_000_000, 2_400_000_000);
-      await post('Thanh toán lương — payroll paid', daysAgo(day, 9), [
+      await post('Thanh toán lương cho người lao động', daysAgo(day, 9), [
         { account: 'payroll', amount: dong(wages) },
         { account: 'bankVnd', amount: dong(-wages) },
       ]);
 
       const admin = between(320_000_000, 520_000_000);
-      await post('Chi phí quản lý — administration', daysAgo(day, 14), [
+      await post('Chi phí quản lý doanh nghiệp', daysAgo(day, 14), [
         { account: 'admin', amount: dong(admin) },
         { account: 'bankVnd', amount: dong(-admin) },
       ]);
 
       const supplier = between(2_100_000_000, 3_600_000_000);
-      await post('Thanh toán nhà cung cấp — supplier settlement', daysAgo(day - 3, 11), [
+      await post('Thanh toán cho nhà cung cấp', daysAgo(day - 3, 11), [
         { account: 'payable', amount: dong(supplier) },
         { account: 'bankVnd', amount: dong(-supplier) },
       ]);
 
       const depreciation = 306_000_000;
-      await post('Khấu hao tài sản cố định — depreciation', daysAgo(day, 17), [
+      await post('Trích khấu hao tài sản cố định', daysAgo(day, 17), [
         { account: 'admin', amount: dong(depreciation) },
         { account: 'depreciation', amount: dong(-depreciation) },
       ]);
@@ -954,7 +955,7 @@ async function main(): Promise<void> {
     // differ — which is the whole point of the two-phase model.
 
     await post(
-      'Container đã xuất, chờ vận đơn — loaded, awaiting bill of lading',
+      'Container đã xuất, chờ vận đơn',
       daysAgo(1, 16),
       [
         { account: 'arAud', amount: foreign(54_600), fxRate: '17010' },

@@ -3,6 +3,7 @@ import { err, ok, type Result } from '@/lib/result';
 import { newId } from '@/lib/id';
 import { convert, parseRate } from '@/lib/fx';
 import type { CurrencyCode, MinorUnits } from '@/lib/money';
+import { ledgerMessages, type Locale } from '@/lib/i18n';
 import type { LedgerError } from '@/server/domain/errors';
 import { endOfMonth, isClosable } from '@/server/domain/period';
 import { accountingPeriods, accounts, organizations } from '@/server/db/schema';
@@ -131,7 +132,9 @@ export function createRevaluationService(database: Database, orgId: string) {
         const total = lines.reduce((sum, line) => sum + BigInt(line.differenceMinor), 0n);
 
         const entry = await createJournalService(tx, orgId).postEntry({
-          description: `Foreign exchange revaluation, ${periodMonth.slice(0, 7)}`,
+          description: ledgerMessages(await booksLocale(tx, orgId)).revaluation(
+            periodMonth.slice(0, 7),
+          ),
           // The journal resolves the entry's currency to the organisation's
           // functional one regardless; this is what it will be.
           currency: functional,
@@ -160,6 +163,16 @@ export function createRevaluationService(database: Database, orgId: string) {
       });
     },
   };
+
+  /** The language the books are kept in; see `docs/adr/0014-two-locales.md`. */
+  async function booksLocale(handle: Transactional, organizationId: string): Promise<Locale> {
+    const [row] = await handle
+      .select({ locale: organizations.locale })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .limit(1);
+    return row?.locale ?? 'en';
+  }
 
   async function functionalCurrency(
     handle: Transactional,

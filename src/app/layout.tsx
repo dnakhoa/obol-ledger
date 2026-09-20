@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+import { viewerLocale } from '@/server/i18n';
 
 /**
  * Fonts are self-hosted by `next/font`: it downloads them at build time and
@@ -9,13 +10,18 @@ import './globals.css';
  * layout shift when the face swaps in.
  */
 const inter = Inter({
-  subsets: ['latin'],
+  // `vietnamese` as well as `latin`, which is not optional once the interface
+  // speaks Vietnamese: without it every ề, ữ and ợ falls out of Inter and is
+  // painted by a system fallback, so a Vietnamese sentence renders in two
+  // typefaces at two weights. It costs one more subset file, fetched only by
+  // browsers that need it.
+  subsets: ['latin', 'vietnamese'],
   display: 'swap',
   variable: '--font-inter',
 });
 
 const mono = JetBrains_Mono({
-  subsets: ['latin'],
+  subsets: ['latin', 'vietnamese'],
   display: 'swap',
   weight: ['400', '500'],
   variable: '--font-mono-face',
@@ -68,9 +74,14 @@ const THEME_SCRIPT = `
 })();
 `.trim();
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // `lang` is not decoration: it picks the hyphenation and line-breaking rules,
+  // tells a screen reader which voice to use, and is what a translation tool
+  // reads before offering to translate a page that is already translated.
+  const locale = await viewerLocale();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>

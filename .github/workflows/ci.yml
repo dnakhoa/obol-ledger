@@ -19,7 +19,11 @@ jobs:
   verify:
     name: Verify
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Raised from 10 when the suite passed 600 tests and started running into
+    # the cap. Most of the time is PGlite: every integration file boots its own
+    # Postgres so row-level security is actually enforced during tests, which
+    # is worth several minutes of wall clock.
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v5

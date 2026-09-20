@@ -23,6 +23,7 @@ import { DELIVERY_STATUSES } from '@/server/domain/webhook';
 import { ACCOUNT_ROLES, PERIOD_STATUSES } from '@/server/domain/period';
 import type { CostingMethod } from '@/server/domain/costing';
 import type { Unit } from '@/lib/quantity';
+import type { Locale } from '@/lib/i18n/locales';
 
 /**
  * The ledger schema.
@@ -84,6 +85,16 @@ export const organizations = pgTable('organizations', {
    * chart but the US one. See `docs/adr/0013-inventory-costing.md`.
    */
   costingMethod: text('costing_method').$type<CostingMethod>().notNull().default('fifo'),
+  /**
+   * The language the *books* are kept in — not the viewer's.
+   *
+   * Only the descriptions the ledger writes for itself follow this: a closing
+   * entry, a revaluation, the cost of goods sold behind a shipment. Those
+   * become part of the accounting record and cannot be retranslated later
+   * without rewriting history. Account names and anything a person typed are
+   * left exactly as they were typed.
+   */
+  locale: text('locale').$type<Locale>().notNull().default('en'),
   /**
    * The one ledger a signed-out visitor may read.
    *

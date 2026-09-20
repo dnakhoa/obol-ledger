@@ -3,6 +3,7 @@ import { err, ok, type Result } from '@/lib/result';
 import { parseTable, sniffSeparator } from '@/lib/csv';
 import { isCurrencyCode, parseDecimal, type CurrencyCode } from '@/lib/money';
 import { defaultPrecision, isUnit, parseQuantity, type Unit } from '@/lib/quantity';
+import { ledgerMessages, type Locale } from '@/lib/i18n';
 import { describe as describeError, type LedgerError } from '@/server/domain/errors';
 import { inventoryItems, organizations } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
@@ -30,14 +31,58 @@ import { createInventoryService } from './inventory';
 
 /** What a column may be called. People type headers; matching one spelling is how a good file gets rejected. */
 const COLUMNS = {
-  sku: ['sku', 'code', 'productcode', 'itemcode', 'ma', 'mahang'],
-  name: ['name', 'product', 'productname', 'description', 'tenhang'],
-  unit: ['unit', 'uom', 'unitofmeasure', 'donvi'],
-  quantity: ['quantity', 'qty', 'amountreceived', 'received', 'soluong'],
-  cost: ['cost', 'totalcost', 'total', 'amount', 'value', 'linetotal', 'thanhtien'],
+  sku: [
+    'sku',
+    'code',
+    'productcode',
+    'itemcode',
+    'ma',
+    'mahang',
+    '品目コード',
+    '商品コード',
+    'コード',
+  ],
+  name: ['name', 'product', 'productname', 'description', 'tenhang', '品名', '品目名', '商品名'],
+  unit: ['unit', 'uom', 'unitofmeasure', 'donvi', '単位'],
+  quantity: ['quantity', 'qty', 'amountreceived', 'received', 'soluong', '数量'],
+  cost: [
+    'cost',
+    'totalcost',
+    'total',
+    'amount',
+    'value',
+    'linetotal',
+    'thanhtien',
+    '金額',
+    '仕入金額',
+    '合計',
+  ],
   currency: ['currency', 'ccy', 'tiente'],
-  date: ['date', 'datereceived', 'received', 'arrived', 'arrivaldate', 'invoicedate', 'ngay'],
-  reference: ['reference', 'ref', 'container', 'invoice', 'invoiceno', 'lot', 'batch', 'sochungtu'],
+  date: [
+    'date',
+    'datereceived',
+    'received',
+    'arrived',
+    'arrivaldate',
+    'invoicedate',
+    'ngay',
+    '日付',
+    '入荷日',
+    '仕入日',
+  ],
+  reference: [
+    'reference',
+    'ref',
+    'container',
+    'invoice',
+    'invoiceno',
+    'lot',
+    'batch',
+    'sochungtu',
+    '伝票番号',
+    'コンテナ番号',
+    '請求書番号',
+  ],
 } as const;
 
 export type ImportRow = {
@@ -128,6 +173,9 @@ export function createStockImportService(database: Database, orgId: string) {
           });
         }
 
+        // Written in the tenant's language, because it becomes the
+        // description on a posted entry rather than a label on a screen.
+        const ledger = ledgerMessages(await booksLocale(tx, orgId));
         const inventory = createInventoryService(tx, orgId);
         const byCode = await codes(tx);
         let products = 0;
@@ -172,7 +220,7 @@ export function createStockImportService(database: Database, orgId: string) {
             creditAccountId: input.creditAccountId,
             occurredAt: new Date(`${row.date}T12:00:00.000Z`),
             ...(row.reference ? { reference: row.reference } : {}),
-            description: `Nhập kho — imported delivery${row.reference ? ` ${row.reference}` : ''}`,
+            description: ledger.importedDelivery(row.reference),
           });
           if (!received.ok) {
             // Carried out with the line number attached, because "insufficient
@@ -196,6 +244,15 @@ export type ImportRefusal = {
   readonly code: 'import_has_problems';
   readonly problems: readonly { readonly line: number; readonly problem: string }[];
 };
+
+async function booksLocale(tx: Transactional, orgId: string): Promise<Locale> {
+  const [row] = await tx
+    .select({ locale: organizations.locale })
+    .from(organizations)
+    .where(eq(organizations.id, orgId))
+    .limit(1);
+  return row?.locale ?? 'en';
+}
 
 async function read(tx: Transactional, orgId: string, input: ImportInput): Promise<ImportPreview> {
   const separator = sniffSeparator(input.text);

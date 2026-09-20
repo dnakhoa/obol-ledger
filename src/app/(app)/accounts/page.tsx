@@ -11,22 +11,20 @@ import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
 import { ArrowRightIcon } from '@/components/icons';
 import { viewerServices } from '@/server/container';
+import { translations } from '@/server/i18n';
 import { buildPosition } from '@/server/queries';
 import { normalBalanceOf } from '@/server/domain/account';
 import type { AccountDto } from '@/server/services/dto';
+import { classBlurb, classLabel } from '@/lib/i18n';
 
-export const metadata: Metadata = { title: 'Chart of accounts' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await translations();
+  return { title: t.accounts.title };
+}
 export const dynamic = 'force-dynamic';
 
-const CLASS_BLURB: Record<string, string> = {
-  asset: 'What the business owns. Debits increase these.',
-  liability: 'What the business owes. Credits increase these.',
-  equity: "The owners' residual claim. Credits increase these.",
-  revenue: 'Income earned. Credits increase these.',
-  expense: 'Costs incurred. Debits increase these.',
-};
-
 export default async function AccountsPage() {
+  const { t } = await translations();
   let accounts: AccountDto[];
   try {
     accounts = await (await viewerServices()).services.accounts.list();
@@ -42,11 +40,11 @@ export default async function AccountsPage() {
   return (
     <>
       <PageHeader
-        title="Chart of accounts"
-        description="Grouped by class. Balances are shown the way an accountant reads them — positive means healthy, whichever side the account normally sits on."
+        title={t.accounts.title}
+        description={t.accounts.description}
         actions={
           <ButtonLink href="/transfer" variant="primary">
-            Post an entry
+            {t.accounts.postEntry}
             <ArrowRightIcon />
           </ButtonLink>
         }
@@ -54,26 +52,26 @@ export default async function AccountsPage() {
 
       {accounts.length === 0 ? (
         <Card>
-          <EmptyState
-            title="No accounts yet"
-            description="Accounts are created through the API. Run pnpm db:seed to load a month of example books."
-          />
+          <EmptyState title={t.accounts.emptyTitle} description={t.accounts.emptyBody} />
         </Card>
       ) : (
         position.rows.map((group) => {
           const members = accounts.filter((account) => account.type === group.type);
           if (members.length === 0) return null;
+          const className = classLabel(group.type, t);
 
           return (
             <Card key={group.type}>
               <CardHeader>
                 <div className="space-y-0.5">
-                  <CardTitle>{group.label}</CardTitle>
-                  <CardDescription>{CLASS_BLURB[group.type] ?? ''}</CardDescription>
+                  <CardTitle>{className}</CardTitle>
+                  <CardDescription>{classBlurb(group.type, t)}</CardDescription>
                 </div>
                 <div className="text-right">
                   <p className="text-ink-muted text-[11px] tracking-wide uppercase">
-                    {normalBalanceOf(group.type)}-normal
+                    {normalBalanceOf(group.type) === 'debit'
+                      ? t.accounts.normalDebit
+                      : t.accounts.normalCredit}
                   </p>
                   <p className="numeric text-sm font-semibold">
                     <Money value={group.total} showCurrency />
@@ -82,7 +80,7 @@ export default async function AccountsPage() {
               </CardHeader>
 
               <TableScroll>
-                <Table caption={`${group.label} accounts and balances`}>
+                <Table caption={t.accounts.tableCaption(className)}>
                   <thead>
                     <tr>
                       {/*
@@ -91,15 +89,15 @@ export default async function AccountsPage() {
                         and monospaced so the column scans as a column rather
                         than as ragged text.
                       */}
-                      <Th className="w-20">Code</Th>
-                      <Th>Account</Th>
-                      <Th className="hidden xl:table-cell">Identifier</Th>
+                      <Th className="w-20">{t.accounts.code}</Th>
+                      <Th>{t.accounts.account}</Th>
+                      <Th className="hidden xl:table-cell">{t.accounts.identifier}</Th>
                       <Th align="right" className="hidden sm:table-cell">
-                        Overdraft
+                        {t.accounts.overdraft}
                       </Th>
-                      <Th align="right">Balance</Th>
+                      <Th align="right">{t.accounts.balance}</Th>
                       <Th align="right" className="hidden sm:table-cell">
-                        <span className="sr-only">Statement</span>
+                        <span className="sr-only">{t.accounts.statement}</span>
                       </Th>
                     </tr>
                   </thead>
@@ -118,7 +116,7 @@ export default async function AccountsPage() {
                           </Link>
                           {account.status === 'closed' ? (
                             <Badge tone="caution" className="ml-2">
-                              Closed
+                              {t.accounts.closed}
                             </Badge>
                           ) : null}
                         </Td>
@@ -126,7 +124,9 @@ export default async function AccountsPage() {
                           {account.id}
                         </Td>
                         <Td align="right" className="text-ink-muted hidden text-xs sm:table-cell">
-                          {account.overdraftAllowed ? 'Allowed' : 'Blocked'}
+                          {account.overdraftAllowed
+                            ? t.accounts.overdraftAllowed
+                            : t.accounts.overdraftBlocked}
                         </Td>
                         <Td align="right" numeric className="font-medium">
                           {/*
@@ -145,7 +145,7 @@ export default async function AccountsPage() {
                             href={`/accounts/${account.id}`}
                             className="text-ink-muted hover:text-ink text-xs transition-colors duration-150"
                           >
-                            Statement
+                            {t.accounts.statement}
                           </Link>
                         </Td>
                       </Tr>
@@ -160,11 +160,7 @@ export default async function AccountsPage() {
 
       <Card>
         <CardBody className="text-ink-muted text-xs">
-          <p>
-            Accounts with overdraft blocked cannot be pushed below zero. That rule is enforced by a
-            CHECK constraint in Postgres as well as by the service, so it holds even for a writer
-            that bypasses this application.
-          </p>
+          <p>{t.accounts.overdraftNote}</p>
         </CardBody>
       </Card>
     </>

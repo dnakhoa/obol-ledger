@@ -127,6 +127,20 @@
       "when": 1789906000000,
       "tag": "0017_inventory",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789910000000,
+      "tag": "0018_books_locale",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789912000000,
+      "tag": "0019_japanese_books",
+      "breakpoints": true
     }
   ]
 }

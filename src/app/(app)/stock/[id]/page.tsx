@@ -13,10 +13,31 @@ import { SetupRequiredError } from '@/server/setup-error';
 import { ArrowLeftIcon } from '@/components/icons';
 import { IssueForm, ReceiveForm, type AccountOption } from '@/components/stock-forms';
 import { viewerServices } from '@/server/container';
+import { translations } from '@/server/i18n';
+import { dateFormats } from '@/lib/i18n';
 import { SUPPORTED_CURRENCIES } from '@/lib/money';
 import { toQuantityString, unitLabel } from '@/lib/quantity';
 
-export const metadata: Metadata = { title: 'Product' };
+/**
+ * The tab title is the product's own name — data, not a translated label.
+ * Somebody with six of these open is looking for the granite, not the word
+ * for "product" in their language.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const item = await (await viewerServices()).services.inventory.item(id);
+    if (item) return { title: item.name };
+  } catch {
+    // The page itself renders the setup notice; a title is not worth failing on.
+  }
+  const { t } = await translations();
+  return { title: t.stock.title };
+}
 export const dynamic = 'force-dynamic';
 
 /**
@@ -30,15 +51,10 @@ export const dynamic = 'force-dynamic';
  * sorts a column.
  */
 
-const DATE = new Intl.DateTimeFormat('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const { locale, t } = await translations();
+  const DATE = dateFormats(locale);
 
   let item, lots, movements, accounts, functional;
   try {
@@ -83,18 +99,54 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   const lotOptions = lots.map((lot) => ({
     id: lot.id,
-    label: `${lot.reference ?? DATE.format(lot.acquiredAt)} — ${quantity(lot.remainingQuantityMinor)} ${unitLabel(item.unit)} left`,
+    label: t.product.lotOption(
+      lot.reference ?? DATE.day(lot.acquiredAt),
+      `${quantity(lot.remainingQuantityMinor)} ${unitLabel(item.unit)}`,
+    ),
   }));
+
+  // Resolved here rather than in the form: several of these take the unit or
+  // the number of decimal places, so in the dictionary they are functions, and
+  // a function cannot be serialised across the server/client boundary.
+  const unitName = unitLabel(item.unit);
+  const receiveLabels = {
+    quantity: t.product.howMuchArrived(unitName),
+    quantityHint: t.product.decimalHint(item.quantityPrecision),
+    cost: t.product.paidInTotal,
+    costHint: t.product.paidInTotalHint,
+    currency: t.product.paidIn,
+    creditAccount: t.product.paidFrom,
+    creditAccountHint: t.product.paidFromHint,
+    date: t.product.dateArrived,
+    reference: t.product.reference,
+    referenceHint: t.product.referenceHint,
+    submit: t.product.receiveButton,
+    working: t.common.working,
+  };
+  const requiresLot = item.costingMethod === 'specific';
+  const issueLabels = {
+    quantity: t.product.howMuchWentOut(unitName),
+    date: t.product.dateShipped,
+    reference: t.product.reference,
+    referenceHint: t.product.issueReferenceHint,
+    lot: requiresLot ? t.product.whichDelivery : t.product.whichDeliveryOptional,
+    lotHint: requiresLot
+      ? t.product.whichDeliveryRequiredHint
+      : t.product.whichDeliveryOptionalHint,
+    lotPlaceholder: requiresLot ? t.product.chooseDelivery : t.product.oldestFirst,
+    submit: t.product.issueButton,
+    working: t.common.working,
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={item.name}
-        description={`${item.sku} · measured in ${unitLabel(item.unit)}`}
+        description={`${item.sku} · ${t.product.measuredInSuffix(unitLabel(item.unit))}`}
         actions={
           <ButtonLink href="/stock">
             <ArrowLeftIcon />
-            All stock
+            {t.product.allStock}
           </ButtonLink>
         }
       />
@@ -102,7 +154,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">On hand</p>
+            <p className="text-ink-muted text-xs">{t.product.onHand}</p>
             <p className="numeric text-2xl font-semibold">
               {quantity(item.onHandMinor)}
               <span className="text-ink-muted ml-1.5 text-sm font-normal">
@@ -113,7 +165,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         </Card>
         <Card>
           <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">What it cost you</p>
+            <p className="text-ink-muted text-xs">{t.product.whatItCost}</p>
             <p className="numeric text-2xl font-semibold">
               <Money value={item.value} showCurrency />
             </p>
@@ -121,7 +173,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         </Card>
         <Card>
           <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">Deliveries still open</p>
+            <p className="text-ink-muted text-xs">{t.product.deliveriesStillOpen}</p>
             <p className="numeric text-2xl font-semibold">{item.openLayers}</p>
           </CardBody>
         </Card>
@@ -129,26 +181,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
       <Card>
         <CardHeader>
-          <CardTitle>Deliveries you still hold</CardTitle>
-          <CardDescription>
-            Oldest first — the order they will be used in unless you say otherwise.
-          </CardDescription>
+          <CardTitle>{t.product.lotsTitle}</CardTitle>
+          <CardDescription>{t.product.lotsHint}</CardDescription>
         </CardHeader>
         {lots.length === 0 ? (
-          <EmptyState
-            title="Nothing on hand"
-            description="Book in a delivery below and it will appear here as its own lot, with its own price."
-          />
+          <EmptyState title={t.product.nothingOnHand} description={t.product.nothingOnHandBody} />
         ) : (
           <TableScroll>
-            <Table caption="Open deliveries, oldest first">
+            <Table caption={t.product.lotsCaption}>
               <thead>
                 <tr>
-                  <Th>Reference</Th>
-                  <Th>Arrived</Th>
-                  <Th align="right">Left</Th>
-                  <Th align="right">Paid for the lot</Th>
-                  <Th align="right">Value of what is left</Th>
+                  <Th>{t.product.reference}</Th>
+                  <Th>{t.product.arrived}</Th>
+                  <Th align="right">{t.product.left}</Th>
+                  <Th align="right">{t.product.paidForLot}</Th>
+                  <Th align="right">{t.product.valueOfRemainder}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -160,17 +207,17 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                           href={`/journal/${lot.transactionId}`}
                           className="hover:text-action font-medium underline-offset-4 hover:underline"
                         >
-                          {lot.reference ?? 'Delivery'}
+                          {lot.reference ?? t.product.delivery}
                         </Link>
                       ) : (
-                        (lot.reference ?? 'Opening balance')
+                        (lot.reference ?? t.product.openingBalance)
                       )}
                     </Td>
-                    <Td>{DATE.format(lot.acquiredAt)}</Td>
+                    <Td>{DATE.day(lot.acquiredAt)}</Td>
                     <Td align="right" numeric>
                       {quantity(lot.remainingQuantityMinor)}
                       <span className="text-ink-muted ml-1 text-[11px]">
-                        of {quantity(lot.quantityMinor)}
+                        {t.product.ofTotal(quantity(lot.quantityMinor))}
                       </span>
                     </Td>
                     <Td align="right" numeric>
@@ -190,20 +237,17 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Book in a delivery</CardTitle>
-            <CardDescription>
-              This opens a new lot and posts the purchase to the ledger in one go, so the stock
-              records and the accounts cannot disagree.
-            </CardDescription>
+            <CardTitle>{t.product.receiveTitle}</CardTitle>
+            <CardDescription>{t.product.receiveHint}</CardDescription>
           </CardHeader>
           <CardBody>
             {creditAccounts.length === 0 ? (
               <p className="text-ink-secondary text-sm">
-                Open a bank account or a supplier payable on the{' '}
+                {t.product.needCreditAccount}{' '}
                 <Link href="/accounts" className="underline underline-offset-4">
-                  chart of accounts
+                  {t.stock.chartOfAccountsLink}
                 </Link>{' '}
-                first.
+                {t.stock.firstSuffix}
               </p>
             ) : (
               <ReceiveForm
@@ -213,6 +257,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 currencies={currencies}
                 creditAccounts={creditAccounts}
                 today={today}
+                labels={receiveLabels}
               />
             )}
           </CardBody>
@@ -220,17 +265,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
         <Card>
           <CardHeader>
-            <CardTitle>Ship it out</CardTitle>
-            <CardDescription>
-              The ledger works out what it cost from the lots it came from, and refuses if there is
-              not enough.
-            </CardDescription>
+            <CardTitle>{t.product.issueTitle}</CardTitle>
+            <CardDescription>{t.product.issueHint}</CardDescription>
           </CardHeader>
           <CardBody>
             {lots.length === 0 ? (
-              <p className="text-ink-secondary text-sm">
-                There is nothing on hand to ship. Book in a delivery first.
-              </p>
+              <p className="text-ink-secondary text-sm">{t.product.nothingToShip}</p>
             ) : (
               <IssueForm
                 itemId={item.id}
@@ -238,7 +278,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 precision={item.quantityPrecision}
                 today={today}
                 lots={lotOptions}
-                requiresLot={item.costingMethod === 'specific'}
+                requiresLot={requiresLot}
+                labels={issueLabels}
               />
             )}
           </CardBody>
@@ -247,39 +288,33 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
       <Card>
         <CardHeader>
-          <CardTitle>Everything that has moved</CardTitle>
-          <CardDescription>
-            Each shipment shows which deliveries it was costed from. This is the working you would
-            otherwise keep in a spreadsheet.
-          </CardDescription>
+          <CardTitle>{t.product.movementsTitle}</CardTitle>
+          <CardDescription>{t.product.movementsHint}</CardDescription>
         </CardHeader>
         {movements.length === 0 ? (
-          <EmptyState
-            title="Nothing has moved yet"
-            description="Deliveries and shipments will be listed here."
-          />
+          <EmptyState title={t.product.nothingMoved} description={t.product.nothingMovedBody} />
         ) : (
           <TableScroll>
-            <Table caption="Stock movements, most recent first">
+            <Table caption={t.product.movementsCaption}>
               <thead>
                 <tr>
-                  <Th>Date</Th>
-                  <Th>What happened</Th>
-                  <Th align="right">Quantity</Th>
-                  <Th>Costed from</Th>
-                  <Th align="right">Cost</Th>
+                  <Th>{t.product.date}</Th>
+                  <Th>{t.product.whatHappened}</Th>
+                  <Th align="right">{t.product.quantity}</Th>
+                  <Th>{t.product.costedFrom}</Th>
+                  <Th align="right">{t.product.cost}</Th>
                 </tr>
               </thead>
               <tbody>
                 {movements.map((movement) => (
                   <Tr key={movement.id}>
-                    <Td>{DATE.format(movement.occurredAt)}</Td>
+                    <Td>{DATE.day(movement.occurredAt)}</Td>
                     <Td>
                       <Link
                         href={`/journal/${movement.transactionId}`}
                         className="hover:text-action font-medium underline-offset-4 hover:underline"
                       >
-                        {movement.kind === 'receipt' ? 'Delivery in' : 'Shipped out'}
+                        {movement.kind === 'receipt' ? t.product.deliveryIn : t.product.shippedOut}
                       </Link>
                       {movement.reference ? (
                         <span className="text-ink-muted ml-2 text-xs">{movement.reference}</span>
@@ -296,7 +331,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                         <span className="flex flex-wrap gap-1">
                           {movement.drawnFrom.map((draw) => (
                             <Badge key={draw.layerId}>
-                              {draw.layerReference ?? 'lot'} · {quantity(draw.quantityMinor)}
+                              {draw.layerReference ?? t.product.delivery} ·{' '}
+                              {quantity(draw.quantityMinor)}
                             </Badge>
                           ))}
                         </span>

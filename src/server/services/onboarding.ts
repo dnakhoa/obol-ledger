@@ -3,6 +3,7 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { newId } from '@/lib/id';
 import { SUPPORTED_CURRENCIES, type CurrencyCode } from '@/lib/money';
+import type { Locale } from '@/lib/i18n';
 import { memberships, organizations } from '@/server/db/schema';
 import { db } from '@/server/db/client';
 import type { Transactional } from '@/server/db/types';
@@ -28,6 +29,17 @@ export type CreateLedgerInput = {
   readonly functionalCurrency: CurrencyCode;
   /** Which chart of accounts to open with. Defaults to the generic one. */
   readonly chartTemplate?: ChartTemplate;
+  /**
+   * The language the books will be kept in.
+   *
+   * Asked here because it is a property of the accounting records rather than
+   * a preference — the descriptions the ledger writes for itself become part
+   * of the books and cannot be retranslated later without rewriting history.
+   * Defaulting it to whatever language the person is reading the sign-up page
+   * in is the best guess available, and it is the only moment at which the
+   * guess is free to be wrong.
+   */
+  readonly locale?: Locale;
 };
 
 export async function createLedger(input: CreateLedgerInput): Promise<{ orgId: string }> {
@@ -49,6 +61,7 @@ export async function createLedger(input: CreateLedgerInput): Promise<{ orgId: s
       slug: await uniqueSlug(tx, input.name, orgId),
       functionalCurrency: input.functionalCurrency,
       chartTemplate: template.id,
+      locale: input.locale ?? 'en',
     });
 
     await tx.insert(memberships).values({

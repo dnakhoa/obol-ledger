@@ -7,28 +7,41 @@ import { StatementSectionTable } from '@/components/statement';
 import { SetupNotice } from '@/components/setup-notice';
 import { AlertIcon, CheckIcon } from '@/components/icons';
 import { viewerServices } from '@/server/container';
+import { translations } from '@/server/i18n';
+import { classLabel, dateFormats } from '@/lib/i18n';
 import { SetupRequiredError } from '@/server/setup-error';
 import type { BalanceSheet, IncomeStatement } from '@/server/services/dto';
 
-export const metadata: Metadata = { title: 'Reports' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await translations();
+  return { title: t.reports.title };
+}
 export const dynamic = 'force-dynamic';
 
 type PageProps = { searchParams: Promise<{ days?: string }> };
 
 const PERIODS = [
-  { days: 30, label: '30 days' },
-  { days: 90, label: '90 days' },
-  { days: 365, label: '12 months' },
+  { days: 30, key: 'period30' },
+  { days: 90, key: 'period90' },
+  { days: 365, key: 'period365' },
 ] as const;
 
-const DATE = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
-
 export default async function ReportsPage({ searchParams }: PageProps) {
+  const { locale, t } = await translations();
+  const format = dateFormats(locale);
+  // The class is named at the call site rather than read off the section:
+  // `StatementSection` carries a label for the API and no type, and adding one
+  // to the DTO to satisfy the interface would be the tail wagging the dog.
+  const sectionLabels = (type: string) => {
+    const name = classLabel(type, t);
+    return {
+      name,
+      amount: t.reports.amount,
+      caption: t.reports.sectionCaption(name),
+      empty: t.reports.sectionEmpty(name),
+      total: t.reports.sectionTotal(name),
+    };
+  };
   const query = await searchParams;
   const days = PERIODS.find((period) => String(period.days) === query.days)?.days ?? 30;
 
@@ -50,10 +63,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
 
   return (
     <>
-      <PageHeader
-        title="Reports"
-        description="The two statements a ledger exists to produce. Both are derived from the same postings as everything else — no separate reporting store to fall out of step."
-      />
+      <PageHeader title={t.reports.title} description={t.reports.description} />
 
       {/*
         The accounting identity, stated before the detail that supports it.
@@ -76,26 +86,24 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </span>
             <div>
               <p className="text-sm font-semibold">
-                {sheet.balanced
-                  ? 'The balance sheet balances'
-                  : 'The balance sheet does not balance'}
+                {sheet.balanced ? t.reports.sheetBalances : t.reports.sheetDoesNot}
               </p>
-              <p className="text-ink-muted text-xs">
-                Assets = Liabilities + Equity + retained earnings
-              </p>
+              <p className="text-ink-muted text-xs">{t.reports.equation}</p>
             </div>
           </div>
 
           <dl className="flex flex-wrap items-center gap-x-8 gap-y-3">
             <div>
-              <dt className="text-ink-muted text-[11px] tracking-wide uppercase">Assets</dt>
+              <dt className="text-ink-muted text-[11px] tracking-wide uppercase">
+                {t.reports.assets}
+              </dt>
               <dd className="numeric text-sm font-medium">
                 <Money value={sheet.assets.total} showCurrency />
               </dd>
             </div>
             <div>
               <dt className="text-ink-muted text-[11px] tracking-wide uppercase">
-                Liabilities + equity
+                {t.reports.liabilitiesPlusEquity}
               </dt>
               <dd className="numeric text-sm font-medium">
                 <Money value={sheet.liabilitiesAndEquity} showCurrency />
@@ -109,24 +117,27 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         <Card>
           <CardHeader>
             <div className="space-y-0.5">
-              <CardTitle>Balance sheet</CardTitle>
-              <CardDescription>Position as at {DATE.format(new Date(sheet.asOf))}</CardDescription>
+              <CardTitle>{t.reports.balanceSheet}</CardTitle>
+              <CardDescription>{t.reports.asAt(format.full(new Date(sheet.asOf)))}</CardDescription>
             </div>
             <Badge>{sheet.currency}</Badge>
           </CardHeader>
 
-          <StatementSectionTable section={sheet.assets} emphasis />
+          <StatementSectionTable section={sheet.assets} labels={sectionLabels('asset')} emphasis />
 
           <div className="border-line border-t">
-            <StatementSectionTable section={sheet.liabilities} />
+            <StatementSectionTable
+              section={sheet.liabilities}
+              labels={sectionLabels('liability')}
+            />
           </div>
           <div className="border-line border-t">
-            <StatementSectionTable section={sheet.equity} />
+            <StatementSectionTable section={sheet.equity} labels={sectionLabels('equity')} />
           </div>
 
           <div className="border-line flex items-center justify-between border-t px-4 py-3 sm:px-5">
             <div>
-              <p className="text-sm font-medium">Retained earnings</p>
+              <p className="text-sm font-medium">{t.reports.retainedEarnings}</p>
               <p className="text-ink-muted text-xs">
                 Revenue less expenses, folded into equity as it would be at period close
               </p>
@@ -140,9 +151,9 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         <Card>
           <CardHeader>
             <div className="space-y-0.5">
-              <CardTitle>Income statement</CardTitle>
+              <CardTitle>{t.reports.incomeStatement}</CardTitle>
               <CardDescription>
-                {DATE.format(new Date(income.from))} — {DATE.format(new Date(income.to))}
+                {format.full(new Date(income.from))} — {format.full(new Date(income.to))}
               </CardDescription>
             </div>
             {/*
@@ -150,7 +161,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
               than a caption. Real links, so a period is shareable and the back
               button works.
             */}
-            <nav aria-label="Reporting period" className="flex items-center gap-1">
+            <nav aria-label={t.reports.reportingPeriod} className="flex items-center gap-1">
               {PERIODS.map((period) => (
                 <a
                   key={period.days}
@@ -162,25 +173,25 @@ export default async function ReportsPage({ searchParams }: PageProps) {
                       : 'text-ink-muted hover:text-ink'
                   }`}
                 >
-                  {period.label}
+                  {t.reports[period.key]}
                 </a>
               ))}
             </nav>
           </CardHeader>
 
-          <StatementSectionTable section={income.revenue} />
+          <StatementSectionTable section={income.revenue} labels={sectionLabels('revenue')} />
           <div className="border-line border-t">
-            <StatementSectionTable section={income.expenses} />
+            <StatementSectionTable section={income.expenses} labels={sectionLabels('expense')} />
           </div>
 
           <div className="border-line flex items-center justify-between border-t px-4 py-3 sm:px-5">
             <div>
-              <p className="text-sm font-semibold">Net income</p>
-              <p className="text-ink-muted text-xs">Revenue less expenses for the period</p>
+              <p className="text-sm font-semibold">{t.reports.netIncome}</p>
+              <p className="text-ink-muted text-xs">{t.reports.netIncomeHint}</p>
             </div>
             <div className="flex items-center gap-3">
               <Badge tone={income.profitable ? 'positive' : 'neutral'}>
-                {income.profitable ? 'Profit' : 'Loss or breakeven'}
+                {income.profitable ? t.reports.profit : t.reports.lossOrBreakeven}
               </Badge>
               <span className="numeric text-base font-semibold">
                 <Money value={income.netIncome} signed showCurrency />
