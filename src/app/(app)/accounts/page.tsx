@@ -37,7 +37,7 @@ export default async function AccountsPage() {
     throw error;
   }
 
-  const position = buildPosition(accounts, 'USD');
+  const position = buildPosition(accounts);
 
   return (
     <>
@@ -129,7 +129,16 @@ export default async function AccountsPage() {
                           {account.overdraftAllowed ? 'Allowed' : 'Blocked'}
                         </Td>
                         <Td align="right" numeric className="font-medium">
-                          <Money value={account.balance} signed />
+                          {/*
+                            The currency is shown on every row, not only the
+                            foreign ones. On a chart holding dong, dollars,
+                            euros and Australian dollars, a bare number is a
+                            number the reader has to guess the unit of — and
+                            guessing wrong by a factor of twenty-five thousand
+                            is the kind of mistake this whole project exists
+                            to prevent.
+                          */}
+                          <Money value={account.balance} signed showCurrency />
                         </Td>
                         <Td align="right" className="hidden sm:table-cell">
                           <Link

@@ -33,7 +33,9 @@ export const GET = defineRoute(
       ? new Date(query.data.from)
       : new Date(to.getTime() - THIRTY_DAYS_MS);
 
-    const statement = await services.reporting.incomeStatement(query.data.currency, { from, to });
+    // No currency parameter: an income statement has exactly one unit, the
+    // currency the books are kept in.
+    const statement = await services.reporting.incomeStatement({ from, to });
     return json({ data: statement, meta: { profitable: statement.profitable } });
   },
 );

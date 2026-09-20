@@ -254,7 +254,7 @@ describe('reporting service', () => {
         { accountId: revenue.id, amount: -10_000n },
       ]);
 
-      const volume = await services.reporting.dailyVolume('USD', 30);
+      const volume = await services.reporting.dailyVolume(30);
       // Today is the last point on the spine.
       expect(volume.at(-1)?.volume.amount).toBe('100.00');
       // 100 debit + 100 credit moved, but only 100 changed hands.
@@ -265,7 +265,7 @@ describe('reporting service', () => {
     it('returns a gap-free spine so quiet days plot as zero', async () => {
       // A chart that drops empty days compresses its x-axis and makes a gap
       // look like activity, so the query fills them rather than the component.
-      const volume = await services.reporting.dailyVolume('USD', 30);
+      const volume = await services.reporting.dailyVolume(30);
       expect(volume).toHaveLength(30);
       expect(volume.every((point) => point.volume.amount === '0.00')).toBe(true);
 
@@ -275,8 +275,8 @@ describe('reporting service', () => {
     });
 
     it('clamps an absurd window rather than scanning forever', async () => {
-      expect(await services.reporting.dailyVolume('USD', 10_000)).toHaveLength(366);
-      expect(await services.reporting.dailyVolume('USD', 0)).toHaveLength(1);
+      expect(await services.reporting.dailyVolume(10_000)).toHaveLength(366);
+      expect(await services.reporting.dailyVolume(0)).toHaveLength(1);
     });
   });
 });

@@ -40,8 +40,8 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
     // Independent reads, issued together.
     [sheet, income] = await Promise.all([
-      services.reporting.balanceSheet('USD'),
-      services.reporting.incomeStatement('USD', { from, to }),
+      services.reporting.balanceSheet(),
+      services.reporting.incomeStatement({ from, to }),
     ]);
   } catch (error) {
     if (error instanceof SetupRequiredError) return <SetupNotice detail={error.message} />;

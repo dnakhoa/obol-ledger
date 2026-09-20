@@ -30,6 +30,14 @@ export type AccountDto = {
    * caller that predates two-phase entries and only ever meant "posted".
    */
   readonly balance: MoneyDto;
+  /**
+   * The same settled balance, in the organisation's functional currency.
+   *
+   * What a total is summed from. Adding a dollar balance to a dong one is a
+   * number with no meaning, so anything that aggregates across accounts —
+   * the accounting equation, a class subtotal — uses this and nothing else.
+   */
+  readonly baseBalance: MoneyDto;
   /** Settled plus in-flight. */
   readonly pendingBalance: MoneyDto;
   /** Settled minus in-flight outflows — what can still be spent. */

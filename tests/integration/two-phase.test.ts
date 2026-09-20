@@ -377,7 +377,7 @@ describe('two-phase entries', () => {
       const rows = await services.reporting.trialBalance();
       expect(rows.every((row) => row.balanced)).toBe(true);
 
-      const sheet = await services.reporting.balanceSheet('USD');
+      const sheet = await services.reporting.balanceSheet();
       expect(sheet.balanced).toBe(true);
       expect(sheet.assets.total.amount).toBe('1000.00');
     });
