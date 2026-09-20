@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
-import { demoServices } from '@/server/container';
+import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { createApiKeySchema } from '@/server/http/schemas';
 import { rateLimit } from '@/server/http/rate-limit';
 
@@ -51,7 +51,12 @@ export async function issueApiKeyAction(
     };
   }
 
-  const issued = await (await demoServices()).apiKeys.issue(parsed.data.name);
+  const writer = await requireWriter();
+  if (!writer.allowed) {
+    return { status: 'error', message: refusalMessage(writer.reason) };
+  }
+
+  const issued = await writer.services.apiKeys.issue(parsed.data.name);
   revalidatePath('/settings');
   return {
     status: 'issued',
@@ -61,6 +66,8 @@ export async function issueApiKeyAction(
 }
 
 export async function revokeApiKeyAction(formData: FormData): Promise<void> {
-  await (await demoServices()).apiKeys.revoke(String(formData.get('keyId')));
+  const writer = await requireWriter();
+  if (!writer.allowed) return;
+  await writer.services.apiKeys.revoke(String(formData.get('keyId')));
   revalidatePath('/settings');
 }

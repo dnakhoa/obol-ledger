@@ -4,6 +4,8 @@ import { openAccount, servicesFor, usd } from '../helpers/fixtures';
 import { setDatabaseForTesting } from '@/server/db/client';
 import { resetRateLimits } from '@/server/http/rate-limit';
 import { GET as search } from '@/app/api/search/route';
+import { organizations } from '@/server/db/schema';
+import { eq } from 'drizzle-orm';
 
 /**
  * The command palette's search.
@@ -21,6 +23,9 @@ describe('palette search', () => {
     setDatabaseForTesting(db);
     resetRateLimits();
     process.env['DEMO_ORG_SLUG'] = 'primary';
+    // A signed-out request reads the published demo, which is a column rather
+    // than a slug — so the fixture has to say which tenant that is.
+    await db.update(organizations).set({ isDemo: true }).where(eq(organizations.id, db.$orgId));
     services = servicesFor(db, db.$orgId);
   });
 

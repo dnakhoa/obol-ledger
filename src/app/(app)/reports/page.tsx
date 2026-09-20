@@ -6,7 +6,7 @@ import { Money } from '@/components/money';
 import { StatementSectionTable } from '@/components/statement';
 import { SetupNotice } from '@/components/setup-notice';
 import { AlertIcon, CheckIcon } from '@/components/icons';
-import { demoServices } from '@/server/container';
+import { viewerServices } from '@/server/container';
 import { SetupRequiredError } from '@/server/setup-error';
 import type { BalanceSheet, IncomeStatement } from '@/server/services/dto';
 
@@ -35,7 +35,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   let sheet: BalanceSheet;
   let income: IncomeStatement;
   try {
-    const services = await demoServices();
+    const { services } = await viewerServices();
     const to = new Date();
     const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
     // Independent reads, issued together.

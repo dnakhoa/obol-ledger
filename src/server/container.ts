@@ -9,6 +9,7 @@ import { createReportingService } from './services/reporting';
 import { createPeriodService } from './services/periods';
 import { createWebhookService } from './services/webhooks';
 import { SetupRequiredError } from './setup-error';
+import { currentViewer, type Viewer } from './auth/viewer';
 
 /**
  * Composition root.
@@ -48,9 +49,36 @@ export function authentication() {
  * The deployed demo is a real multi-tenant ledger with one tenant published,
  * rather than a single-tenant app pretending otherwise — so the read path goes
  * through exactly the same isolation as an authenticated one.
+ *
+ * Kept for the seed and for tests, which need to name the demo before anyone
+ * has signed in. The application resolves it from `organizations.is_demo`
+ * instead: deciding by slug is how a tenant becomes publicly readable by
+ * renaming itself.
  */
 export function demoOrgSlug(): string {
   return process.env['DEMO_ORG_SLUG'] ?? 'demo';
+}
+
+/**
+ * Services for whoever is asking, and the viewer that decided.
+ *
+ * Every page and action goes through this rather than naming a tenant, so
+ * "whose books are these?" is answered once, from the session, in a single
+ * place. A signed-out visitor gets the published demo and cannot write; a
+ * member gets their own organisation.
+ */
+export async function viewerServices(): Promise<{ services: Services; viewer: Viewer }> {
+  const viewer = await currentViewer();
+  if (viewer.kind === 'unenrolled') {
+    // No membership yet — there is no ledger to bind services to, and
+    // inventing one would be worse than sending them to onboarding.
+    throw new OnboardingRequiredError('This account has no ledger yet.');
+  }
+  return { services: servicesFor(viewer.orgId), viewer };
+}
+
+export class OnboardingRequiredError extends Error {
+  override readonly name = 'OnboardingRequiredError';
 }
 
 /**

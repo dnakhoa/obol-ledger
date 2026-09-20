@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/page-header';
 import { EndpointForm } from '@/components/endpoint-form';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
-import { demoServices } from '@/server/container';
+import { viewerServices } from '@/server/container';
 import { MAX_ATTEMPTS } from '@/server/domain/webhook';
 import type { DeliveryDto, EndpointDto } from '@/server/services/webhooks';
 import {
@@ -42,7 +42,7 @@ export default async function WebhooksPage() {
   let deliveries: DeliveryDto[];
 
   try {
-    const services = await demoServices();
+    const { services } = await viewerServices();
     [endpoints, deliveries] = await Promise.all([
       services.webhooks.list(),
       services.webhooks.deliveries({ limit: 30 }),

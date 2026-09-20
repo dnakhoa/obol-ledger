@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
-import { demoOrgSlug, demoServices, authentication } from '@/server/container';
+import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { db } from '@/server/db/client';
 import { createEndpointSchema } from '@/server/http/schemas';
 import { createDispatcher } from '@/server/services/webhook-dispatcher';
@@ -49,7 +49,12 @@ export async function registerEndpointAction(
     };
   }
 
-  const result = await (await demoServices()).webhooks.register(parsed.data);
+  const writer = await requireWriter();
+  if (!writer.allowed) {
+    return { status: 'error', message: refusalMessage(writer.reason) };
+  }
+
+  const result = await writer.services.webhooks.register(parsed.data);
   if (!result.ok) {
     return {
       status: 'error',
@@ -75,17 +80,23 @@ export async function registerEndpointAction(
 export async function setEndpointEnabledAction(formData: FormData): Promise<void> {
   const endpointId = String(formData.get('endpointId'));
   const enabled = formData.get('enabled') === 'true';
-  await (await demoServices()).webhooks.setEnabled(endpointId, enabled);
+  const writer = await requireWriter();
+  if (!writer.allowed) return;
+  await writer.services.webhooks.setEnabled(endpointId, enabled);
   revalidatePath('/webhooks');
 }
 
 export async function removeEndpointAction(formData: FormData): Promise<void> {
-  await (await demoServices()).webhooks.remove(String(formData.get('endpointId')));
+  const writer = await requireWriter();
+  if (!writer.allowed) return;
+  await writer.services.webhooks.remove(String(formData.get('endpointId')));
   revalidatePath('/webhooks');
 }
 
 export async function replayDeliveryAction(formData: FormData): Promise<void> {
-  await (await demoServices()).webhooks.replay(String(formData.get('deliveryId')));
+  const writer = await requireWriter();
+  if (!writer.allowed) return;
+  await writer.services.webhooks.replay(String(formData.get('deliveryId')));
   revalidatePath('/webhooks');
 }
 
@@ -99,10 +110,12 @@ export async function replayDeliveryAction(formData: FormData): Promise<void> {
  * simulation of it.
  */
 export async function dispatchNowAction(): Promise<void> {
-  const org = await authentication().organizationBySlug(demoOrgSlug());
-  if (!org) return;
+  // Draining a queue sends real HTTP to real endpoints, so it is a write in
+  // every sense that matters even though it changes no ledger row.
+  const writer = await requireWriter();
+  if (!writer.allowed) return;
 
-  const result = await createDispatcher(db(), org.id).dispatch();
+  const result = await createDispatcher(db(), writer.viewer.orgId).dispatch();
   logger.info('webhooks.dispatched.manual', { ...result });
   revalidatePath('/webhooks');
 }

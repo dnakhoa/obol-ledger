@@ -51,9 +51,9 @@ complete enough to close a book with.
 
 Things a reviewer should know without having to find them:
 
-- **The demo tenant accepts unauthenticated writes** through the dashboard's
-  server actions. That is a deliberate choice so the deployment is explorable,
-  not an authorisation model to copy.
+- **The demo tenant is readable by anyone and writable by nobody.** Signing in
+  gives you your own ledger; the demo stays a demo. There is no invite flow
+  yet, so an organisation has exactly one member.
 - **DNS rebinding is open** in the webhook SSRF check. Closing it means pinning
   the resolved address into the connection, which Node's `fetch` does not
   expose.

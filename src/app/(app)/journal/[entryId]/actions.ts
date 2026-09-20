@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
-import { demoServices } from '@/server/container';
+import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { describe as describeError } from '@/server/domain/errors';
 import { rateLimit } from '@/server/http/rate-limit';
 import { logger } from '@/server/observability/logger';
@@ -43,7 +43,11 @@ export async function reverseEntryAction(
 
   const reason = reasonSchema.safeParse(formData.get('reason')).data;
 
-  const services = await demoServices();
+  const writer = await requireWriter();
+  if (!writer.allowed) {
+    return { status: 'error', message: refusalMessage(writer.reason) };
+  }
+  const services = writer.services;
   const result = await services.journal.reverseEntry({
     transactionId,
     ...(reason ? { description: reason } : {}),

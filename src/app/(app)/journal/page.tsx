@@ -12,7 +12,7 @@ import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
 import { ArrowRightIcon, CheckIcon, DownloadIcon } from '@/components/icons';
 import { cn } from '@/lib/cn';
-import { demoServices } from '@/server/container';
+import { viewerServices } from '@/server/container';
 import type { AccountDto, Page, TransactionDto } from '@/server/services/dto';
 import { JournalFilters } from '@/components/journal-filters';
 
@@ -53,7 +53,7 @@ export default async function JournalPage({ searchParams }: PageProps) {
   let page: Page<TransactionDto>;
   let accounts: AccountDto[];
   try {
-    const services = await demoServices();
+    const { services } = await viewerServices();
     // Independent reads: the accounts are only needed to populate the filter.
     [page, accounts] = await Promise.all([
       services.journal.list({

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { headers } from 'next/headers';
-import { demoServices } from '@/server/container';
+import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { createEntrySchema } from '@/server/http/schemas';
 import { toDraftPostings } from '@/server/http/entries';
 import { describe as describeError } from '@/server/domain/errors';
@@ -91,9 +91,12 @@ export async function postEntryAction(
     };
   }
 
-  const result = await (
-    await demoServices()
-  ).journal.postEntry({
+  const writer = await requireWriter();
+  if (!writer.allowed) {
+    return { status: 'error', message: refusalMessage(writer.reason) };
+  }
+
+  const result = await writer.services.journal.postEntry({
     description: parsed.data.description,
     currency: parsed.data.currency,
     postings: converted.postings,
