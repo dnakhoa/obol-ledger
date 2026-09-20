@@ -55,6 +55,9 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   fx_rate_required: 422,
   invalid_fx_rate: 422,
   rate_not_found: 422,
+  fx_account_missing: 409,
+  amount_not_representable: 422,
+  currency_imbalance: 422,
 };
 
 export function statusFor(error: LedgerError): number {

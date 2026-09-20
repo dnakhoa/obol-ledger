@@ -18,7 +18,7 @@ export type CreateAccountInput = {
   readonly overdraftAllowed?: boolean;
   readonly metadata?: Record<string, string> | undefined;
   /** Structural job, currently only `retained_earnings`. At most one per tenant. */
-  readonly role?: 'retained_earnings' | undefined;
+  readonly role?: 'retained_earnings' | 'fx_gain_loss' | undefined;
 };
 
 /**

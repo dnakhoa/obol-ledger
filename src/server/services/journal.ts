@@ -5,7 +5,12 @@ import { toDecimalString, type CurrencyCode, type MinorUnits } from '@/lib/money
 import { deriveBalances, presentedBalance, type AccountType } from '@/server/domain/account';
 import type { LedgerError } from '@/server/domain/errors';
 import { canTransition, type TransactionStatus } from '@/server/domain/transaction-status';
-import { validateDraft, type DraftPosting } from '@/server/domain/transaction';
+import {
+  validateDraft,
+  type DraftPosting,
+  type ResolvedPosting,
+} from '@/server/domain/transaction';
+import { toSignedMinorUnits } from '@/server/http/schemas';
 import { convert, parseRate } from '@/lib/fx';
 import { organizations } from '@/server/db/schema';
 import { accounts, idempotencyKeys, postings, transactions } from '@/server/db/schema';
@@ -37,6 +42,14 @@ export type PostEntryInput = {
   readonly expectedVersions?: Readonly<Record<string, number>> | undefined;
   /** Caller-supplied annotation; opaque to the ledger. */
   readonly metadata?: Record<string, string> | undefined;
+  /**
+   * Absorb a functional-currency difference into the FX gain/loss account.
+   *
+   * Opt-in, because an adjustment applied by default is how a ledger hides
+   * arithmetic errors. See `appendFxAdjustment` for the rule that makes it
+   * safe.
+   */
+  readonly fxAdjustment?: boolean | undefined;
   /**
    * Supplied by the HTTP layer, which fingerprints the *raw* request body. A
    * retry is "the same request" from the client's point of view, so the hash
@@ -108,12 +121,17 @@ export function createJournalService(database: Database, orgId: string) {
   async function postEntryInner(
     input: PostEntryInput,
   ): Promise<Result<PostEntryResult, LedgerError>> {
-    // A first pass on structure alone — at least two legs, no zero amounts, no
-    // repeated account. It cannot check the balance for a cross-currency entry
-    // because it does not yet know the accounts' currencies, so the real
-    // balance check happens inside the transaction below and again at COMMIT.
-    const draft = validateDraft({ currency: input.currency, postings: input.postings });
-    if (!draft.ok && draft.error.code !== 'unbalanced_transaction') return draft;
+    /*
+     * Structural validation happens inside the transaction, not before it.
+     *
+     * It used to run here, to reject a malformed batch without paying for a
+     * transaction. That stopped being possible: every rule it checks now
+     * depends on the posting's *account currency* — whether an amount is
+     * representable, what it scales to, whether the entry balances — and the
+     * account rows are only in hand once the transaction is open. A batch
+     * that fails now costs one transaction that immediately rolls back, which
+     * is a fair price for a check that is actually correct.
+     */
 
     try {
       // `withTenant` opens the transaction and stamps it with the tenant, so
@@ -134,12 +152,17 @@ export function createJournalService(database: Database, orgId: string) {
         const resolved = resolveBaseAmounts(input.postings, accountRows, functional);
         if (!resolved.ok) throw new DomainAbort(resolved.error);
 
-        const balanced = validateDraft({ currency: functional, postings: resolved.value });
+        const adjusted = input.fxAdjustment
+          ? await appendFxAdjustment(tx, resolved.value, accountRows, functional)
+          : ok(resolved.value);
+        if (!adjusted.ok) throw new DomainAbort(adjusted.error);
+
+        const balanced = validateDraft({ currency: functional, postings: adjusted.value });
         if (!balanced.ok) throw new DomainAbort(balanced.error);
 
         const entry = await writeEntry(
           tx,
-          { ...input, currency: functional, postings: resolved.value },
+          { ...input, currency: functional, postings: adjusted.value },
           accountRows,
         );
 
@@ -228,7 +251,9 @@ export function createJournalService(database: Database, orgId: string) {
 
   async function writeEntry(
     tx: Transactional,
-    input: PostEntryInput,
+    // Resolved, not drafted: by this point every amount is scaled to its
+    // account's currency and every functional amount is decided.
+    input: Omit<PostEntryInput, 'postings'> & { postings: readonly ResolvedPosting[] },
     accountRows: Map<string, AccountRow>,
     reversesTransactionId?: string,
   ): Promise<TransactionDto> {
@@ -275,8 +300,8 @@ export function createJournalService(database: Database, orgId: string) {
         // The posting's own currency is its account's, not the entry's. That
         // is the whole change: an entry may now span several.
         currency: accountRows.get(posting.accountId)?.currency ?? input.currency,
-        baseAmountMinor: posting.baseAmount ?? posting.amount,
-        fxRate: posting.fxRate ?? '1',
+        baseAmountMinor: posting.baseAmount,
+        fxRate: posting.fxRate,
         sequence,
       }))
       .sort((left, right) => (left.accountId < right.accountId ? -1 : 1));
@@ -338,17 +363,45 @@ export function createJournalService(database: Database, orgId: string) {
     draftPostings: readonly DraftPosting[],
     accountRows: Map<string, AccountRow>,
     functional: CurrencyCode,
-  ): Result<DraftPosting[], LedgerError> {
-    const resolved: DraftPosting[] = [];
+  ): Result<ResolvedPosting[], LedgerError> {
+    const resolved: ResolvedPosting[] = [];
 
-    for (const posting of draftPostings) {
-      const account = accountRows.get(posting.accountId);
-      if (!account) return err({ code: 'account_not_found', accountId: posting.accountId });
+    for (const draft of draftPostings) {
+      const account = accountRows.get(draft.accountId);
+      if (!account) return err({ code: 'account_not_found', accountId: draft.accountId });
 
       const accountCurrency = account.currency as CurrencyCode;
 
+      /*
+       * Rescale the amount against the account's own currency.
+       *
+       * The HTTP layer scaled it against the entry's currency because that is
+       * all it knew. `"40000.00"` is 4,000,000 minor units of USD and 40,000
+       * of VND, so for an account whose exponent differs from the entry's the
+       * provisional value is out by a factor of a hundred. Redone here, where
+       * the account row says what the currency actually is.
+       */
+      const posting = draft;
+      const amount =
+        draft.amountDecimal !== undefined && draft.direction !== undefined
+          ? toSignedMinorUnits(draft.amountDecimal, draft.direction, accountCurrency)
+          : draft.amount;
+
+      if (amount === undefined) {
+        // More decimal places than the currency allows: "10.005" in a
+        // two-place currency, or any fraction of a dong. Reported against the
+        // *account's* currency, which is the one that makes it
+        // unrepresentable — the entry's may well have room for it.
+        return err({
+          code: 'amount_not_representable',
+          accountId: draft.accountId,
+          amount: draft.amountDecimal ?? String(draft.amount),
+          currency: accountCurrency,
+        });
+      }
+
       if (accountCurrency === functional) {
-        if (posting.baseAmount !== undefined && posting.baseAmount !== posting.amount) {
+        if (posting.baseAmount !== undefined && posting.baseAmount !== amount) {
           return err({
             code: 'currency_mismatch',
             expected: functional,
@@ -356,12 +409,22 @@ export function createJournalService(database: Database, orgId: string) {
             accountId: posting.accountId,
           });
         }
-        resolved.push({ ...posting, baseAmount: posting.amount, fxRate: '1' });
+        resolved.push({
+          accountId: posting.accountId,
+          amount,
+          baseAmount: amount,
+          fxRate: '1',
+        });
         continue;
       }
 
       if (posting.baseAmount !== undefined) {
-        resolved.push({ ...posting, fxRate: posting.fxRate ?? impliedRate(posting) });
+        resolved.push({
+          accountId: posting.accountId,
+          amount,
+          baseAmount: posting.baseAmount,
+          fxRate: posting.fxRate ?? impliedRate(amount, posting.baseAmount),
+        });
         continue;
       }
 
@@ -380,17 +443,83 @@ export function createJournalService(database: Database, orgId: string) {
       }
 
       resolved.push({
-        ...posting,
-        baseAmount: convert({
-          amount: posting.amount,
-          from: accountCurrency,
-          to: functional,
-          rate,
-        }),
+        accountId: posting.accountId,
+        amount,
+        baseAmount: convert({ amount, from: accountCurrency, to: functional, rate }),
+        fxRate: posting.fxRate,
       });
     }
 
     return ok(resolved);
+  }
+
+  /**
+   * Absorbs a functional-currency difference into the FX gain/loss account.
+   *
+   * A settlement entry looks like this: clear a 40,000 USD payable that was
+   * booked at 25,400 dong, paying from a dollar account whose dollars are now
+   * worth 25,700. The dollars cancel exactly — 40,000 in, 40,000 out — while
+   * the functional amounts differ by twelve million dong. That difference is a
+   * real loss, and it belongs on the income statement rather than in a
+   * suspense account nobody reads.
+   *
+   * ## When this is safe, exactly
+   *
+   * Only when the entry already balances *within every transaction currency*.
+   *
+   * That condition is not a heuristic. If the dollars net to zero and the dong
+   * net to zero, yet the functional totals do not, the only thing that can
+   * have caused it is two different rates applied to the same amount — which
+   * is precisely an exchange difference. A mistyped amount leaves a currency
+   * unbalanced, so it fails this check and is refused as it always was. The
+   * plug cannot swallow a typo, which is the property that makes an automatic
+   * adjustment defensible at all.
+   *
+   * A posting already in the functional currency contributes to both sums, so
+   * an entry with no foreign leg can never reach here with work to do.
+   */
+  async function appendFxAdjustment(
+    tx: Transactional,
+    draftPostings: readonly ResolvedPosting[],
+    accountRows: Map<string, AccountRow>,
+    functional: CurrencyCode,
+  ): Promise<Result<ResolvedPosting[], LedgerError>> {
+    const byCurrency = new Map<CurrencyCode, bigint>();
+    let baseResidual = 0n;
+
+    for (const posting of draftPostings) {
+      const currency = (accountRows.get(posting.accountId)?.currency ?? functional) as CurrencyCode;
+      byCurrency.set(currency, (byCurrency.get(currency) ?? 0n) + BigInt(posting.amount));
+      baseResidual += BigInt(posting.baseAmount);
+    }
+
+    for (const [currency, residual] of byCurrency) {
+      if (residual !== 0n) {
+        return err({
+          code: 'currency_imbalance',
+          currency,
+          residual: toDecimalString(residual as MinorUnits, currency),
+        });
+      }
+    }
+
+    if (baseResidual === 0n) return ok([...draftPostings]);
+
+    const [fxAccount] = await tx
+      .select({ id: accounts.id, currency: accounts.currency })
+      .from(accounts)
+      .where(eq(accounts.role, 'fx_gain_loss'))
+      .limit(1);
+    if (!fxAccount) return err({ code: 'fx_account_missing' });
+
+    // The adjustment is denominated in the functional currency, so its own
+    // amount and base amount are the same number and its rate is one. It is
+    // the residual negated: whatever the entry is short, this supplies.
+    const amount = -baseResidual as MinorUnits;
+    return ok([
+      ...draftPostings,
+      { accountId: fxAccount.id, amount, baseAmount: amount, fxRate: '1' },
+    ]);
   }
 
   /**
@@ -400,10 +529,9 @@ export function createJournalService(database: Database, orgId: string) {
    * both amounts has implicitly decided the rate, and asking them to restate
    * it is asking for a third number that can disagree with the other two.
    */
-  function impliedRate(posting: DraftPosting): string {
-    const base = posting.baseAmount ?? posting.amount;
-    if (posting.amount === 0n) return '1';
-    const scaled = (BigInt(base) * 10n ** 10n) / BigInt(posting.amount);
+  function impliedRate(amount: MinorUnits, baseAmount: MinorUnits): string {
+    if (amount === 0n) return '1';
+    const scaled = (BigInt(baseAmount) * 10n ** 10n) / BigInt(amount);
     const whole = scaled / 10n ** 10n;
     const fraction = (scaled % 10n ** 10n).toString().padStart(10, '0').replace(/0+$/u, '');
     const magnitude = fraction ? `${whole}.${fraction}` : String(whole);
@@ -458,7 +586,7 @@ export function createJournalService(database: Database, orgId: string) {
    */
   function assertNoOverdraft(
     currency: CurrencyCode,
-    draftPostings: readonly DraftPosting[],
+    draftPostings: readonly ResolvedPosting[],
     accountRows: Map<string, AccountRow>,
   ): void {
     const deltas = new Map<string, bigint>();
@@ -576,10 +704,22 @@ export function createJournalService(database: Database, orgId: string) {
             description: input.description ?? `Reversal of ${original.description}`,
             currency: original.currency as CurrencyCode,
             ...(input.occurredAt ? { occurredAt: input.occurredAt } : {}),
-            // The mirror image: every amount negated, order preserved.
+            /*
+             * The mirror image: every amount negated, order preserved — and
+             * the *original's* functional amounts and rates carried across,
+             * not recomputed.
+             *
+             * Reconverting at today's rate would be the obvious thing and
+             * would be wrong: a reversal exists to cancel an entry exactly,
+             * and a rate that has moved since would leave a residual behind.
+             * Whether that residual is a real gain is a separate question with
+             * a separate entry — see the FX adjustment.
+             */
             postings: original_postings.map((posting) => ({
               accountId: posting.accountId,
               amount: -posting.amountMinor as MinorUnits,
+              baseAmount: -posting.baseAmountMinor as MinorUnits,
+              fxRate: String(posting.fxRate),
             })),
           },
           accountRows,

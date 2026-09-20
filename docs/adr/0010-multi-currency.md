@@ -108,12 +108,12 @@ in VND — that is the account's reality, and translating it would be answering 
 question nobody asked. The functional amount travels alongside for anyone
 reconciling to the consolidated accounts.
 
-**Realized FX gain and loss is a later, separate decision.** When a foreign
-receivable settles at a rate different from the one it was booked at, the
-difference is real income. That needs an account role and a settlement path,
-and folding it into this change would mean shipping two models at once.
-Unrealized gain — revaluing open foreign balances at a period-end rate — hangs
-off the period close and comes after that.
+**Realized FX gain and loss follows immediately**, in migrations 0011 and 0012. When a foreign payable settles at a rate different from the one it was
+booked at, the difference is real income or expense, and a designated account
+absorbs it — but only when the entry already balances within every transaction
+currency, which is the condition that makes an automatic adjustment incapable
+of hiding a typo. Unrealized gain, revaluing open foreign balances at a
+period-end rate, hangs off the period close and comes after that.
 
 **Existing data migrates only if it is unambiguous.** The backfill sets
 `base_amount_minor = amount_minor` and `fx_rate = 1` for every posting whose

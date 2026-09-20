@@ -68,6 +68,14 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
   },
   invalid_fx_rate: { code: 'invalid_fx_rate', accountId: 'acct_x', rate: 'abc' },
   rate_not_found: { code: 'rate_not_found', base: 'USD', quote: 'VND' },
+  fx_account_missing: { code: 'fx_account_missing' },
+  amount_not_representable: {
+    code: 'amount_not_representable',
+    accountId: 'acct_x',
+    amount: '10.005',
+    currency: 'USD',
+  },
+  currency_imbalance: { code: 'currency_imbalance', currency: 'USD', residual: '1.00' },
 };
 
 const variants = Object.values(EVERY_VARIANT);

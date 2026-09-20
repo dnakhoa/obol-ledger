@@ -66,10 +66,27 @@ export const createAccountSchema = z.object({
 
 export type CreateAccountBody = z.infer<typeof createAccountSchema>;
 
+/** A rate as a decimal string: ten places, matching `numeric(20, 10)`. */
+const fxRateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d+(\.\d{1,10})?$/u, { message: 'Expected a positive decimal with up to 10 places' });
+
 const postingSchema = z.object({
   accountId: accountIdSchema,
   direction: z.enum(['debit', 'credit']),
+  /** In the *account's* currency, which need not be the entry's. */
   amount: decimalAmountSchema,
+  /**
+   * What this posting was worth in the organisation's functional currency.
+   *
+   * Required for a posting on a foreign account unless `fxRate` is given.
+   * Supplying it rather than a rate is how a caller keeps ownership of the
+   * rounding — see `docs/adr/0010-multi-currency.md`.
+   */
+  baseAmount: decimalAmountSchema.optional(),
+  /** Converted with, when `baseAmount` is absent. Ten decimal places. */
+  fxRate: fxRateSchema.optional(),
 });
 
 export const createEntrySchema = z.object({
@@ -77,6 +94,14 @@ export const createEntrySchema = z.object({
   currency: currencySchema,
   occurredAt: z.iso.datetime({ offset: true }).optional(),
   postings: z.array(postingSchema).min(2).max(64),
+  /**
+   * Absorb a functional-currency difference into the FX gain/loss account.
+   *
+   * Only legal when the entry already balances within every transaction
+   * currency — otherwise the adjustment would hide a mistyped amount, which
+   * is the failure mode that makes automatic plugs untrustworthy.
+   */
+  fxAdjustment: z.boolean().default(false),
   /**
    * `pending` reserves the funds without moving them — an authorisation.
    * `posted` settles immediately. Defaults to posted so an ordinary transfer
