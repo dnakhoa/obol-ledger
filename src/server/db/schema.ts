@@ -367,6 +367,25 @@ export const webhookDeliveries = pgTable(
   ],
 );
 
+/**
+ * Shared rate-limit counters.
+ *
+ * Not tenant data and carrying no policy: the key is a client and a route, and
+ * the check runs before a tenant is resolved. See `drizzle/0008_rate_limits.sql`.
+ */
+export const rateLimits = pgTable(
+  'rate_limits',
+  {
+    key: text('key').primaryKey(),
+    windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+    count: integer('count').notNull().default(0),
+    /** The window before this one, weighted by elapsed time into the current. */
+    previousCount: integer('previous_count').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('rate_limits_updated_at_idx').on(table.updatedAt)],
+);
+
 export const accountsRelations = relations(accounts, ({ many }) => ({
   postings: many(postings),
 }));

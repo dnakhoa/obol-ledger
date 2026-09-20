@@ -51,9 +51,6 @@ complete enough to close a book with.
 
 Things a reviewer should know without having to find them:
 
-- **Rate limiting is in-process.** Fine on a single instance, wrong across
-  several — each one would allow the full quota. The correct fix is a shared
-  counter; the current one is a fixed window with a comment saying so.
 - **The demo tenant accepts unauthenticated writes** through the dashboard's
   server actions. That is a deliberate choice so the deployment is explorable,
   not an authorisation model to copy.

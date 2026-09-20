@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { createLogger, type Logger } from '@/server/observability/logger';
 import { authenticate, type Authenticated } from './auth';
 import { servicesFor, type Services } from '@/server/container';
-import { rateLimit, rateLimitProblem } from './rate-limit';
+import { rateLimitProblem } from './rate-limit';
+import { durableRateLimit } from './durable-rate-limit';
+import { db } from '@/server/db/client';
 import { problem, problemResponse } from './problem';
 
 /**
@@ -67,7 +69,12 @@ export function defineRoute<Params = Record<string, never>>(
 
     try {
       if (options.rateLimit !== false) {
-        const decision = rateLimit(clientKey(request));
+        // Counted in Postgres so every instance shares one quota, with the
+        // in-process window kept as a pre-check that can only reject. If the
+        // counter is unreachable the decision degrades to that local answer
+        // rather than refusing everything — see `durable-rate-limit.ts`.
+        const decision = await durableRateLimit(db(), clientKey(request));
+        if (decision.degraded) log.warn('ratelimit.degraded', { key: options.name });
         if (!decision.allowed) {
           return finish(
             problemResponse(

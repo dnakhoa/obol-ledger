@@ -1,14 +1,20 @@
 import { problem, type Problem } from './problem';
 
 /**
- * A fixed-window rate limiter held in process memory.
+ * A fixed-window counter held in process memory, used as a *pre-check*.
  *
- * Its limits are worth stating plainly rather than discovering in production:
- * the counter lives in one serverless instance, so N instances allow N times
- * the quota, and a cold start resets it. That is an acceptable trade for a
- * demonstration ledger whose goal is to blunt accidental floods — a real
- * deployment moves the counter to Redis or the platform's own edge limiter, and
- * only this module changes.
+ * On its own this is wrong in a specific way: the counter lives in one
+ * serverless instance, so N instances allow N times the quota and a cold start
+ * hands a client a fresh allowance. `durable-rate-limit.ts` is the authority;
+ * this exists in front of it for two reasons.
+ *
+ * It can reject without a round trip. A local count is a subset of the shared
+ * one, so "already over here" implies "over there" — the implication only runs
+ * that way, which is why this may refuse but never grant. Under a flood that
+ * bounds database work at roughly `limit` writes per client per window.
+ *
+ * And it is what the system falls back to when the shared counter is
+ * unreachable, so a database blip degrades the limiter rather than removing it.
  */
 export type RateLimitDecision =
   | { readonly allowed: true; readonly remaining: number; readonly resetAt: number }
