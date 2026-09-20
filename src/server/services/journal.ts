@@ -6,6 +6,8 @@ import { deriveBalances, presentedBalance, type AccountType } from '@/server/dom
 import type { LedgerError } from '@/server/domain/errors';
 import { canTransition, type TransactionStatus } from '@/server/domain/transaction-status';
 import { validateDraft, type DraftPosting } from '@/server/domain/transaction';
+import { convert, parseRate } from '@/lib/fx';
+import { organizations } from '@/server/db/schema';
 import { accounts, idempotencyKeys, postings, transactions } from '@/server/db/schema';
 import type { AccountRow } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
@@ -106,8 +108,12 @@ export function createJournalService(database: Database, orgId: string) {
   async function postEntryInner(
     input: PostEntryInput,
   ): Promise<Result<PostEntryResult, LedgerError>> {
+    // A first pass on structure alone — at least two legs, no zero amounts, no
+    // repeated account. It cannot check the balance for a cross-currency entry
+    // because it does not yet know the accounts' currencies, so the real
+    // balance check happens inside the transaction below and again at COMMIT.
     const draft = validateDraft({ currency: input.currency, postings: input.postings });
-    if (!draft.ok) return draft;
+    if (!draft.ok && draft.error.code !== 'unbalanced_transaction') return draft;
 
     try {
       // `withTenant` opens the transaction and stamps it with the tenant, so
@@ -119,7 +125,23 @@ export function createJournalService(database: Database, orgId: string) {
         }
 
         const accountRows = await loadAccounts(tx, input.postings);
-        const entry = await writeEntry(tx, input, accountRows);
+
+        // Base amounts are resolved here rather than in the pure validator,
+        // because only this layer knows each account's currency. The draft is
+        // then re-validated against them, so the balance rule is enforced in
+        // the functional currency by the domain as well as by the database.
+        const functional = await functionalCurrency(tx);
+        const resolved = resolveBaseAmounts(input.postings, accountRows, functional);
+        if (!resolved.ok) throw new DomainAbort(resolved.error);
+
+        const balanced = validateDraft({ currency: functional, postings: resolved.value });
+        if (!balanced.ok) throw new DomainAbort(balanced.error);
+
+        const entry = await writeEntry(
+          tx,
+          { ...input, currency: functional, postings: resolved.value },
+          accountRows,
+        );
 
         if (input.idempotency) {
           await tx
@@ -210,7 +232,6 @@ export function createJournalService(database: Database, orgId: string) {
     accountRows: Map<string, AccountRow>,
     reversesTransactionId?: string,
   ): Promise<TransactionDto> {
-    assertCurrenciesMatch(input.currency, input.postings, accountRows);
     assertVersions(input.expectedVersions, accountRows);
     assertNoOverdraft(input.currency, input.postings, accountRows);
 
@@ -251,7 +272,11 @@ export function createJournalService(database: Database, orgId: string) {
         transactionId,
         accountId: posting.accountId,
         amountMinor: posting.amount,
-        currency: input.currency,
+        // The posting's own currency is its account's, not the entry's. That
+        // is the whole change: an entry may now span several.
+        currency: accountRows.get(posting.accountId)?.currency ?? input.currency,
+        baseAmountMinor: posting.baseAmount ?? posting.amount,
+        fxRate: posting.fxRate ?? '1',
         sequence,
       }))
       .sort((left, right) => (left.accountId < right.accountId ? -1 : 1));
@@ -259,7 +284,9 @@ export function createJournalService(database: Database, orgId: string) {
     const postingRows = await tx.insert(postings).values(rows).returning();
 
     const dtos = postingRows
-      .map((row) => toPostingDto(row, accountRows.get(row.accountId)?.name ?? 'unknown'))
+      .map((row) =>
+        toPostingDto(row, accountRows.get(row.accountId)?.name ?? 'unknown', input.currency),
+      )
       .sort((left, right) => left.sequence - right.sequence);
 
     const dto = toTransactionDto(transactionRow, dtos);
@@ -280,22 +307,107 @@ export function createJournalService(database: Database, orgId: string) {
     return dto;
   }
 
-  function assertCurrenciesMatch(
-    currency: CurrencyCode,
+  /** The currency this tenant keeps its books in. */
+  async function functionalCurrency(tx: Transactional): Promise<CurrencyCode> {
+    const [row] = await tx
+      .select({ currency: organizations.functionalCurrency })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+    return (row?.currency ?? 'USD') as CurrencyCode;
+  }
+
+  /**
+   * Fills in each posting's functional-currency amount.
+   *
+   * Three cases, in order of how often they happen:
+   *
+   *  - The account is already in the functional currency. The amount *is* the
+   *    base amount, at a rate of one, and a caller who supplies a different
+   *    one is told rather than quietly overruled.
+   *  - The caller supplied a base amount. It is taken as given — that is the
+   *    contract, and it is what lets the caller own the rounding policy.
+   *  - The caller supplied a rate. The service converts, which is the
+   *    convenience layer the ADR describes: visible, replaceable, and not the
+   *    thing the constraint trusts.
+   *
+   * A foreign posting with neither is refused. Guessing a rate here would
+   * produce a ledger that balances and lies.
+   */
+  function resolveBaseAmounts(
     draftPostings: readonly DraftPosting[],
     accountRows: Map<string, AccountRow>,
-  ): void {
+    functional: CurrencyCode,
+  ): Result<DraftPosting[], LedgerError> {
+    const resolved: DraftPosting[] = [];
+
     for (const posting of draftPostings) {
       const account = accountRows.get(posting.accountId);
-      if (account && account.currency !== currency) {
-        throw new DomainAbort({
-          code: 'currency_mismatch',
-          expected: account.currency as CurrencyCode,
-          received: currency,
+      if (!account) return err({ code: 'account_not_found', accountId: posting.accountId });
+
+      const accountCurrency = account.currency as CurrencyCode;
+
+      if (accountCurrency === functional) {
+        if (posting.baseAmount !== undefined && posting.baseAmount !== posting.amount) {
+          return err({
+            code: 'currency_mismatch',
+            expected: functional,
+            received: accountCurrency,
+            accountId: posting.accountId,
+          });
+        }
+        resolved.push({ ...posting, baseAmount: posting.amount, fxRate: '1' });
+        continue;
+      }
+
+      if (posting.baseAmount !== undefined) {
+        resolved.push({ ...posting, fxRate: posting.fxRate ?? impliedRate(posting) });
+        continue;
+      }
+
+      if (posting.fxRate === undefined) {
+        return err({
+          code: 'fx_rate_required',
           accountId: posting.accountId,
+          currency: accountCurrency,
+          functional,
         });
       }
+
+      const rate = parseRate(posting.fxRate);
+      if (typeof rate !== 'bigint') {
+        return err({ code: 'invalid_fx_rate', accountId: posting.accountId, rate: posting.fxRate });
+      }
+
+      resolved.push({
+        ...posting,
+        baseAmount: convert({
+          amount: posting.amount,
+          from: accountCurrency,
+          to: functional,
+          rate,
+        }),
+      });
     }
+
+    return ok(resolved);
+  }
+
+  /**
+   * The rate a supplied base amount implies, recorded for audit.
+   *
+   * Derived rather than demanded, because a caller who has already decided
+   * both amounts has implicitly decided the rate, and asking them to restate
+   * it is asking for a third number that can disagree with the other two.
+   */
+  function impliedRate(posting: DraftPosting): string {
+    const base = posting.baseAmount ?? posting.amount;
+    if (posting.amount === 0n) return '1';
+    const scaled = (BigInt(base) * 10n ** 10n) / BigInt(posting.amount);
+    const whole = scaled / 10n ** 10n;
+    const fraction = (scaled % 10n ** 10n).toString().padStart(10, '0').replace(/0+$/u, '');
+    const magnitude = fraction ? `${whole}.${fraction}` : String(whole);
+    return magnitude.startsWith('-') ? magnitude.slice(1) : magnitude;
   }
 
   /**
@@ -712,10 +824,18 @@ async function hydrate(
     .where(inArray(postings.transactionId, ids))
     .orderBy(asc(postings.transactionId), asc(postings.sequence));
 
+  // An entry's own currency *is* the functional currency — that is what the
+  // column means since migration 0010, and it is what a posting's base amount
+  // is denominated in. Read from the entry rather than fetched again, so a
+  // page of entries costs no extra query.
+  const functionalOf = new Map(rows.map((row) => [row.id, row.currency as CurrencyCode]));
+
   const byTransaction = new Map<string, ReturnType<typeof toPostingDto>[]>();
   for (const line of lines) {
     const bucket = byTransaction.get(line.posting.transactionId) ?? [];
-    bucket.push(toPostingDto(line.posting, line.accountName));
+    bucket.push(
+      toPostingDto(line.posting, line.accountName, functionalOf.get(line.posting.transactionId)),
+    );
     byTransaction.set(line.posting.transactionId, bucket);
   }
 

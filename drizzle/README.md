@@ -21,3 +21,14 @@ the database actually is. When they disagree, the SQL wins.
 The snapshot files a generator would keep here were stale and have been
 removed; `meta/_journal.json` stays, because the migrator uses it to decide
 what is pending. A new migration adds its file and one journal entry.
+
+## Editing an applied migration does nothing
+
+The migrator records what it has run and skips those files without looking at
+them again, so appending to a migration that has already been applied is a
+**silent no-op** — no error, no warning, and `migrations applied` in the log.
+The change lands on a fresh database (CI, a new environment) and never on one
+that has already seen the file, which is the worst possible split.
+
+If a migration is still unreleased and you want to keep it in one file, drop
+and recreate the local database. Otherwise write the next migration.

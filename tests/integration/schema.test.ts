@@ -50,10 +50,10 @@ describe('schema invariants', () => {
         VALUES ('txn_unbalanced', ${org}, 'bad', 'USD', now())
       `);
       await tx.execute(sql`
-        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, base_amount_minor, fx_rate, sequence)
         VALUES
-          ('post_a', ${org}, 'txn_unbalanced', 'acct_cash',      1000, 'USD', 0),
-          ('post_b', ${org}, 'txn_unbalanced', 'acct_revenue', 0 - 999, 'USD', 1)
+          ('post_a', ${org}, 'txn_unbalanced', 'acct_cash',      1000, 'USD',       1000, 1, 0),
+          ('post_b', ${org}, 'txn_unbalanced', 'acct_revenue', 0 - 999, 'USD',  0 - 999, 1, 1)
       `);
     });
 
@@ -69,20 +69,25 @@ describe('schema invariants', () => {
       // acct_revenue allows overdraft, so nothing but the double-entry rule
       // itself can reject this row.
       await tx.execute(sql`
-        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
-        VALUES ('post_single', ${org}, 'txn_single', 'acct_revenue', 1000, 'USD', 0)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, base_amount_minor, fx_rate, sequence)
+        VALUES ('post_single', ${org}, 'txn_single', 'acct_revenue', 1000, 'USD',  1000, 1, 0)
       `);
     });
 
     await expectDatabaseError(oneSided, /requires at least two/);
   });
 
-  it('makes a cross-currency posting unrepresentable', async () => {
+  it('keeps a posting out of an account that does not hold its currency', async () => {
     // acct_eur holds EUR, so the composite foreign key has no row to point at.
+    //
+    // The sibling key on `(transaction_id, currency)` was dropped in migration
+    // 0010 — it was what made a *cross-currency entry* unrepresentable, which
+    // is now the point of the model. This one stays: an entry may span
+    // currencies, a posting may not contradict its account.
     await expectDatabaseError(
       db.execute(sql`
-        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
-        VALUES ('post_x', ${org}, 'txn_seed', 'acct_eur', 100, 'USD', 99)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, base_amount_minor, fx_rate, sequence)
+        VALUES ('post_x', ${org}, 'txn_seed', 'acct_eur', 100, 'USD',  100, 1, 99)
       `),
       /postings_account_currency_fk/,
     );
@@ -95,10 +100,10 @@ describe('schema invariants', () => {
         VALUES ('txn_good', ${org}, 'sale', 'USD', now())
       `);
       await tx.execute(sql`
-        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, base_amount_minor, fx_rate, sequence)
         VALUES
-          ('post_c', ${org}, 'txn_good', 'acct_cash',        2500, 'USD', 0),
-          ('post_d', ${org}, 'txn_good', 'acct_revenue', 0 - 2500, 'USD', 1)
+          ('post_c', ${org}, 'txn_good', 'acct_cash',        2500, 'USD',         2500, 1, 0),
+          ('post_d', ${org}, 'txn_good', 'acct_revenue', 0 - 2500, 'USD',  0 - 2500, 1, 1)
       `);
     });
 
@@ -124,10 +129,10 @@ describe('schema invariants', () => {
         VALUES ('txn_overdraw', ${org}, 'too much', 'USD', now())
       `);
       await tx.execute(sql`
-        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, base_amount_minor, fx_rate, sequence)
         VALUES
-          ('post_e', ${org}, 'txn_overdraw', 'acct_cash', 0 - 999999, 'USD', 0),
-          ('post_f', ${org}, 'txn_overdraw', 'acct_loan',     999999, 'USD', 1)
+          ('post_e', ${org}, 'txn_overdraw', 'acct_cash', 0 - 999999, 'USD',  0 - 999999, 1, 0),
+          ('post_f', ${org}, 'txn_overdraw', 'acct_loan',     999999, 'USD',      999999, 1, 1)
       `);
     });
 
@@ -149,8 +154,8 @@ describe('schema invariants', () => {
     await db.execute(sql`UPDATE accounts SET status = 'closed' WHERE id = 'acct_loan'`);
     await expectDatabaseError(
       db.execute(sql`
-        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, sequence)
-        VALUES ('post_g', ${org}, 'txn_seed', 'acct_loan', 100, 'USD', 98)
+        INSERT INTO postings (id, org_id, transaction_id, account_id, amount_minor, currency, base_amount_minor, fx_rate, sequence)
+        VALUES ('post_g', ${org}, 'txn_seed', 'acct_loan', 100, 'USD',  100, 1, 98)
       `),
       /is closed/,
     );

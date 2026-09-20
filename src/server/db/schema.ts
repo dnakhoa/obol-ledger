@@ -3,6 +3,7 @@ import {
   boolean,
   char,
   date,
+  numeric,
   foreignKey,
   index,
   integer,
@@ -56,8 +57,55 @@ export const organizations = pgTable('organizations', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
+  /**
+   * The currency the books are kept in.
+   *
+   * Every posting is also measured in this, and the balance rule applies to
+   * that measurement — across currencies, "sums to zero" needs a unit. See
+   * `docs/adr/0010-multi-currency.md`.
+   */
+  functionalCurrency: char('functional_currency', { length: 3 }).notNull().default('USD'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Rates as point-in-time facts, never updated.
+ *
+ * A rate that changes is a new row with a later `as_of`, and a lookup asks for
+ * the most recent one at or before the entry's date — so re-running last
+ * quarter's reports uses last quarter's rates, which is the only way a
+ * restated figure can be explained.
+ */
+export const exchangeRates = pgTable(
+  'exchange_rates',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    baseCurrency: char('base_currency', { length: 3 }).notNull(),
+    quoteCurrency: char('quote_currency', { length: 3 }).notNull(),
+    /** One unit of base is worth this many of quote. Numeric, never a float. */
+    rate: numeric('rate', { precision: 20, scale: 10 }).notNull(),
+    asOf: date('as_of').notNull(),
+    /** Where it came from: a provider, a contract, a customs declaration. */
+    source: text('source').notNull().default('manual'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('exchange_rates_unique_key').on(
+      table.orgId,
+      table.baseCurrency,
+      table.quoteCurrency,
+      table.asOf,
+      table.source,
+    ),
+    index('exchange_rates_lookup_idx').on(
+      table.orgId,
+      table.baseCurrency,
+      table.quoteCurrency,
+      table.asOf,
+    ),
+  ],
+);
 
 /**
  * An API credential, stored as a SHA-256 digest rather than in the clear.
@@ -121,6 +169,17 @@ export const accounts = pgTable(
      * Trigger-maintained. Pending entries are not included here.
      */
     balanceMinor: bigint('balance_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    /**
+     * The same balance in the organisation's functional currency.
+     *
+     * Maintained by the same trigger, so the two cannot drift apart. Without
+     * it the trial balance has nothing to sum: adding a dong balance to a
+     * dollar balance produces a number with no meaning, and it only ever
+     * looked right because every account was USD.
+     */
+    baseBalanceMinor: bigint('base_balance_minor', { mode: 'bigint' })
       .notNull()
       .default(sql`0`),
     /**
@@ -223,16 +282,26 @@ export const postings = pgTable(
     /** Signed minor units: positive debits the account, negative credits it. */
     amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
     currency: char('currency', { length: 3 }).notNull(),
+    /**
+     * The same movement, measured in the organisation's functional currency.
+     *
+     * This is what the balance rule checks. Supplied rather than computed
+     * here — rounding a rate multiplication per leg is how an entry stops
+     * summing to zero, and where that cent goes is an accounting policy
+     * rather than arithmetic. See `docs/adr/0010-multi-currency.md`.
+     */
+    baseAmountMinor: bigint('base_amount_minor', { mode: 'bigint' }).notNull(),
+    /** The rate used, recorded for audit. Nothing is checked against it. */
+    fxRate: numeric('fx_rate', { precision: 20, scale: 10 }).notNull(),
     /** Position within the entry, so a journal renders in the order it was written. */
     sequence: integer('sequence').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    foreignKey({
-      name: 'postings_transaction_currency_fk',
-      columns: [table.transactionId, table.currency],
-      foreignColumns: [transactions.id, transactions.currency],
-    }).onDelete('restrict'),
+    // `(transaction_id, currency)` deliberately absent: it is the constraint
+    // that made a cross-currency entry unrepresentable, and dropping it is
+    // the substance of migration 0010. The account one stays — a posting
+    // still cannot be denominated in a currency its account does not hold.
     foreignKey({
       name: 'postings_account_currency_fk',
       columns: [table.accountId, table.currency],
