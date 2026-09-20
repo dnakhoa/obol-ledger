@@ -1,0 +1,27 @@
+version: 2
+
+# Weekly rather than daily, and grouped.
+#
+# A separate pull request per patch bump produces a queue nobody reads, and an
+# unread queue is worse than no automation — it trains you to ignore the one
+# that matters. Grouping minor and patch updates into a single PR per ecosystem
+# keeps the signal where it belongs: a major bump arrives on its own, because
+# that is the one worth looking at.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
