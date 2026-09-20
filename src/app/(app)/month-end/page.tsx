@@ -6,7 +6,6 @@ import { ActionButton, RateForm, Step } from '@/components/month-end-steps';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
 import { viewerServices } from '@/server/container';
-import { Money } from '@/components/money';
 import { closeMonthAction, recordRateAction, reopenMonthAction, revalueAction } from './actions';
 
 export const metadata: Metadata = { title: 'Month end' };
@@ -77,7 +76,6 @@ export default async function MonthEndPage() {
       )
     : [];
   const ratesReady = ratesAtMonthEnd.length === foreignCurrencies.length;
-  const revalued = Boolean(current && periods.find((p) => p.id === current.id)?.closedAt === null);
 
   return (
     <>
