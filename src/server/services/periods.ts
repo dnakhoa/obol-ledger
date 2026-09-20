@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { err, ok, type Result } from '@/lib/result';
 import { newId } from '@/lib/id';
 import type { MinorUnits, CurrencyCode } from '@/lib/money';
+import { ledgerMessages, type Locale } from '@/lib/i18n';
 import type { LedgerError } from '@/server/domain/errors';
 import {
   endOfMonth,
@@ -236,7 +237,7 @@ export function createPeriodService(database: Database, orgId: string) {
         if (row.closingTransactionId) {
           const reversal = await journalIn(tx).reverseEntry({
             transactionId: row.closingTransactionId,
-            description: `Reopening ${periodMonth.slice(0, 7)}`,
+            description: ledgerMessages(await booksLocale(tx)).reopening(periodMonth.slice(0, 7)),
             /*
              * Dated inside the month being reopened, not today.
              *
@@ -354,6 +355,16 @@ export function createPeriodService(database: Database, orgId: string) {
    * the same deferred constraint and the same overdraft check as an entry
    * somebody typed.
    */
+  /** The language this tenant keeps its books in; see ADR 14. */
+  async function booksLocale(tx: Transactional): Promise<Locale> {
+    const [row] = await tx
+      .select({ locale: organizations.locale })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+    return row?.locale ?? 'en';
+  }
+
   async function postClosingEntry(
     tx: Transactional,
     input: {
@@ -376,7 +387,9 @@ export function createPeriodService(database: Database, orgId: string) {
     const residual = legs.reduce((total, leg) => total + BigInt(leg.amount), 0n);
 
     const result = await journalIn(tx).postEntry({
-      description: `Closing entry for ${input.periodMonth.slice(0, 7)}`,
+      description: ledgerMessages(await booksLocale(tx)).closingEntry(
+        input.periodMonth.slice(0, 7),
+      ),
       currency: input.currency,
       occurredAt: endOfMonth(input.periodMonth),
       metadata: { closingPeriod: input.periodMonth.slice(0, 7) },

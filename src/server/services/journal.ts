@@ -3,6 +3,7 @@ import { err, ok, type Result } from '@/lib/result';
 import { newId } from '@/lib/id';
 import { toDecimalString, type CurrencyCode, type MinorUnits } from '@/lib/money';
 import { deriveBalances, presentedBalance, type AccountType } from '@/server/domain/account';
+import { ledgerMessages, type Locale } from '@/lib/i18n';
 import type { LedgerError } from '@/server/domain/errors';
 import { canTransition, type TransactionStatus } from '@/server/domain/transaction-status';
 import {
@@ -330,6 +331,16 @@ export function createJournalService(database: Database, orgId: string) {
     });
 
     return dto;
+  }
+
+  /** The language this tenant keeps its books in; see ADR 14. */
+  async function booksLocale(tx: Transactional): Promise<Locale> {
+    const [row] = await tx
+      .select({ locale: organizations.locale })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+    return row?.locale ?? 'en';
   }
 
   /** The currency this tenant keeps its books in. */
@@ -701,7 +712,9 @@ export function createJournalService(database: Database, orgId: string) {
         const entry = await writeEntry(
           tx,
           {
-            description: input.description ?? `Reversal of ${original.description}`,
+            description:
+              input.description ??
+              ledgerMessages(await booksLocale(tx)).reversalOf(original.description),
             currency: original.currency as CurrencyCode,
             ...(input.occurredAt ? { occurredAt: input.occurredAt } : {}),
             /*

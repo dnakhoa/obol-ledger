@@ -22,18 +22,45 @@ import {
  * `'use client'` boundary here rather than on the layout means the sidebar
  * chrome, the header and every page body stay on the server.
  */
+/**
+ * The labels are a prop, not a lookup.
+ *
+ * This is the one Client Component in the shell, because it is the only part
+ * that needs the current path. Importing a dictionary here would pull every
+ * language into the client bundle to render ten words; passing the ten words
+ * in from the server costs nothing and keeps both dictionaries on the server.
+ */
+export type NavLabels = {
+  readonly primary: string;
+  readonly overview: string;
+  readonly accounts: string;
+  readonly stock: string;
+  readonly journal: string;
+  readonly reports: string;
+  readonly monthEnd: string;
+  readonly newEntry: string;
+  readonly webhooks: string;
+  readonly api: string;
+  readonly settings: string;
+};
+
 const LINKS = [
-  { href: '/', label: 'Overview', Icon: GaugeIcon, exact: true },
-  { href: '/accounts', label: 'Accounts', Icon: AccountsIcon, exact: false },
-  { href: '/stock', label: 'Stock', Icon: StockIcon, exact: false },
-  { href: '/journal', label: 'Journal', Icon: JournalIcon, exact: false },
-  { href: '/reports', label: 'Reports', Icon: ReportsIcon, exact: false },
-  { href: '/month-end', label: 'Month end', Icon: CalendarIcon, exact: false },
-  { href: '/transfer', label: 'New entry', Icon: TransferIcon, exact: false },
-  { href: '/webhooks', label: 'Webhooks', Icon: WebhookIcon, exact: false },
-  { href: '/api-reference', label: 'API', Icon: ApiIcon, exact: false },
-  { href: '/settings', label: 'Settings', Icon: SettingsIcon, exact: false },
-] as const;
+  { href: '/', key: 'overview', Icon: GaugeIcon, exact: true },
+  { href: '/accounts', key: 'accounts', Icon: AccountsIcon, exact: false },
+  { href: '/stock', key: 'stock', Icon: StockIcon, exact: false },
+  { href: '/journal', key: 'journal', Icon: JournalIcon, exact: false },
+  { href: '/reports', key: 'reports', Icon: ReportsIcon, exact: false },
+  { href: '/month-end', key: 'monthEnd', Icon: CalendarIcon, exact: false },
+  { href: '/transfer', key: 'newEntry', Icon: TransferIcon, exact: false },
+  { href: '/webhooks', key: 'webhooks', Icon: WebhookIcon, exact: false },
+  { href: '/api-reference', key: 'api', Icon: ApiIcon, exact: false },
+  { href: '/settings', key: 'settings', Icon: SettingsIcon, exact: false },
+] as const satisfies readonly {
+  href: string;
+  key: keyof NavLabels;
+  Icon: unknown;
+  exact: boolean;
+}[];
 
 /**
  * The bottom bar caps at five, which is the practical ceiling before targets
@@ -59,12 +86,12 @@ function isActive(pathname: string, href: string, exact: boolean): boolean {
   return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SidebarNav() {
+export function SidebarNav({ labels }: { labels: NavLabels }) {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Primary" className="flex flex-col gap-0.5">
-      {LINKS.map(({ href, label, Icon, exact }) => {
+    <nav aria-label={labels.primary} className="flex flex-col gap-0.5">
+      {LINKS.map(({ href, key, Icon, exact }) => {
         const active = isActive(pathname, href, exact);
         return (
           <Link
@@ -79,7 +106,7 @@ export function SidebarNav() {
             )}
           >
             <Icon className="text-ink-muted shrink-0" />
-            {label}
+            {labels[key]}
           </Link>
         );
       })}
@@ -93,16 +120,16 @@ export function SidebarNav() {
  * Five items is the practical ceiling for a bottom bar — beyond that the
  * targets fall below a comfortable 44px — and the list is capped accordingly.
  */
-export function MobileNav() {
+export function MobileNav({ labels }: { labels: NavLabels }) {
   const pathname = usePathname();
 
   return (
     <nav
-      aria-label="Primary"
+      aria-label={labels.primary}
       className="border-line bg-surface/95 fixed inset-x-0 bottom-0 z-40 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
     >
       <ul className="mx-auto flex max-w-2xl">
-        {MOBILE_LINKS.map(({ href, label, Icon, exact }) => {
+        {MOBILE_LINKS.map(({ href, key, Icon, exact }) => {
           const active = isActive(pathname, href, exact);
           return (
             <li key={href} className="flex-1">
@@ -115,7 +142,7 @@ export function MobileNav() {
                 )}
               >
                 <Icon className={cn(active && 'text-ink')} />
-                {label}
+                {labels[key]}
               </Link>
             </li>
           );

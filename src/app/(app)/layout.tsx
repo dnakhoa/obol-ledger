@@ -2,10 +2,12 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MobileNav, SidebarNav } from '@/components/nav';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { LanguageToggle } from '@/components/language-toggle';
 import { CommandPalette, PaletteTrigger } from '@/components/command-palette';
 import { ViewerMenu } from '@/components/viewer-menu';
 import { currentViewer, orgName } from '@/server/auth/viewer';
 import { ScaleIcon } from '@/components/icons';
+import { translations } from '@/server/i18n';
 
 /**
  * The application shell.
@@ -26,6 +28,7 @@ import { ScaleIcon } from '@/components/icons';
 export const dynamic = 'force-dynamic';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
+  const { locale, t } = await translations();
   const viewer = await currentViewer();
   // An unenrolled account has no ledger to render a shell around, so the
   // pages send it to onboarding; the shell still needs a name for the header.
@@ -43,7 +46,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         href="#main"
         className="sr-only-focusable bg-action text-action-ink fixed top-3 left-3 z-50 rounded-lg px-3 py-2 text-sm font-medium"
       >
-        Skip to content
+        {t.common.skipToContent}
       </a>
 
       <aside className="border-line bg-surface sticky top-0 hidden h-dvh flex-col border-r lg:flex">
@@ -52,17 +55,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <span className="bg-action text-action-ink flex size-7 items-center justify-center rounded-md">
               <ScaleIcon width={15} height={15} />
             </span>
-            Obol
+            {t.common.appName}
           </Link>
         </div>
         <div className="px-3 pt-3">
           <PaletteTrigger />
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          <SidebarNav />
+          <SidebarNav labels={t.nav} />
         </div>
         <div className="border-line space-y-3 border-t p-3">
           <ViewerMenu {...identity} orgName={ledgerName} />
+          <LanguageToggle current={locale} label={t.common.language} />
           <ThemeToggle />
         </div>
       </aside>
@@ -73,10 +77,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <span className="bg-action text-action-ink flex size-7 items-center justify-center rounded-md">
               <ScaleIcon width={15} height={15} />
             </span>
-            Obol
+            {t.common.appName}
           </Link>
           <div className="flex items-center gap-2">
             <PaletteTrigger variant="icon" />
+            <LanguageToggle current={locale} label={t.common.language} />
             <ThemeToggle />
           </div>
         </header>
@@ -93,7 +98,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      <MobileNav />
+      <MobileNav labels={t.nav} />
     </div>
   );
 }

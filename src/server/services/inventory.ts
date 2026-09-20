@@ -5,6 +5,7 @@ import { convert, parseRate } from '@/lib/fx';
 import type { CurrencyCode, MinorUnits } from '@/lib/money';
 import { defaultPrecision, type Unit } from '@/lib/quantity';
 import { allocate, onHand, type CostLayer, type CostingMethod } from '@/server/domain/costing';
+import { ledgerMessages, type Locale } from '@/lib/i18n';
 import type { LedgerError } from '@/server/domain/errors';
 import {
   accounts,
@@ -230,7 +231,7 @@ export function createInventoryService(database: Database, orgId: string) {
         const entry = await createJournalService(tx, orgId).postEntry({
           description:
             input.description ??
-            `Stock received: ${item.value.name}${input.reference ? ` (${input.reference})` : ''}`,
+            ledgerMessages(org.locale).stockReceived(item.value.name, input.reference),
           currency: org.functionalCurrency,
           occurredAt,
           metadata: {
@@ -362,7 +363,7 @@ export function createInventoryService(database: Database, orgId: string) {
         const entry = await createJournalService(tx, orgId).postEntry({
           description:
             input.description ??
-            `Cost of goods sold: ${item.value.name}${input.reference ? ` (${input.reference})` : ''}`,
+            ledgerMessages(org.locale).costOfGoodsSold(item.value.name, input.reference),
           currency: org.functionalCurrency,
           occurredAt,
           metadata: {
@@ -506,6 +507,8 @@ type OrgRow = {
   chartTemplate: string;
   costingMethod: CostingMethod;
   functionalCurrency: CurrencyCode;
+  /** The language the *books* are in — see `docs/adr/0014-two-locales.md`. */
+  locale: Locale;
 };
 
 async function organisation(tx: Transactional, orgId: string): Promise<OrgRow> {
@@ -514,6 +517,7 @@ async function organisation(tx: Transactional, orgId: string): Promise<OrgRow> {
       chartTemplate: organizations.chartTemplate,
       costingMethod: organizations.costingMethod,
       functionalCurrency: organizations.functionalCurrency,
+      locale: organizations.locale,
     })
     .from(organizations)
     .where(eq(organizations.id, orgId))
@@ -523,6 +527,7 @@ async function organisation(tx: Transactional, orgId: string): Promise<OrgRow> {
     chartTemplate: row?.chartTemplate ?? 'generic',
     costingMethod: row?.costingMethod ?? 'fifo',
     functionalCurrency: (row?.functionalCurrency ?? 'USD') as CurrencyCode,
+    locale: row?.locale ?? 'en',
   };
 }
 

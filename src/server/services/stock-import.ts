@@ -3,6 +3,7 @@ import { err, ok, type Result } from '@/lib/result';
 import { parseTable, sniffSeparator } from '@/lib/csv';
 import { isCurrencyCode, parseDecimal, type CurrencyCode } from '@/lib/money';
 import { defaultPrecision, isUnit, parseQuantity, type Unit } from '@/lib/quantity';
+import { ledgerMessages, type Locale } from '@/lib/i18n';
 import { describe as describeError, type LedgerError } from '@/server/domain/errors';
 import { inventoryItems, organizations } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
@@ -128,6 +129,9 @@ export function createStockImportService(database: Database, orgId: string) {
           });
         }
 
+        // Written in the tenant's language, because it becomes the
+        // description on a posted entry rather than a label on a screen.
+        const ledger = ledgerMessages(await booksLocale(tx, orgId));
         const inventory = createInventoryService(tx, orgId);
         const byCode = await codes(tx);
         let products = 0;
@@ -172,7 +176,7 @@ export function createStockImportService(database: Database, orgId: string) {
             creditAccountId: input.creditAccountId,
             occurredAt: new Date(`${row.date}T12:00:00.000Z`),
             ...(row.reference ? { reference: row.reference } : {}),
-            description: `Nhập kho — imported delivery${row.reference ? ` ${row.reference}` : ''}`,
+            description: ledger.importedDelivery(row.reference),
           });
           if (!received.ok) {
             // Carried out with the line number attached, because "insufficient
@@ -196,6 +200,15 @@ export type ImportRefusal = {
   readonly code: 'import_has_problems';
   readonly problems: readonly { readonly line: number; readonly problem: string }[];
 };
+
+async function booksLocale(tx: Transactional, orgId: string): Promise<Locale> {
+  const [row] = await tx
+    .select({ locale: organizations.locale })
+    .from(organizations)
+    .where(eq(organizations.id, orgId))
+    .limit(1);
+  return row?.locale ?? 'en';
+}
 
 async function read(tx: Transactional, orgId: string, input: ImportInput): Promise<ImportPreview> {
   const separator = sniffSeparator(input.text);

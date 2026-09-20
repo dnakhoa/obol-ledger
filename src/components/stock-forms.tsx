@@ -6,6 +6,7 @@ import { Field, Input, Select } from './ui/field';
 import { AlertIcon, CheckIcon } from './icons';
 import { cn } from '@/lib/cn';
 import { SUPPORTED_UNITS, unitLabel } from '@/lib/quantity';
+import type { Messages } from '@/lib/i18n';
 import type { StockState } from '@/app/(app)/stock/actions';
 import { createItemAction, issueAction, receiveAction } from '@/app/(app)/stock/actions';
 
@@ -39,10 +40,18 @@ function Outcome({ state }: { state: StockState }) {
   );
 }
 
-function Submit({ children, pending }: { children: React.ReactNode; pending: boolean }) {
+function Submit({
+  children,
+  pending,
+  working,
+}: {
+  children: React.ReactNode;
+  pending: boolean;
+  working: string;
+}) {
   return (
     <Button type="submit" variant="primary" disabled={pending}>
-      {pending ? 'Working…' : children}
+      {pending ? working : children}
     </Button>
   );
 }
@@ -52,9 +61,14 @@ export type AccountOption = { readonly id: string; readonly label: string };
 export function AddProductForm({
   assetAccounts,
   expenseAccounts,
+  labels,
+  working,
 }: {
   assetAccounts: readonly AccountOption[];
   expenseAccounts: readonly AccountOption[];
+  /** Handed down from the server, so no dictionary reaches the client bundle. */
+  labels: Messages['stock'];
+  working: string;
 }) {
   const [state, action, pending] = useActionState(createItemAction, INITIAL);
   const id = useId();
@@ -62,21 +76,13 @@ export function AddProductForm({
   return (
     <form action={action} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          label="Product code"
-          htmlFor={`${id}-sku`}
-          hint="What you call it on a packing list."
-        >
+        <Field label={labels.productCode} htmlFor={`${id}-sku`} hint={labels.productCodeHint}>
           <Input id={`${id}-sku`} name="sku" required placeholder="GRN-600" autoComplete="off" />
         </Field>
-        <Field label="Name" htmlFor={`${id}-name`}>
-          <Input id={`${id}-name`} name="name" required placeholder="Granite paver 600×600" />
+        <Field label={labels.name} htmlFor={`${id}-name`}>
+          <Input id={`${id}-name`} name="name" required placeholder={labels.namePlaceholder} />
         </Field>
-        <Field
-          label="Measured in"
-          htmlFor={`${id}-unit`}
-          hint="Square metres, tonnes, pieces — whatever you invoice in."
-        >
+        <Field label={labels.measuredIn} htmlFor={`${id}-unit`} hint={labels.measuredInHint}>
           <Select id={`${id}-unit`} name="unit" defaultValue="m2">
             {SUPPORTED_UNITS.map((unit) => (
               <option key={unit} value={unit}>
@@ -86,22 +92,18 @@ export function AddProductForm({
           </Select>
         </Field>
         <Field
-          label="Costing method"
+          label={labels.costingMethod}
           htmlFor={`${id}-method`}
-          hint="Leave as the company default unless this product is one-of-a-kind."
+          hint={labels.costingMethodHint}
         >
           <Select id={`${id}-method`} name="costingMethod" defaultValue="">
-            <option value="">Company default</option>
-            <option value="fifo">Oldest delivery first (FIFO)</option>
-            <option value="weighted_average">Average across deliveries</option>
-            <option value="specific">Pick the delivery by hand</option>
+            <option value="">{labels.companyDefault}</option>
+            <option value="fifo">{labels.methodFifoOption}</option>
+            <option value="weighted_average">{labels.methodAverageOption}</option>
+            <option value="specific">{labels.methodSpecificOption}</option>
           </Select>
         </Field>
-        <Field
-          label="Stock account"
-          htmlFor={`${id}-stock`}
-          hint="Where the value sits while you hold it."
-        >
+        <Field label={labels.stockAccount} htmlFor={`${id}-stock`} hint={labels.stockAccountHint}>
           <Select id={`${id}-stock`} name="inventoryAccountId" required>
             {assetAccounts.map((account) => (
               <option key={account.id} value={account.id}>
@@ -110,11 +112,7 @@ export function AddProductForm({
             ))}
           </Select>
         </Field>
-        <Field
-          label="Cost of sales account"
-          htmlFor={`${id}-cogs`}
-          hint="Where the cost goes when it ships."
-        >
+        <Field label={labels.cogsAccount} htmlFor={`${id}-cogs`} hint={labels.cogsAccountHint}>
           <Select id={`${id}-cogs`} name="cogsAccountId" required>
             {expenseAccounts.map((account) => (
               <option key={account.id} value={account.id}>
@@ -125,12 +123,38 @@ export function AddProductForm({
         </Field>
       </div>
       <div className="flex items-center gap-3">
-        <Submit pending={pending}>Add product</Submit>
+        <Submit pending={pending} working={working}>
+          {labels.addProductButton}
+        </Submit>
         <Outcome state={state} />
       </div>
     </form>
   );
 }
+
+/**
+ * Every label already resolved to a plain string.
+ *
+ * `howMuchArrived` takes the unit and `decimalHint` takes a number of places,
+ * so in the dictionary they are functions — and a function cannot be
+ * serialised across the server/client boundary. Calling them on the server and
+ * handing the result down keeps the boundary made of data, which is also what
+ * stops a dictionary being bundled for the browser.
+ */
+export type ReceiveLabels = {
+  readonly quantity: string;
+  readonly quantityHint: string;
+  readonly cost: string;
+  readonly costHint: string;
+  readonly currency: string;
+  readonly creditAccount: string;
+  readonly creditAccountHint: string;
+  readonly date: string;
+  readonly reference: string;
+  readonly referenceHint: string;
+  readonly submit: string;
+  readonly working: string;
+};
 
 export function ReceiveForm({
   itemId,
@@ -139,6 +163,7 @@ export function ReceiveForm({
   currencies,
   creditAccounts,
   today,
+  labels,
 }: {
   itemId: string;
   unit: string;
@@ -146,6 +171,7 @@ export function ReceiveForm({
   currencies: readonly string[];
   creditAccounts: readonly AccountOption[];
   today: string;
+  labels: ReceiveLabels;
 }) {
   const [state, action, pending] = useActionState(receiveAction, INITIAL);
   const id = useId();
@@ -157,18 +183,10 @@ export function ReceiveForm({
       <input type="hidden" name="precision" value={precision} />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          label={`How much arrived (${unitLabel(unit as never)})`}
-          htmlFor={`${id}-qty`}
-          hint={precision > 0 ? `Up to ${precision} decimal places.` : 'Whole units.'}
-        >
+        <Field label={labels.quantity} htmlFor={`${id}-qty`} hint={labels.quantityHint}>
           <Input id={`${id}-qty`} name="quantity" required inputMode="decimal" placeholder="1000" />
         </Field>
-        <Field
-          label="What you paid in total"
-          htmlFor={`${id}-cost`}
-          hint="The whole delivery, not the unit price."
-        >
+        <Field label={labels.cost} htmlFor={`${id}-cost`} hint={labels.costHint}>
           <Input
             id={`${id}-cost`}
             name="cost"
@@ -177,7 +195,7 @@ export function ReceiveForm({
             placeholder="40000.00"
           />
         </Field>
-        <Field label="Paid in" htmlFor={`${id}-ccy`}>
+        <Field label={labels.currency} htmlFor={`${id}-ccy`}>
           <Select id={`${id}-ccy`} name="currency" defaultValue={currencies[0]}>
             {currencies.map((currency) => (
               <option key={currency} value={currency}>
@@ -187,9 +205,9 @@ export function ReceiveForm({
           </Select>
         </Field>
         <Field
-          label="Paid from / owed to"
+          label={labels.creditAccount}
           htmlFor={`${id}-credit`}
-          hint="The bank account it left, or the supplier you now owe."
+          hint={labels.creditAccountHint}
         >
           <Select id={`${id}-credit`} name="creditAccountId" required>
             {creditAccounts.map((account) => (
@@ -199,20 +217,18 @@ export function ReceiveForm({
             ))}
           </Select>
         </Field>
-        <Field label="Date it arrived" htmlFor={`${id}-date`}>
+        <Field label={labels.date} htmlFor={`${id}-date`}>
           <Input id={`${id}-date`} name="occurredAt" type="date" defaultValue={today} required />
         </Field>
-        <Field
-          label="Reference"
-          htmlFor={`${id}-ref`}
-          hint="Container or invoice number. This is what the costing report will show you."
-        >
+        <Field label={labels.reference} htmlFor={`${id}-ref`} hint={labels.referenceHint}>
           <Input id={`${id}-ref`} name="reference" placeholder="CONT-4417" autoComplete="off" />
         </Field>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Submit pending={pending}>Book in this delivery</Submit>
+        <Submit pending={pending} working={labels.working}>
+          {labels.submit}
+        </Submit>
         <Outcome state={state} />
       </div>
     </form>
@@ -224,6 +240,18 @@ export type LotOption = {
   readonly label: string;
 };
 
+export type IssueLabels = {
+  readonly quantity: string;
+  readonly date: string;
+  readonly reference: string;
+  readonly referenceHint: string;
+  readonly lot: string;
+  readonly lotHint: string;
+  readonly lotPlaceholder: string;
+  readonly submit: string;
+  readonly working: string;
+};
+
 export function IssueForm({
   itemId,
   unit,
@@ -231,6 +259,7 @@ export function IssueForm({
   today,
   lots,
   requiresLot,
+  labels,
 }: {
   itemId: string;
   unit: string;
@@ -239,6 +268,7 @@ export function IssueForm({
   lots: readonly LotOption[];
   /** True when this product is costed by picking the delivery by hand. */
   requiresLot: boolean;
+  labels: IssueLabels;
 }) {
   const [state, action, pending] = useActionState(issueAction, INITIAL);
   const [lot, setLot] = useState('');
@@ -251,24 +281,16 @@ export function IssueForm({
       <input type="hidden" name="precision" value={precision} />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={`How much went out (${unitLabel(unit as never)})`} htmlFor={`${id}-qty`}>
+        <Field label={labels.quantity} htmlFor={`${id}-qty`}>
           <Input id={`${id}-qty`} name="quantity" required inputMode="decimal" placeholder="1500" />
         </Field>
-        <Field label="Date it shipped" htmlFor={`${id}-date`}>
+        <Field label={labels.date} htmlFor={`${id}-date`}>
           <Input id={`${id}-date`} name="occurredAt" type="date" defaultValue={today} required />
         </Field>
-        <Field label="Reference" htmlFor={`${id}-ref`} hint="Your sales order or invoice number.">
+        <Field label={labels.reference} htmlFor={`${id}-ref`} hint={labels.referenceHint}>
           <Input id={`${id}-ref`} name="reference" placeholder="SO-9004" autoComplete="off" />
         </Field>
-        <Field
-          label={requiresLot ? 'Which delivery' : 'Which delivery (optional)'}
-          htmlFor={`${id}-lot`}
-          hint={
-            requiresLot
-              ? 'This product is costed one piece at a time, so the delivery has to be named.'
-              : 'Leave blank and the oldest delivery is used first.'
-          }
-        >
+        <Field label={labels.lot} htmlFor={`${id}-lot`} hint={labels.lotHint}>
           <Select
             id={`${id}-lot`}
             name="layerId"
@@ -276,7 +298,7 @@ export function IssueForm({
             onChange={(event) => setLot(event.target.value)}
             required={requiresLot}
           >
-            <option value="">{requiresLot ? 'Choose a delivery…' : 'Oldest first'}</option>
+            <option value="">{labels.lotPlaceholder}</option>
             {lots.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.label}
@@ -287,7 +309,9 @@ export function IssueForm({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Submit pending={pending}>Ship it out</Submit>
+        <Submit pending={pending} working={labels.working}>
+          {labels.submit}
+        </Submit>
         <Outcome state={state} />
       </div>
     </form>

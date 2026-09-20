@@ -12,10 +12,12 @@ import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
 import { AddProductForm, type AccountOption } from '@/components/stock-forms';
 import { viewerServices } from '@/server/container';
+import { translations } from '@/server/i18n';
 import { toQuantityString, unitLabel } from '@/lib/quantity';
 import { minorUnits, toDecimalString, type CurrencyCode } from '@/lib/money';
 import type { ItemSummary } from '@/server/services/inventory';
 import type { AccountDto } from '@/server/services/dto';
+import type { Messages } from '@/lib/i18n';
 
 export const metadata: Metadata = { title: 'Stock' };
 export const dynamic = 'force-dynamic';
@@ -29,14 +31,31 @@ export const dynamic = 'force-dynamic';
  * moving while the marble has not shifted since March.
  */
 
-const METHOD_LABEL: Record<string, string> = {
-  fifo: 'Oldest delivery first',
-  lifo: 'Newest delivery first',
-  weighted_average: 'Average across deliveries',
-  specific: 'Delivery picked by hand',
-};
+/**
+ * The costing methods, named the way each language names them.
+ *
+ * The Vietnamese is not a translation of the English. `Nhập trước, xuất trước`
+ * is the phrase Thông tư 200 uses, and an accountant recognises it instantly
+ * where a literal rendering of "oldest delivery first" would read as something
+ * a foreign system invented. See `src/lib/i18n/messages/vi.ts`.
+ */
+function methodLabel(method: string, t: Messages): string {
+  switch (method) {
+    case 'fifo':
+      return t.stock.methodFifo;
+    case 'lifo':
+      return t.stock.methodLifo;
+    case 'weighted_average':
+      return t.stock.methodAverage;
+    case 'specific':
+      return t.stock.methodSpecific;
+    default:
+      return method;
+  }
+}
 
 export default async function StockPage() {
+  const { t } = await translations();
   let items: readonly ItemSummary[];
   let accounts: AccountDto[];
   try {
@@ -63,11 +82,11 @@ export default async function StockPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Stock"
-        description="Every delivery is kept as its own lot with its own price. When something ships, the ledger works out what it cost from the lots it came from — and tells you which ones."
+        title={t.stock.title}
+        description={t.stock.description}
         actions={
           <ButtonLink href="/stock/import" variant="primary">
-            Import from a spreadsheet
+            {t.stock.importButton}
             <ArrowRightIcon />
           </ButtonLink>
         }
@@ -76,20 +95,18 @@ export default async function StockPage() {
       {items.length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>What is in the yard</CardTitle>
-            <CardDescription>
-              Values are what you paid, not what you will sell it for.
-            </CardDescription>
+            <CardTitle>{t.stock.inTheYard}</CardTitle>
+            <CardDescription>{t.stock.inTheYardHint}</CardDescription>
           </CardHeader>
           <TableScroll>
-            <Table caption="Products held, with quantity on hand and cost value">
+            <Table caption={t.stock.tableCaption}>
               <thead>
                 <tr>
-                  <Th>Product</Th>
-                  <Th align="right">On hand</Th>
-                  <Th align="right">Deliveries open</Th>
-                  <Th>Costed by</Th>
-                  <Th align="right">Value</Th>
+                  <Th>{t.stock.product}</Th>
+                  <Th align="right">{t.stock.onHand}</Th>
+                  <Th align="right">{t.stock.deliveriesOpen}</Th>
+                  <Th>{t.stock.costedBy}</Th>
+                  <Th align="right">{t.stock.value}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -115,10 +132,10 @@ export default async function StockPage() {
                     </Td>
                     <Td>
                       <span className="text-ink-secondary text-xs">
-                        {METHOD_LABEL[item.costingMethod] ?? item.costingMethod}
+                        {methodLabel(item.costingMethod, t)}
                       </span>
                       {item.costingInherited ? null : (
-                        <Badge className="ml-2">just this product</Badge>
+                        <Badge className="ml-2">{t.stock.justThisProduct}</Badge>
                       )}
                     </Td>
                     <Td align="right" numeric>
@@ -130,7 +147,7 @@ export default async function StockPage() {
               <tfoot>
                 <Tr>
                   <Td colSpan={4} className="font-medium">
-                    Total stock value
+                    {t.stock.totalValue}
                   </Td>
                   <Td align="right" numeric className="font-semibold">
                     <Money
@@ -149,33 +166,31 @@ export default async function StockPage() {
         </Card>
       ) : (
         <Card>
-          <EmptyState
-            title="No products yet"
-            description="Add the things you buy and sell. Once a product exists you can book deliveries against it, and the ledger will work out what each shipment cost."
-          />
+          <EmptyState title={t.stock.emptyTitle} description={t.stock.emptyBody} />
         </Card>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Add a product</CardTitle>
-          <CardDescription>
-            A product is anything you buy in and sell on. You need one before you can book a
-            delivery.
-          </CardDescription>
+          <CardTitle>{t.stock.addProduct}</CardTitle>
+          <CardDescription>{t.stock.addProductHint}</CardDescription>
         </CardHeader>
         <CardBody>
           {options('asset').length === 0 || options('expense').length === 0 ? (
             <p className="text-ink-secondary text-sm">
-              You need an asset account for the stock to sit in and an expense account for the cost
-              of sales. Open them on the{' '}
+              {t.stock.needAccounts}{' '}
               <Link href="/accounts" className="underline underline-offset-4">
-                chart of accounts
+                {t.stock.chartOfAccountsLink}
               </Link>{' '}
-              first.
+              {t.stock.firstSuffix}
             </p>
           ) : (
-            <AddProductForm assetAccounts={options('asset')} expenseAccounts={options('expense')} />
+            <AddProductForm
+              assetAccounts={options('asset')}
+              expenseAccounts={options('expense')}
+              labels={t.stock}
+              working={t.common.working}
+            />
           )}
         </CardBody>
       </Card>
