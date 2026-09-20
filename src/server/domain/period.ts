@@ -12,7 +12,7 @@
 export const PERIOD_STATUSES = ['open', 'closed'] as const;
 export type PeriodStatus = (typeof PERIOD_STATUSES)[number];
 
-export const ACCOUNT_ROLES = ['retained_earnings'] as const;
+export const ACCOUNT_ROLES = ['retained_earnings', 'fx_gain_loss'] as const;
 export type AccountRole = (typeof ACCOUNT_ROLES)[number];
 
 /** Account classes that measure a period and so reset when it ends. */

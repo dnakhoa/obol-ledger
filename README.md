@@ -257,6 +257,28 @@ and the deferred constraint are exercised as they will be in production.
 284 tests · 21 files · ~59s · no external services
 ```
 
+### Foreign exchange, for the businesses that actually feel it
+
+An importer books a 40,000 USD supplier invoice at 25,400 dong to the dollar
+and pays it three weeks later at 25,700. The dollars cancel exactly — 40,000
+out against 40,000 owed — while the dong differ by twelve million. That is a
+realized loss, and an importer's margin lives on it.
+
+The settlement is **one entry**. A designated account absorbs the difference,
+and the rule for when that is allowed has an exact answer rather than a
+heuristic: only when the entry already balances **within every transaction
+currency**. If the dollars net to zero and the dong net to zero yet the
+functional totals do not, the only possible cause is two rates applied to the
+same amount. A mistyped amount breaks a currency's balance and is still
+refused — so the adjustment cannot swallow a typo, which is the only thing that
+makes an automatic plug defensible.
+
+Everything under it stays exact. A rate is parsed to an integer scaled by
+10¹⁰, never a float; minor units are rescaled by the difference in exponents
+inside the same fraction, so there is one rounding, half away from zero.
+Reversing a foreign entry carries the _original's_ rates rather than today's,
+because a reversal exists to cancel exactly.
+
 ### The parts a product needs and a demo skips
 
 **Credentials you can rotate.** Keys are stored as SHA-256 digests and shown

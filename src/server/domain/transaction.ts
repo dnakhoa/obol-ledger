@@ -16,7 +16,16 @@ import type { LedgerError } from './errors';
  */
 export type DraftPosting = {
   readonly accountId: string;
-  readonly amount: MinorUnits;
+  /**
+   * Signed minor units.
+   *
+   * Optional only for a draft that arrived over HTTP carrying
+   * `amountDecimal` instead: scaling a decimal needs the currency's exponent,
+   * and a posting's currency is its account's, which that layer does not
+   * know. The service fills this in from the account row before anything
+   * validates it.
+   */
+  readonly amount?: MinorUnits;
   /**
    * The same movement in the organisation's functional currency, which is the
    * unit the balance rule applies to.
@@ -30,6 +39,35 @@ export type DraftPosting = {
   readonly baseAmount?: MinorUnits;
   /** The rate used to reach `baseAmount`, as a decimal string. For audit. */
   readonly fxRate?: string;
+  /**
+   * The amount as the caller wrote it, before scaling to minor units.
+   *
+   * Present when the request came over HTTP. Scaling needs the currency's
+   * exponent, and a posting's currency is its *account's* — which the HTTP
+   * layer does not know without a database read it deliberately avoids
+   * before opening a transaction. So the decimal travels down and the service
+   * scales it once the account row is in hand. `"40000.00"` is 4,000,000
+   * minor units of USD and 40,000 of VND, and guessing wrong is a factor of a
+   * hundred.
+   */
+  readonly amountDecimal?: string;
+  readonly direction?: 'debit' | 'credit';
+};
+
+/**
+ * A posting after the service has resolved it against its account.
+ *
+ * Every field the ledger stores, with nothing optional left: the amount is
+ * scaled to the account's currency, the functional amount is decided, and the
+ * rate is recorded. Everything downstream of resolution takes this rather
+ * than `DraftPosting`, so "has this been resolved yet?" is a question the type
+ * system answers.
+ */
+export type ResolvedPosting = {
+  readonly accountId: string;
+  readonly amount: MinorUnits;
+  readonly baseAmount: MinorUnits;
+  readonly fxRate: string;
 };
 
 export type DraftTransaction = {
@@ -40,7 +78,7 @@ export type DraftTransaction = {
 
 /** What a posting contributes to the balance: its functional-currency amount. */
 function balancingAmount(posting: DraftPosting): MinorUnits {
-  return posting.baseAmount ?? posting.amount;
+  return posting.baseAmount ?? posting.amount ?? (0n as MinorUnits);
 }
 
 /**
@@ -67,6 +105,11 @@ export function validateDraft(draft: DraftTransaction): Result<DraftTransaction,
 
   for (const [index, posting] of postings.entries()) {
     if (posting.amount === 0n) {
+      return err({ code: 'zero_amount_posting', index });
+    }
+    // Unscaled drafts never reach here: `validateDraft` runs after the
+    // service has resolved every amount against its account's currency.
+    if (posting.amount === undefined) {
       return err({ code: 'zero_amount_posting', index });
     }
     if (seen.has(posting.accountId)) {

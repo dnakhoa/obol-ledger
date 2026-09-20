@@ -70,7 +70,19 @@ export type LedgerError =
       readonly functional: CurrencyCode;
     }
   | { readonly code: 'invalid_fx_rate'; readonly accountId: string; readonly rate: string }
-  | { readonly code: 'rate_not_found'; readonly base: CurrencyCode; readonly quote: CurrencyCode };
+  | { readonly code: 'rate_not_found'; readonly base: CurrencyCode; readonly quote: CurrencyCode }
+  | { readonly code: 'fx_account_missing' }
+  | {
+      readonly code: 'amount_not_representable';
+      readonly accountId: string;
+      readonly amount: string;
+      readonly currency: CurrencyCode;
+    }
+  | {
+      readonly code: 'currency_imbalance';
+      readonly currency: CurrencyCode;
+      readonly residual: string;
+    };
 
 export type LedgerErrorCode = LedgerError['code'];
 
@@ -103,6 +115,9 @@ const TITLES: Record<LedgerErrorCode, string> = {
   fx_rate_required: 'Exchange rate required',
   invalid_fx_rate: 'Exchange rate is not a positive decimal',
   rate_not_found: 'No exchange rate on file',
+  fx_account_missing: 'No foreign exchange gain/loss account',
+  amount_not_representable: 'Amount could not be interpreted',
+  currency_imbalance: 'Entry does not balance within a currency',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -161,6 +176,12 @@ export function describe(error: LedgerError): string {
       return `"${error.rate}" is not a positive decimal with at most ten places, so it cannot be an exchange rate for the posting to ${error.accountId}.`;
     case 'rate_not_found':
       return `No ${error.base}/${error.quote} rate is on file at or before that date. Record one, or supply the rate with the entry.`;
+    case 'amount_not_representable':
+      return `An amount of "${error.amount}" is not representable in ${error.currency}, which is what account ${error.accountId} holds.`;
+    case 'fx_account_missing':
+      return 'No account is designated as foreign exchange gain/loss, so an exchange difference has nowhere to go. Mark one revenue or expense account with the fx_gain_loss role.';
+    case 'currency_imbalance':
+      return `The ${error.currency} postings sum to ${error.residual} rather than zero. An exchange difference can only be absorbed when each currency already balances on its own — otherwise the adjustment would hide a mistyped amount.`;
     case 'retained_earnings_missing':
       return 'No account is designated as retained earnings, so a period\u2019s profit has nowhere to go. Mark one equity account with the retained_earnings role.';
   }

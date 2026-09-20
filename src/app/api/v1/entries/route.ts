@@ -89,6 +89,7 @@ export const POST = defineRoute(
       postings: converted.postings,
       status: body.data.status,
       metadata: body.data.metadata,
+      fxAdjustment: body.data.fxAdjustment,
       ...(body.data.expectedVersions ? { expectedVersions: body.data.expectedVersions } : {}),
       ...(key ? { idempotency: { key, fingerprint: fingerprintOf(body.raw) } } : {}),
     });

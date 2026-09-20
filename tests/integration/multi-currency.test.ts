@@ -5,6 +5,12 @@ import { openAccount, servicesFor } from '../helpers/fixtures';
 import { withTenant } from '@/server/db/tenancy';
 import { organizations, postings } from '@/server/db/schema';
 import { minorUnits, type MinorUnits } from '@/lib/money';
+import { setDatabaseForTesting } from '@/server/db/client';
+import { resetRateLimits } from '@/server/http/rate-limit';
+import { apiKeys } from '@/server/db/schema';
+import { digestToken } from '@/server/services/authentication';
+import { newId } from '@/lib/id';
+import { POST as createEntry } from '@/app/api/v1/entries/route';
 
 /**
  * An entry that crosses currencies.
@@ -228,6 +234,56 @@ describe('multi-currency entries', () => {
         }),
         /postings_fx_rate_check|violates check constraint/,
       );
+    });
+  });
+
+  describe('over HTTP', () => {
+    it('scales each amount against its own account currency', async () => {
+      // The bug this exists to catch: the HTTP layer scales amounts with the
+      // *entry's* currency, because it is all it knows before opening a
+      // transaction. "1000.00" is 100,000 minor units of USD and 1,000 of
+      // VND, so on a dong-functional ledger a dollar posting comes out a
+      // hundred times too small unless the service rescales it.
+      setDatabaseForTesting(db);
+      resetRateLimits();
+      process.env['DEMO_ORG_SLUG'] = 'primary';
+
+      await db.insert(apiKeys).values({
+        id: newId('apiKey'),
+        orgId: db.$orgId,
+        name: 'test key',
+        tokenDigest: digestToken('fx-token'),
+        tokenPrefix: 'fx-tok',
+      });
+
+      const response = await createEntry(
+        new Request('https://ledger.test/api/v1/entries', {
+          method: 'POST',
+          headers: {
+            authorization: 'Bearer fx-token',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            description: 'Buy USD',
+            currency: 'VND',
+            postings: [
+              { accountId: vndBank.id, direction: 'credit', amount: '25470500' },
+              { accountId: usdBank.id, direction: 'debit', amount: '1000.00', fxRate: '25470.5' },
+            ],
+          }),
+        }),
+        { params: Promise.resolve({}) },
+      );
+
+      expect(response.status).toBe(201);
+      const payload = (await response.json()) as {
+        data: { postings: { accountId: string; amount: { minorUnits: string } }[] };
+      };
+      const usdLeg = payload.data.postings.find((p) => p.accountId === usdBank.id);
+      // 1000.00 USD is 100,000 cents, not 1,000.
+      expect(usdLeg?.amount.minorUnits).toBe('100000');
+
+      setDatabaseForTesting(undefined);
     });
   });
 
