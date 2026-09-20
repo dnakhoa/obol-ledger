@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attachment, csvCell, toCsv, UTF8_BOM } from '@/lib/csv';
+import { attachment, csvCell, parseDelimited, parseTable, toCsv, UTF8_BOM } from '@/lib/csv';
 
 describe('csv', () => {
   describe('formula injection', () => {
@@ -63,5 +63,99 @@ describe('csv', () => {
       expect(header).not.toContain('\n');
       expect(header.match(/"/gu)).toHaveLength(2);
     });
+  });
+});
+
+describe('reading a spreadsheet back', () => {
+  it('reads a paste straight out of Excel, which is tab-separated', () => {
+    // The single most common case and the one a comma-splitting parser turns
+    // into one column with a very confusing error message.
+    const pasted = 'sku\tquantity\tcost\nPAV-600\t1000\t40000.00';
+    expect(parseTable(pasted)).toEqual({
+      headers: ['sku', 'quantity', 'cost'],
+      rows: [['PAV-600', '1000', '40000.00']],
+    });
+  });
+
+  it('reads a semicolon file, which is what European Excel exports', () => {
+    // The comma is the decimal mark in Vietnamese, German and French locales,
+    // so Excel uses a semicolon as the list separator. This is a legitimate
+    // CSV that a comma parser reads as gibberish.
+    const exported = 'sku;quantity;cost\nPAV-600;1000;40000,00';
+    expect(parseDelimited(exported)).toEqual([
+      ['sku', 'quantity', 'cost'],
+      ['PAV-600', '1000', '40000,00'],
+    ]);
+  });
+
+  it('keeps a comma inside a quoted field', () => {
+    expect(parseDelimited('a,b\n"Hamburg, Germany",2')).toEqual([
+      ['a', 'b'],
+      ['Hamburg, Germany', '2'],
+    ]);
+  });
+
+  it('keeps a newline inside a quoted field', () => {
+    // The reason this cannot be a regular expression: the document cannot be
+    // split into lines before it is parsed. A shipping address has newlines.
+    expect(parseDelimited('ref,address\nINV-1,"12 Quarry Rd\nBình Định"')).toEqual([
+      ['ref', 'address'],
+      ['INV-1', '12 Quarry Rd\nBình Định'],
+    ]);
+  });
+
+  it('reads a doubled quote as one literal quote', () => {
+    expect(parseDelimited('a\n"He said ""no"""')).toEqual([['a'], ['He said "no"']]);
+  });
+
+  it('survives Windows line endings and a byte-order mark', () => {
+    expect(parseDelimited(`${UTF8_BOM}a,b\r\n1,2\r\n`)).toEqual([
+      ['a', 'b'],
+      ['1', '2'],
+    ]);
+  });
+
+  it('drops blank lines rather than producing empty rows', () => {
+    expect(parseDelimited('a,b\n1,2\n\n3,4\n')).toEqual([
+      ['a', 'b'],
+      ['1', '2'],
+      ['3', '4'],
+    ]);
+  });
+
+  it('matches headers however they were typed', () => {
+    const { headers } = parseTable('Unit Cost,SKU,"Date  Received"\n1,2,3');
+    expect(headers).toEqual(['unitcost', 'sku', 'datereceived']);
+  });
+
+  it('round-trips what the export side writes', () => {
+    // The two halves of this module have to agree, including about the cell
+    // that had to be defused on the way out.
+    const written = toCsv(['description', 'amount'], [['=SUM(A1:A9), and a "quote"', '10.00']]);
+    const [, first] = parseDelimited(written.replace(UTF8_BOM, ''));
+    // The leading apostrophe is deliberate and survives: it is what stops the
+    // spreadsheet evaluating the cell, and it is visible on the way back in.
+    expect(first?.[0]).toBe('\'=SUM(A1:A9), and a "quote"');
+    expect(first?.[1]).toBe('10.00');
+  });
+});
+
+describe('header matching across languages', () => {
+  it('strips accents rather than the letters carrying them', () => {
+    // `Mã hàng` is "item code" and `Số lượng` is "quantity". Deleting the
+    // accented letters gives `mhng` and `slng`, which match nothing and read
+    // to the person who typed them as the importer not supporting Vietnamese.
+    const { headers } = parseTable('Mã hàng;Số lượng;Thành tiền;Ngày\nA;1;2;3');
+    expect(headers).toEqual(['mahang', 'soluong', 'thanhtien', 'ngay']);
+  });
+
+  it('maps đ, which is a letter and not a d with a mark on it', () => {
+    // NFD does not decompose it, so it survives the diacritic strip and then
+    // falls foul of the a–z filter. `Đơn vị` would become `nvi`.
+    expect(parseTable('Đơn vị\nm2').headers).toEqual(['donvi']);
+  });
+
+  it('handles the other languages the charts ship for', () => {
+    expect(parseTable('Menge;Béton;数量\n1;2;3').headers).toEqual(['menge', 'beton', '']);
   });
 });

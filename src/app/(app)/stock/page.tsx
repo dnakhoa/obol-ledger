@@ -4,6 +4,8 @@ import { Card, CardBody, CardDescription, CardHeader, CardTitle } from '@/compon
 import { Badge } from '@/components/ui/badge';
 import { Table, TableScroll, Td, Th, Tr } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ButtonLink } from '@/components/ui/button';
+import { ArrowRightIcon } from '@/components/icons';
 import { PageHeader } from '@/components/page-header';
 import { Money } from '@/components/money';
 import { SetupNotice } from '@/components/setup-notice';
@@ -63,6 +65,12 @@ export default async function StockPage() {
       <PageHeader
         title="Stock"
         description="Every delivery is kept as its own lot with its own price. When something ships, the ledger works out what it cost from the lots it came from — and tells you which ones."
+        actions={
+          <ButtonLink href="/stock/import" variant="primary">
+            Import from a spreadsheet
+            <ArrowRightIcon />
+          </ButtonLink>
+        }
       />
 
       {items.length > 0 ? (

@@ -70,7 +70,10 @@ export async function createItemAction(
 
   revalidatePath('/stock');
   return result.ok
-    ? { status: 'done', message: `Added ${parsed.data.name}. You can book a delivery against it now.` }
+    ? {
+        status: 'done',
+        message: `Added ${parsed.data.name}. You can book a delivery against it now.`,
+      }
     : { status: 'error', message: describeError(result.error) };
 }
 

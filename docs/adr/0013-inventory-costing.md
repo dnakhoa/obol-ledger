@@ -103,6 +103,31 @@ them.
 quantity changes as it is consumed, and that is the only mutation permitted; a
 correction is a reversing movement, not an edit, so the trail survives.
 
+### Getting the history in is half the problem
+
+A costing engine is useless to somebody whose lots are in a workbook with four
+hundred rows in it, and "type them in again" is not an answer. So deliveries
+can be pasted in, and the care is all in the reading rather than in anything
+clever:
+
+- **What arrives is usually not a CSV file.** Somebody selects a block in Excel
+  and presses copy, and what lands is *tab*-separated.
+- **A comma is not the separator everywhere.** Excel writes CSV with the system
+  list separator, which in Vietnamese, German and French locales is a
+  **semicolon**, because the comma is the decimal mark.
+- **Headers are in the user's language.** `Mã hàng` is a product code. Stripping
+  everything but `a–z` turns it into `mhng`; the accents have to be
+  *decomposed* and their marks removed instead — and `đ` is a letter in its own
+  right, which NFD does not touch, so it is mapped by hand.
+- **`10/01/2026` is the tenth of January**, in every market this ledger ships
+  charts for. The preview prints the resolved date back beside the row, because
+  an ambiguous date the importer got wrong is invisible unless it is echoed.
+
+And it is **all or nothing**. A partially applied import is the worst outcome
+available: the books have moved, nobody knows how far it got, and undoing it
+means finding which rows landed. The preview runs exactly the checks the apply
+runs — a cheaper preview is a preview that lies, usually about the last row.
+
 ## Alternatives considered
 
 **Periodic costing** — count what is left at month end and derive the cost of

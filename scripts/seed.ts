@@ -785,7 +785,8 @@ async function main(): Promise<void> {
       // container equally profitable. Now the earliest lots go first, the
       // later ones cost more, and the margin on each container differs because
       // the stone in it genuinely did.
-      const shipped = ((produced[container.item] ?? 0n) * BigInt(Math.round(container.share * 1000))) / 1000n;
+      const shipped =
+        ((produced[container.item] ?? 0n) * BigInt(Math.round(container.share * 1000))) / 1000n;
       const issued = await inventory.issue({
         itemId: itemIds[container.item] ?? '',
         quantity: shipped as never,
@@ -793,7 +794,8 @@ async function main(): Promise<void> {
         reference: container.invoice,
         description: `Giá vốn — ${container.invoice}`,
       });
-      if (!issued.ok) throw new Error(`issue failed for ${container.invoice}: ${issued.error.code}`);
+      if (!issued.ok)
+        throw new Error(`issue failed for ${container.invoice}: ${issued.error.code}`);
       entries += 1;
 
       // Freight and customs, paid in dong to a local forwarder.
