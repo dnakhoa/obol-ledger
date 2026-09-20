@@ -28,7 +28,7 @@ const ENTRY_DATE = new Intl.DateTimeFormat('en-US', {
 export default async function OverviewPage() {
   let model;
   try {
-    model = await loadDashboard('USD');
+    model = await loadDashboard();
   } catch (error) {
     if (error instanceof Error && error.message.includes('DATABASE_URL')) {
       return <SetupNotice detail={error.message} />;
@@ -37,8 +37,10 @@ export default async function OverviewPage() {
   }
 
   const { accounts, trialBalance, recent, summary, chart } = model;
-  const usd = trialBalance.find((row) => row.currency === 'USD') ?? trialBalance[0];
-  const position = buildPosition(accounts, 'USD');
+  // One row: the trial balance is stated in the functional currency and
+  // nothing else, because that is the only unit it means anything in.
+  const books = trialBalance[0];
+  const position = buildPosition(accounts);
   const allBalanced = trialBalance.every((row) => row.balanced);
 
   return (
@@ -88,24 +90,24 @@ export default async function OverviewPage() {
           </div>
 
           <dl className="flex flex-wrap items-center gap-x-8 gap-y-3">
-            {usd ? (
+            {books ? (
               <>
                 <div>
                   <dt className="text-ink-muted text-[11px] tracking-wide uppercase">Debits</dt>
                   <dd className="numeric text-sm font-medium">
-                    <Money value={usd.debits} showCurrency />
+                    <Money value={books.debits} showCurrency />
                   </dd>
                 </div>
                 <div>
                   <dt className="text-ink-muted text-[11px] tracking-wide uppercase">Credits</dt>
                   <dd className="numeric text-sm font-medium">
-                    <Money value={usd.credits} showCurrency />
+                    <Money value={books.credits} showCurrency />
                   </dd>
                 </div>
                 <div>
                   <dt className="text-ink-muted text-[11px] tracking-wide uppercase">Residual</dt>
                   <dd className="numeric text-sm font-medium">
-                    <Money value={usd.residual} />
+                    <Money value={books.residual} />
                   </dd>
                 </div>
               </>
@@ -118,20 +120,20 @@ export default async function OverviewPage() {
         <StatTile
           label="Cash & assets"
           value={<Money value={position.totalFor('asset')} />}
-          unit="USD"
+          unit={position.currency}
           detail="Debit-normal balances"
           emphasis
         />
         <StatTile
           label="Revenue"
           value={<Money value={position.totalFor('revenue')} />}
-          unit="USD"
+          unit={position.currency}
           detail="Credit-normal, shown positive"
         />
         <StatTile
           label="Expenses"
           value={<Money value={position.totalFor('expense')} />}
-          unit="USD"
+          unit={position.currency}
           detail="Debit-normal balances"
         />
         <StatTile
@@ -150,7 +152,7 @@ export default async function OverviewPage() {
                 Debit side only, last 30 days — every entry has an equal credit.
               </CardDescription>
             </div>
-            <Badge>USD</Badge>
+            <Badge>{chart.currency}</Badge>
           </CardHeader>
           <CardBody>
             <VolumeChart columns={chart.columns} ticks={chart.ticks} currency={chart.currency} />

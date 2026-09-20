@@ -1,9 +1,9 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { CurrencyCode, MinorUnits } from '@/lib/money';
 import { presentedBalance, type AccountType } from '@/server/domain/account';
-import { accounts, postings, transactions } from '@/server/db/schema';
+import { accounts, organizations, postings, transactions } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
-import type { Database } from '@/server/db/types';
+import type { Database, Transactional } from '@/server/db/types';
 import { toMoneyDto } from './serialize';
 import type {
   AccountDto,
@@ -46,6 +46,16 @@ export type AccountStatement = {
 };
 
 export function createReportingService(database: Database, orgId: string) {
+  /** The currency the books are kept in, and the only one a statement has. */
+  const functionalCurrency = async (tx: Transactional): Promise<CurrencyCode> => {
+    const [row] = await tx
+      .select({ currency: organizations.functionalCurrency })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+    return (row?.currency ?? 'USD') as CurrencyCode;
+  };
+
   return {
     /**
      * The trial balance: the ledger auditing itself.
@@ -241,13 +251,22 @@ export function createReportingService(database: Database, orgId: string) {
      * equation requires, and it is why `balanced` is computed rather than
      * asserted.
      */
-    async balanceSheet(currency: CurrencyCode): Promise<BalanceSheet> {
+    /**
+     * The balance sheet, always in the functional currency.
+     *
+     * It used to take a currency and filter accounts to it, which on a
+     * single-currency ledger was invisible and on a multi-currency one left
+     * most of the balance sheet out of the balance sheet — an exporter's
+     * dollar and euro receivables simply did not appear. There is only one
+     * unit a balance sheet can be stated in, and this is it.
+     */
+    async balanceSheet(): Promise<BalanceSheet> {
       return withTenant(database, orgId, async (tx) => {
+        const currency = await functionalCurrency(tx);
         const rows = await tx
           .select()
           .from(accounts)
-          .where(eq(accounts.currency, currency))
-          .orderBy(asc(accounts.type), asc(accounts.name));
+          .orderBy(sql`${accounts.code} asc nulls last`, asc(accounts.name));
 
         const section = (type: AccountType, label: string): StatementSection =>
           buildSection(
@@ -289,11 +308,9 @@ export function createReportingService(database: Database, orgId: string) {
      * we earn in March". The join to `transactions` is what makes the date
      * filter meaningful: a posting's date is its entry's date.
      */
-    async incomeStatement(
-      currency: CurrencyCode,
-      period: { from: Date; to: Date },
-    ): Promise<IncomeStatement> {
+    async incomeStatement(period: { from: Date; to: Date }): Promise<IncomeStatement> {
       return withTenant(database, orgId, async (tx) => {
+        const currency = await functionalCurrency(tx);
         const rows = await tx
           .select({
             accountId: accounts.id,
@@ -452,20 +469,28 @@ export function createReportingService(database: Database, orgId: string) {
      * Only the debit side is summed: every entry has an equal and opposite
      * credit, so summing both would report exactly double the money that moved.
      */
+    /**
+     * Debit-side volume per day, in the functional currency.
+     *
+     * Summed from `base_amount_minor` and filtered by nothing: an entry's own
+     * currency used to gate this, so a dong exporter's chart showed only the
+     * days it happened to trade in whatever currency the caller guessed —
+     * which, with a default of USD, was an empty chart.
+     */
     async dailyVolume(
-      currency: CurrencyCode,
       days: number,
     ): Promise<{ readonly day: string; readonly volume: MoneyDto }[]> {
       const span = Math.min(Math.max(Math.trunc(days), 1), 366);
 
       return withTenant(database, orgId, async (tx) => {
+        const currency = await functionalCurrency(tx);
         const rows = await tx
           .select({ day: sql<string>`series.day`, volume: sql<string>`series.volume` })
           .from(
             sql`(
             SELECT
               to_char(spine.day, 'YYYY-MM-DD') AS day,
-              coalesce(sum(p.amount_minor) FILTER (WHERE p.amount_minor > 0), 0)::text AS volume
+              coalesce(sum(p.base_amount_minor) FILTER (WHERE p.base_amount_minor > 0), 0)::text AS volume
             FROM generate_series(
               date_trunc('day', now()) - make_interval(days => ${span - 1}),
               date_trunc('day', now()),
@@ -473,7 +498,6 @@ export function createReportingService(database: Database, orgId: string) {
             ) AS spine(day)
             LEFT JOIN transactions t
               ON date_trunc('day', t.occurred_at) = spine.day
-             AND t.currency = ${currency}
             LEFT JOIN postings p ON p.transaction_id = t.id
             GROUP BY spine.day
             ORDER BY spine.day
@@ -493,17 +517,25 @@ export type ReportingService = ReturnType<typeof createReportingService>;
 
 /** Total of an account class, in the sign a reader expects. */
 function sumPresented(
-  rows: readonly { type: string; balanceMinor: bigint }[],
+  rows: readonly { type: string; baseBalanceMinor: bigint }[],
   type: AccountType,
 ): bigint {
   return rows
     .filter((row) => row.type === type)
-    .reduce((total, row) => total + presentedBalance(row.balanceMinor as MinorUnits, type), 0n);
+    .reduce((total, row) => total + presentedBalance(row.baseBalanceMinor as MinorUnits, type), 0n);
 }
 
+/**
+ * A statement section, in the functional currency.
+ *
+ * Built from `base_balance_minor` rather than each account's own balance,
+ * because a balance sheet that added a dollar receivable to a dong bank
+ * account would print a number with no unit. Every line is what the account
+ * is worth in the currency the books are kept in.
+ */
 function buildSection(
   label: string,
-  rows: readonly { id: string; name: string; type: string; balanceMinor: bigint }[],
+  rows: readonly { id: string; name: string; type: string; baseBalanceMinor: bigint }[],
   currency: CurrencyCode,
 ): StatementSection {
   const lines: StatementLineDto[] = rows.map((row) => ({
@@ -511,7 +543,7 @@ function buildSection(
     accountName: row.name,
     type: row.type as AccountType,
     amount: toMoneyDto(
-      presentedBalance(row.balanceMinor as MinorUnits, row.type as AccountType),
+      presentedBalance(row.baseBalanceMinor as MinorUnits, row.type as AccountType),
       currency,
     ),
   }));

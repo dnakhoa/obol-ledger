@@ -40,7 +40,13 @@ export default async function PostEntryPage() {
           </CardBody>
         </Card>
       ) : (
-        <EntryComposer accounts={accounts} currency="USD" action={postEntryAction} />
+        // Denominated in the currency the books are kept in. Hard-coding USD
+        // meant a dong ledger offered a form nobody could post an entry with.
+        <EntryComposer
+          accounts={accounts}
+          currency={accounts[0]?.baseBalance.currency ?? 'USD'}
+          action={postEntryAction}
+        />
       )}
     </>
   );

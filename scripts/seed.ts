@@ -6,6 +6,7 @@ import { createAccountService } from '../src/server/services/accounts';
 import { digestToken } from '../src/server/services/authentication';
 import { newId } from '../src/lib/id';
 import { createJournalService } from '../src/server/services/journal';
+import { createRateService } from '../src/server/services/rates';
 import { minorUnits, type MinorUnits } from '../src/lib/money';
 import type { Database } from '../src/server/db/types';
 import { checkTenantPolicies, TENANT_TABLE_COUNT, withTenant } from '../src/server/db/tenancy';
@@ -13,12 +14,30 @@ import type { AccountType } from '../src/server/domain/account';
 import { describeTarget, schemaConnectionString, sslFor } from './connection';
 
 /**
- * Seeds a small, believable set of books.
+ * Seeds a quarter's books for a Vietnamese stone exporter.
  *
- * The data is deliberately not random noise: it is a month of trading for a
- * coffee roastery, so the dashboard shows the shape a real ledger has — a few
- * large entries, many small ones, expenses clustered at month end — and every
- * figure on screen is the result of the same code path the API uses.
+ * Deliberately not random noise, and deliberately not a generic shop. It is a
+ * granite and basalt producer in Bình Định: blocks come out of a quarry, a
+ * factory cuts and finishes them, and containers of pavers and kerbstones
+ * leave for buyers in Europe and Australia who pay in euros and dollars, sixty
+ * days later, while the books are kept in dong.
+ *
+ * That business is chosen because it exercises everything this ledger claims
+ * to do, in the order a real month does it:
+ *
+ *  - a **statutory chart** (Thông tư 200), because a Vietnamese company's
+ *    accountant does not get to invent account codes
+ *  - **entries that cross currencies**, because an export invoice is in euros
+ *    and the books are not
+ *  - **realized** exchange differences, when a customer pays at a rate that
+ *    is not the one you invoiced at
+ *  - **unrealized** ones, on the invoices they have not paid yet
+ *  - a **pending** entry, for a container that has left the factory and not
+ *    yet cleared customs
+ *  - a **period close**, which refuses until the foreign balances have been
+ *    retranslated
+ *
+ * Every figure on screen is the result of the same code path the API uses.
  */
 
 type Seeded = Record<string, string>;
@@ -31,51 +50,201 @@ type Seeded = Record<string, string>;
  * reads. Codes are what an accountant files by, and a demo that sorted
  * alphabetically was showing them a chart nobody keeps.
  */
+/*
+ * The chart, in Thông tư 200 codes.
+ *
+ * Level-two codes where the model needs one account per currency: TT200 keeps
+ * a single 112 for bank deposits and distinguishes currency in a sub-account,
+ * and this ledger holds one currency per account — so 1121 is the dong
+ * account and 1122 the dollar one, which is how the circular numbers them
+ * anyway.
+ *
+ * `monetary` is the IAS 21 distinction and the reason it is stated per
+ * account: 152 and 155 are stone, bought at a rate and carried at it forever,
+ * while 1311 is a dollar invoice that is worth a different number of dong
+ * every month end. One export sale creates both.
+ */
 const ACCOUNTS: {
   key: string;
   code: string;
   name: string;
   type: AccountType;
+  currency: 'VND' | 'USD' | 'EUR' | 'AUD';
   overdraft?: boolean;
+  monetary?: boolean;
   role?: 'retained_earnings' | 'fx_gain_loss';
 }[] = [
-  { key: 'cash', code: '110', name: 'Operating Cash', type: 'asset' },
-  { key: 'receivable', code: '120', name: 'Accounts Receivable', type: 'asset' },
-  { key: 'inventory', code: '130', name: 'Green Coffee Inventory', type: 'asset' },
-  { key: 'equipment', code: '150', name: 'Roasting Equipment', type: 'asset' },
-  { key: 'payable', code: '200', name: 'Accounts Payable', type: 'liability', overdraft: true },
-  { key: 'loan', code: '250', name: 'Equipment Loan', type: 'liability', overdraft: true },
-  { key: 'capital', code: '300', name: 'Owner Capital', type: 'equity', overdraft: true },
-  // Where a closed month's profit lands. Designated by role rather than found
-  // by name, so renaming it does not silently break the close.
+  { key: 'cash', code: '111', name: 'Tiền mặt', type: 'asset', currency: 'VND' },
+  {
+    key: 'bankVnd',
+    code: '1121',
+    name: 'Tiền gửi ngân hàng — VND',
+    type: 'asset',
+    currency: 'VND',
+  },
+  {
+    key: 'bankUsd',
+    code: '1122',
+    name: 'Tiền gửi ngân hàng — USD',
+    type: 'asset',
+    currency: 'USD',
+    overdraft: true,
+  },
+  {
+    key: 'arUsd',
+    code: '1311',
+    name: 'Phải thu khách hàng — USD',
+    type: 'asset',
+    currency: 'USD',
+    overdraft: true,
+  },
+  {
+    key: 'arEur',
+    code: '1312',
+    name: 'Phải thu khách hàng — EUR',
+    type: 'asset',
+    currency: 'EUR',
+    overdraft: true,
+  },
+  {
+    key: 'arAud',
+    code: '1313',
+    name: 'Phải thu khách hàng — AUD',
+    type: 'asset',
+    currency: 'AUD',
+    overdraft: true,
+  },
+  {
+    key: 'vatIn',
+    code: '133',
+    name: 'Thuế GTGT được khấu trừ',
+    type: 'asset',
+    currency: 'VND',
+  },
+  {
+    key: 'blocks',
+    code: '152',
+    name: 'Nguyên liệu — đá khối',
+    type: 'asset',
+    currency: 'VND',
+    monetary: false,
+  },
+  {
+    key: 'wip',
+    code: '154',
+    name: 'Chi phí sản xuất dở dang',
+    type: 'asset',
+    currency: 'VND',
+    monetary: false,
+  },
+  {
+    key: 'finished',
+    code: '155',
+    name: 'Thành phẩm — đá đã gia công',
+    type: 'asset',
+    currency: 'VND',
+    monetary: false,
+  },
+  {
+    key: 'plant',
+    code: '211',
+    name: 'TSCĐ hữu hình — máy cắt, máy mài',
+    type: 'asset',
+    currency: 'VND',
+    monetary: false,
+  },
+  {
+    key: 'depreciation',
+    code: '214',
+    name: 'Hao mòn tài sản cố định',
+    type: 'asset',
+    currency: 'VND',
+    overdraft: true,
+    monetary: false,
+  },
+  {
+    key: 'payable',
+    code: '331',
+    name: 'Phải trả cho người bán',
+    type: 'liability',
+    currency: 'VND',
+    overdraft: true,
+  },
+  {
+    key: 'taxes',
+    code: '333',
+    name: 'Thuế và các khoản phải nộp Nhà nước',
+    type: 'liability',
+    currency: 'VND',
+    overdraft: true,
+  },
+  {
+    key: 'payroll',
+    code: '334',
+    name: 'Phải trả người lao động',
+    type: 'liability',
+    currency: 'VND',
+    overdraft: true,
+  },
+  {
+    key: 'capital',
+    code: '411',
+    name: 'Vốn đầu tư của chủ sở hữu',
+    type: 'equity',
+    currency: 'VND',
+    overdraft: true,
+  },
   {
     key: 'retained',
-    code: '310',
-    name: 'Retained Earnings',
+    code: '421',
+    name: 'Lợi nhuận sau thuế chưa phân phối',
     type: 'equity',
+    currency: 'VND',
     overdraft: true,
     role: 'retained_earnings',
   },
-  { key: 'wholesale', code: '400', name: 'Wholesale Revenue', type: 'revenue', overdraft: true },
-  { key: 'retail', code: '410', name: 'Retail Revenue', type: 'revenue', overdraft: true },
-  { key: 'cogs', code: '500', name: 'Cost of Goods Sold', type: 'expense', overdraft: true },
-  { key: 'rent', code: '540', name: 'Rent', type: 'expense', overdraft: true },
-  { key: 'wages', code: '520', name: 'Wages', type: 'expense', overdraft: true },
-  { key: 'utilities', code: '560', name: 'Utilities', type: 'expense', overdraft: true },
   {
-    key: 'fx',
-    code: '590',
-    name: 'Foreign Exchange Gain/Loss',
+    key: 'revenue',
+    code: '511',
+    name: 'Doanh thu bán hàng và cung cấp dịch vụ',
+    type: 'revenue',
+    currency: 'VND',
+    overdraft: true,
+  },
+  {
+    key: 'finIncome',
+    code: '515',
+    name: 'Doanh thu hoạt động tài chính',
+    type: 'revenue',
+    currency: 'VND',
+    overdraft: true,
+  },
+  { key: 'cogs', code: '632', name: 'Giá vốn hàng bán', type: 'expense', currency: 'VND' },
+  {
+    key: 'finExpense',
+    code: '635',
+    name: 'Chi phí tài chính',
     type: 'expense',
+    currency: 'VND',
     overdraft: true,
     role: 'fx_gain_loss',
   },
+  {
+    key: 'selling',
+    code: '641',
+    name: 'Chi phí bán hàng — cước tàu, hải quan',
+    type: 'expense',
+    currency: 'VND',
+  },
+  {
+    key: 'admin',
+    code: '642',
+    name: 'Chi phí quản lý doanh nghiệp',
+    type: 'expense',
+    currency: 'VND',
+  },
 ];
 
-/**
- * A deterministic generator, so a reseed produces the same books.
- * `Math.random()` would make the screenshots in the README a lie.
- */
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
@@ -91,6 +260,14 @@ const random = mulberry32(20260919);
 
 function between(low: number, high: number): number {
   return Math.floor(random() * (high - low + 1)) + low;
+}
+
+/** The last day of a month, `monthsBack` months before this one, as YYYY-MM-DD. */
+function monthEnd(monthsBack: number): string {
+  const now = new Date();
+  // Day 0 of a month is the last day of the one before it.
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - monthsBack + 1, 0));
+  return end.toISOString().slice(0, 10);
 }
 
 function daysAgo(days: number, hour: number): Date {
@@ -117,7 +294,8 @@ async function main(): Promise<void> {
     // `transactions_guard_mutation` in 0004, and a stale ALTER would fail the
     // seed for a reason that has nothing to do with seeding.
     await database.execute(sql`
-      TRUNCATE idempotency_keys, postings, transactions, accounts, api_keys, organizations
+      TRUNCATE idempotency_keys, postings, transactions, accounting_periods,
+               exchange_rates, accounts, api_keys, memberships, organizations
       RESTART IDENTITY CASCADE
     `);
 
@@ -130,12 +308,16 @@ async function main(): Promise<void> {
       // allows exactly one, so "the demo" is never ambiguous.
       .values({
         id: orgId,
-        name: 'Demo Roastery',
+        name: 'Công ty TNHH Đá Bình Minh',
         slug: demoSlug,
         isDemo: true,
-        // The primary market reads this convention, and the demo is the first
-        // chart most visitors will ever see here.
-        chartTemplate: 'au_nz',
+        // The books are kept in dong. Every export invoice is in a currency
+        // that is not, which is what makes the balance rule interesting.
+        functionalCurrency: 'VND',
+        // A Vietnamese company's accountant does not get to invent account
+        // codes, so the demo is on the statutory chart rather than a
+        // convention — and the database enforces the digit rule.
+        chartTemplate: 'vn_tt200',
       });
 
     // A second tenant with its own books exists purely so the isolation is
@@ -167,15 +349,17 @@ async function main(): Promise<void> {
 
     const accountService = createAccountService(database, orgId);
     const journal = createJournalService(database, orgId);
+    const rates = createRateService(database, orgId);
 
     const ids: Seeded = {};
     for (const account of ACCOUNTS) {
       const created = await accountService.create({
         name: account.name,
         type: account.type,
-        currency: 'USD',
+        currency: account.currency,
         code: account.code,
         overdraftAllowed: account.overdraft ?? false,
+        ...(account.monetary === undefined ? {} : { monetary: account.monetary }),
         ...(account.role ? { role: account.role } : {}),
       });
       ids[account.key] = created.id;
@@ -183,15 +367,50 @@ async function main(): Promise<void> {
     // Back-date the accounts to just before the first entry.
     //
     // `created_at` defaults to now(), so a freshly seeded ledger claims every
-    // account was opened today while showing a statement going back six weeks.
+    // account was opened today while showing a statement going back months.
     // Accounts are not append-only — only postings and journal entries are —
     // so this is a plain UPDATE rather than anything that fights a trigger.
-    // Only created_at: updated_at is trigger-maintained and will correctly
-    // become the time of each account's last movement as the entries post.
-    await database.execute(sql`UPDATE accounts SET created_at = now() - interval '45 days'`);
+    await database.execute(sql`UPDATE accounts SET created_at = now() - interval '110 days'`);
     console.log(`opened ${ACCOUNTS.length} accounts`);
 
-    const dollars = (value: number): MinorUnits => minorUnits(BigInt(Math.round(value * 100)));
+    /*
+     * Rates, as the facts they were on the day.
+     *
+     * Illustrative rather than historical — the point is that they *move*, and
+     * that a lookup asks for the most recent rate at or before a date rather
+     * than today's. Recorded month by month so a revaluation at the end of one
+     * month cannot accidentally use the next month's rate.
+     */
+    const RATES: { base: 'USD' | 'EUR' | 'AUD'; asOf: string; rate: string }[] = [];
+    for (const [monthsBack, usd, eur, aud] of [
+      [3, '25380', '27450', '16420'],
+      [2, '25510', '27780', '16610'],
+      [1, '25640', '28040', '16880'],
+      [0, '25705', '28190', '17010'],
+    ] as const) {
+      const day = monthEnd(monthsBack);
+      RATES.push({ base: 'USD', asOf: day, rate: usd });
+      RATES.push({ base: 'EUR', asOf: day, rate: eur });
+      RATES.push({ base: 'AUD', asOf: day, rate: aud });
+    }
+    for (const rate of RATES) {
+      const recorded = await rates.record({
+        base: rate.base,
+        quote: 'VND',
+        rate: rate.rate,
+        asOf: rate.asOf,
+        source: 'seed',
+      });
+      if (!recorded.ok) throw new Error(`rate ${rate.base} ${rate.asOf} rejected`);
+    }
+    console.log(`recorded ${RATES.length} exchange rates`);
+
+    // Dong has no minor unit, so a "đồng" is already a minor unit. Dollars,
+    // euros and Australian dollars have two — which is exactly the rescaling
+    // that makes a cross-currency entry interesting.
+    const dong = (value: number): MinorUnits => minorUnits(BigInt(Math.round(value)));
+    const foreign = (value: number): MinorUnits => minorUnits(BigInt(Math.round(value * 100)));
+
     const at = (key: string): string => {
       const id = ids[key];
       if (!id) throw new Error(`unknown seed account ${key}`);
@@ -199,20 +418,36 @@ async function main(): Promise<void> {
     };
 
     let entries = 0;
+    type Leg = {
+      account: string;
+      amount: MinorUnits;
+      baseAmount?: MinorUnits;
+      fxRate?: string;
+    };
+
     async function post(
       description: string,
       occurredAt: Date,
-      legs: { account: string; amount: MinorUnits }[],
-      status: 'pending' | 'posted' = 'posted',
-      metadata: Record<string, string> = {},
+      legs: Leg[],
+      options: {
+        status?: 'pending' | 'posted';
+        metadata?: Record<string, string>;
+        fxAdjustment?: boolean;
+      } = {},
     ): Promise<void> {
       const result = await journal.postEntry({
         description,
-        currency: 'USD',
+        currency: 'VND',
         occurredAt,
-        status,
-        metadata,
-        postings: legs.map((leg) => ({ accountId: at(leg.account), amount: leg.amount })),
+        status: options.status ?? 'posted',
+        metadata: options.metadata ?? {},
+        ...(options.fxAdjustment ? { fxAdjustment: true } : {}),
+        postings: legs.map((leg) => ({
+          accountId: at(leg.account),
+          amount: leg.amount,
+          ...(leg.baseAmount === undefined ? {} : { baseAmount: leg.baseAmount }),
+          ...(leg.fxRate === undefined ? {} : { fxRate: leg.fxRate }),
+        })),
       });
       if (!result.ok) {
         throw new Error(`seed entry "${description}" was rejected: ${result.error.code}`);
@@ -220,120 +455,383 @@ async function main(): Promise<void> {
       entries += 1;
     }
 
-    // Opening the books — six weeks before trading starts.
+    // ---- Opening the books, before the quarter starts -----------------------
     //
-    // The gap is deliberate. A business is capitalised and equipped well before
-    // it takes its first order, and these one-off entries are an order of
-    // magnitude larger than daily takings. Posting them inside the dashboard's
-    // 30-day window would set the chart's axis to $48,000 and squash a month of
-    // real trading into invisible slivers — a chart that is accurate and tells
-    // the reader nothing.
-    await post('Owner capital contribution', daysAgo(44, 9), [
-      { account: 'cash', amount: dollars(85_000) },
-      { account: 'capital', amount: dollars(-85_000) },
-    ]);
-    await post('Roaster purchased on finance', daysAgo(43, 11), [
-      { account: 'equipment', amount: dollars(48_000) },
-      { account: 'loan', amount: dollars(-36_000) },
-      { account: 'cash', amount: dollars(-12_000) },
-    ]);
-    await post('Opening green coffee stock', daysAgo(42, 8), [
-      { account: 'inventory', amount: dollars(21_500) },
-      { account: 'payable', amount: dollars(-21_500) },
+    // A quarry and a factory are capitalised long before the first container
+    // ships, and these entries are an order of magnitude larger than a week of
+    // trading. Dated well back so they do not flatten the dashboard's chart.
+
+    await post('Góp vốn chủ sở hữu — owner capital contribution', daysAgo(104, 9), [
+      { account: 'bankVnd', amount: dong(32_000_000_000) },
+      { account: 'capital', amount: dong(-32_000_000_000) },
     ]);
 
-    // A month of trading.
-    for (let day = 27; day >= 0; day -= 1) {
-      const retail = between(380, 1_650);
-      await post(`Retail counter sales`, daysAgo(day, 18), [
-        { account: 'cash', amount: dollars(retail) },
-        { account: 'retail', amount: dollars(-retail) },
+    await post('Mua máy cắt và máy mài đá — cutting and polishing line', daysAgo(102, 10), [
+      { account: 'plant', amount: dong(18_400_000_000) },
+      { account: 'payable', amount: dong(-12_000_000_000) },
+      { account: 'bankVnd', amount: dong(-6_400_000_000) },
+    ]);
+
+    await post('Tồn kho đá khối đầu kỳ — opening granite block stock', daysAgo(100, 8), [
+      { account: 'blocks', amount: dong(4_800_000_000) },
+      { account: 'payable', amount: dong(-4_800_000_000) },
+    ]);
+
+    // ---- A quarter of quarrying, cutting and exporting ----------------------
+    //
+    // Production is posted before the shipments that consume it, which is the
+    // order the factory actually works in — you cannot ship stone you have not
+    // cut. The overdraft rule enforces that: crediting finished goods that do
+    // not exist is refused, which is how the seed found out it had the two
+    // loops the wrong way round.
+
+    // Quarry blocks bought, and the factory turning them into product.
+    for (const day of [95, 80, 65, 50, 35, 20, 6]) {
+      const blocks = between(1_400_000_000, 2_900_000_000);
+      await post('Mua đá khối từ mỏ — granite blocks from the quarry', daysAgo(day, 8), [
+        { account: 'blocks', amount: dong(blocks) },
+        { account: 'payable', amount: dong(-blocks) },
       ]);
 
-      const cost = Math.round(retail * 0.38 * 100) / 100;
-      await post('Cost of retail sales', daysAgo(day, 18), [
-        { account: 'cogs', amount: dollars(cost) },
-        { account: 'inventory', amount: dollars(-cost) },
+      const processed = Math.round(blocks * 0.94);
+      const labour = Math.round(processed * 0.38);
+      await post('Đưa đá khối vào sản xuất — blocks into production', daysAgo(day - 1, 8), [
+        { account: 'wip', amount: dong(processed) },
+        { account: 'blocks', amount: dong(-processed) },
+      ]);
+      await post('Chi phí nhân công phân xưởng — factory wages', daysAgo(day - 1, 17), [
+        { account: 'wip', amount: dong(labour) },
+        { account: 'payroll', amount: dong(-labour) },
+      ]);
+      await post('Nhập kho thành phẩm — finished goods to store', daysAgo(day - 2, 16), [
+        { account: 'finished', amount: dong(processed + labour) },
+        { account: 'wip', amount: dong(-(processed + labour)) },
+      ]);
+    }
+
+    const CONTAINERS: {
+      day: number;
+      currency: 'USD' | 'EUR' | 'AUD';
+      account: string;
+      amount: number;
+      rate: string;
+      buyer: string;
+      product: string;
+      invoice: string;
+    }[] = [
+      // Australia and New Zealand are the largest market, so most containers
+      // leave in Australian dollars.
+      {
+        day: 88,
+        currency: 'AUD',
+        account: 'arAud',
+        amount: 58_400,
+        rate: '16420',
+        buyer: 'Southern Landscape Supplies, Brisbane',
+        product: 'Granite pavers 400x400x30',
+        invoice: 'INV-2601',
+      },
+      {
+        day: 81,
+        currency: 'EUR',
+        account: 'arEur',
+        amount: 41_250,
+        rate: '27450',
+        buyer: 'Steinhandel Nord, Hamburg',
+        product: 'Basalt cubes 100x100x100',
+        invoice: 'INV-2602',
+      },
+      {
+        day: 74,
+        currency: 'AUD',
+        account: 'arAud',
+        amount: 63_900,
+        rate: '16510',
+        buyer: 'Kerb & Co, Melbourne',
+        product: 'Kerbstones 1000x300x150',
+        invoice: 'INV-2603',
+      },
+      {
+        day: 66,
+        currency: 'USD',
+        account: 'arUsd',
+        amount: 37_800,
+        rate: '25510',
+        buyer: 'Pacific Stone Imports, Seattle',
+        product: 'Flagstones, bush hammered',
+        invoice: 'INV-2604',
+      },
+      {
+        day: 59,
+        currency: 'AUD',
+        account: 'arAud',
+        amount: 71_200,
+        rate: '16610',
+        buyer: 'Auckland Paving Centre',
+        product: 'Granite pavers 600x300x30',
+        invoice: 'INV-2605',
+      },
+      {
+        day: 52,
+        currency: 'EUR',
+        account: 'arEur',
+        amount: 48_600,
+        rate: '27780',
+        buyer: 'Pierre Naturelle SA, Lyon',
+        product: 'Palisades 100x100x1000',
+        invoice: 'INV-2606',
+      },
+      {
+        day: 44,
+        currency: 'AUD',
+        account: 'arAud',
+        amount: 66_500,
+        rate: '16700',
+        buyer: 'Southern Landscape Supplies, Brisbane',
+        product: 'Wall cladding panels',
+        invoice: 'INV-2607',
+      },
+      {
+        day: 37,
+        currency: 'USD',
+        account: 'arUsd',
+        amount: 44_150,
+        rate: '25580',
+        buyer: 'Pacific Stone Imports, Seattle',
+        product: 'Stair blocks, 5 sides chiselled',
+        invoice: 'INV-2608',
+      },
+      {
+        day: 30,
+        currency: 'AUD',
+        account: 'arAud',
+        amount: 74_800,
+        rate: '16780',
+        buyer: 'Kerb & Co, Melbourne',
+        product: 'Kerbstones, saw cut',
+        invoice: 'INV-2609',
+      },
+      {
+        day: 22,
+        currency: 'EUR',
+        account: 'arEur',
+        amount: 52_300,
+        rate: '28040',
+        buyer: 'Steinhandel Nord, Hamburg',
+        product: 'Basalt cubes, split face',
+        invoice: 'INV-2610',
+      },
+      {
+        day: 15,
+        currency: 'AUD',
+        account: 'arAud',
+        amount: 69_900,
+        rate: '16880',
+        buyer: 'Auckland Paving Centre',
+        product: 'Garden landscaping sets',
+        invoice: 'INV-2611',
+      },
+      {
+        day: 8,
+        currency: 'AUD',
+        account: 'arAud',
+        amount: 77_400,
+        rate: '16950',
+        buyer: 'Southern Landscape Supplies, Brisbane',
+        product: 'Granite pavers 450x900x60',
+        invoice: 'INV-2612',
+      },
+    ];
+
+    for (const container of CONTAINERS) {
+      const revenueVnd = Math.round(container.amount * Number(container.rate));
+
+      // The export invoice. One entry, two currencies: the receivable is in
+      // the buyer's money and the revenue is in dong, at the rate on the day.
+      await post(
+        `Xuất khẩu — ${container.product} → ${container.buyer}`,
+        daysAgo(container.day, 10),
+        [
+          {
+            account: container.account,
+            amount: foreign(container.amount),
+            fxRate: container.rate,
+          },
+          { account: 'revenue', amount: dong(-revenueVnd) },
+        ],
+        { metadata: { invoice: container.invoice, market: container.currency } },
+      );
+
+      // Cost of the stone that left, at what it actually cost to make.
+      const cost = Math.round(revenueVnd * 0.52);
+      await post(`Giá vốn — ${container.invoice}`, daysAgo(container.day, 10), [
+        { account: 'cogs', amount: dong(cost) },
+        { account: 'finished', amount: dong(-cost) },
       ]);
 
-      if (day % 3 === 0) {
-        const wholesale = between(2_400, 9_800);
-        // Annotated, because this is the entry a person actually goes looking
-        // for: "which entry was invoice INV-1042?" is the question metadata
-        // exists to answer, and an unannotated fixture would never show it.
-        await post(
-          'Wholesale order invoiced',
-          daysAgo(day, 10),
-          [
-            { account: 'receivable', amount: dollars(wholesale) },
-            { account: 'wholesale', amount: dollars(-wholesale) },
-          ],
-          'posted',
-          { invoice: `INV-${1000 + day}`, channel: 'wholesale' },
-        );
-      }
+      // Freight and customs, paid in dong to a local forwarder.
+      const freight = between(48_000_000, 96_000_000);
+      await post(`Cước tàu và thông quan — ${container.invoice}`, daysAgo(container.day - 1, 15), [
+        { account: 'selling', amount: dong(freight) },
+        { account: 'bankVnd', amount: dong(-freight) },
+      ]);
+    }
 
-      if (day % 7 === 2) {
-        const collected = between(3_000, 11_000);
-        await post(
-          'Customer payment received',
-          daysAgo(day, 14),
-          [
-            { account: 'cash', amount: dollars(collected) },
-            { account: 'receivable', amount: dollars(-collected) },
-          ],
-          'posted',
-          { settlementBatch: `BATCH-${day}`, channel: 'wholesale' },
-        );
-      }
+    // ---- Customers paying, at a rate that is never the invoiced one ---------
+    //
+    // This is the entry an exporter feels. The invoice was raised at one rate
+    // and the money arrives at another, and the difference is real income or
+    // expense rather than a rounding artefact. `fxAdjustment` books it — and
+    // only because each currency balances on its own, which is what stops the
+    // adjustment hiding a mistyped amount.
 
-      if (day % 5 === 1) {
-        const restock = between(1_800, 6_500);
-        await post('Green coffee restock', daysAgo(day, 7), [
-          { account: 'inventory', amount: dollars(restock) },
-          { account: 'payable', amount: dollars(-restock) },
-        ]);
+    const COLLECTIONS: {
+      day: number;
+      from: string;
+      amount: number;
+      invoicedAt: string;
+      paidAt: string;
+      invoice: string;
+    }[] = [
+      {
+        day: 28,
+        from: 'arAud',
+        amount: 58_400,
+        invoicedAt: '16420',
+        paidAt: '16735',
+        invoice: 'INV-2601',
+      },
+      {
+        day: 21,
+        from: 'arEur',
+        amount: 41_250,
+        invoicedAt: '27450',
+        paidAt: '27960',
+        invoice: 'INV-2602',
+      },
+      {
+        day: 14,
+        from: 'arAud',
+        amount: 63_900,
+        invoicedAt: '16510',
+        paidAt: '16820',
+        invoice: 'INV-2603',
+      },
+      {
+        day: 9,
+        from: 'arUsd',
+        amount: 37_800,
+        invoicedAt: '25510',
+        paidAt: '25655',
+        invoice: 'INV-2604',
+      },
+      {
+        day: 4,
+        from: 'arAud',
+        amount: 71_200,
+        invoicedAt: '16610',
+        paidAt: '16940',
+        invoice: 'INV-2605',
+      },
+    ];
+
+    for (const payment of COLLECTIONS) {
+      const bank = payment.from === 'arUsd' ? 'bankUsd' : payment.from;
+      const invoicedVnd = Math.round(payment.amount * Number(payment.invoicedAt));
+      const receivedVnd = Math.round(payment.amount * Number(payment.paidAt));
+
+      if (bank === 'bankUsd') {
+        // Dollars land in the dollar account: the currency does not change,
+        // only what it is worth.
+        await post(
+          `Khách hàng thanh toán — ${payment.invoice}`,
+          daysAgo(payment.day, 11),
+          [
+            { account: 'bankUsd', amount: foreign(payment.amount), baseAmount: dong(receivedVnd) },
+            {
+              account: payment.from,
+              amount: foreign(-payment.amount),
+              baseAmount: dong(-invoicedVnd),
+            },
+          ],
+          { fxAdjustment: true, metadata: { invoice: payment.invoice } },
+        );
+      } else {
+        /*
+         * Converted to dong on arrival, which is what most exporters do with
+         * euros and Australian dollars — and this one states the difference
+         * explicitly rather than letting `fxAdjustment` find it.
+         *
+         * That is not a style choice. The automatic adjustment is only
+         * allowed when the entry already balances *within every transaction
+         * currency*, which is what stops it swallowing a mistyped amount.
+         * A conversion does not: Australian dollars go out and dong come in,
+         * so no currency nets to zero on its own and the guard refuses. The
+         * same-currency settlement above is exactly the case it does cover.
+         */
+        const difference = receivedVnd - invoicedVnd;
+        await post(
+          `Khách hàng thanh toán — ${payment.invoice}`,
+          daysAgo(payment.day, 11),
+          [
+            { account: 'bankVnd', amount: dong(receivedVnd) },
+            {
+              account: payment.from,
+              amount: foreign(-payment.amount),
+              baseAmount: dong(-invoicedVnd),
+            },
+            // A weakening dong makes a foreign receivable worth more of it,
+            // so these are gains — 515, doanh thu hoạt động tài chính.
+            { account: 'finIncome', amount: dong(-difference) },
+          ],
+          { metadata: { invoice: payment.invoice } },
+        );
       }
     }
 
-    // Month-end obligations.
-    await post('Monthly rent', daysAgo(2, 9), [
-      { account: 'rent', amount: dollars(4_200) },
-      { account: 'cash', amount: dollars(-4_200) },
-    ]);
-    await post('Payroll', daysAgo(1, 9), [
-      { account: 'wages', amount: dollars(18_400) },
-      { account: 'cash', amount: dollars(-18_400) },
-    ]);
-    await post('Utilities', daysAgo(1, 16), [
-      { account: 'utilities', amount: dollars(1_180) },
-      { account: 'cash', amount: dollars(-1_180) },
-    ]);
-    await post('Supplier settlement', daysAgo(0, 11), [
-      { account: 'payable', amount: dollars(14_000) },
-      { account: 'cash', amount: dollars(-14_000) },
-    ]);
+    // ---- The rest of running a factory -------------------------------------
 
-    // Two entries left in flight, so the demo shows the state a single-balance
-    // ledger cannot represent: funds reserved but not moved. Cash reads a full
-    // posted balance and a lower available one, which is the whole point.
+    for (const day of [90, 60, 30]) {
+      const wages = between(1_900_000_000, 2_400_000_000);
+      await post('Thanh toán lương — payroll paid', daysAgo(day, 9), [
+        { account: 'payroll', amount: dong(wages) },
+        { account: 'bankVnd', amount: dong(-wages) },
+      ]);
+
+      const admin = between(320_000_000, 520_000_000);
+      await post('Chi phí quản lý — administration', daysAgo(day, 14), [
+        { account: 'admin', amount: dong(admin) },
+        { account: 'bankVnd', amount: dong(-admin) },
+      ]);
+
+      const supplier = between(2_100_000_000, 3_600_000_000);
+      await post('Thanh toán nhà cung cấp — supplier settlement', daysAgo(day - 3, 11), [
+        { account: 'payable', amount: dong(supplier) },
+        { account: 'bankVnd', amount: dong(-supplier) },
+      ]);
+
+      const depreciation = 306_000_000;
+      await post('Khấu hao tài sản cố định — depreciation', daysAgo(day, 17), [
+        { account: 'admin', amount: dong(depreciation) },
+        { account: 'depreciation', amount: dong(-depreciation) },
+      ]);
+    }
+
+    // ---- A container that has left and not yet cleared ----------------------
+    //
+    // The state a single-balance ledger cannot hold: the stone is on a ship,
+    // the invoice is raised, and nothing has settled. It reserves the value
+    // without moving it, so the receivable's posted and available balances
+    // differ — which is the whole point of the two-phase model.
+
     await post(
-      'Card authorisation — equipment deposit',
-      daysAgo(0, 14),
+      'Container đã xuất, chờ vận đơn — loaded, awaiting bill of lading',
+      daysAgo(1, 16),
       [
-        { account: 'equipment', amount: dollars(3_200) },
-        { account: 'cash', amount: dollars(-3_200) },
+        { account: 'arAud', amount: foreign(54_600), fxRate: '17010' },
+        { account: 'revenue', amount: dong(-Math.round(54_600 * 17_010)) },
       ],
-      'pending',
-    );
-    await post(
-      'Wholesale order awaiting delivery',
-      daysAgo(0, 16),
-      [
-        { account: 'receivable', amount: dollars(6_450) },
-        { account: 'wholesale', amount: dollars(-6_450) },
-      ],
-      'pending',
+      { status: 'pending', metadata: { invoice: 'INV-2613', market: 'AUD' } },
     );
 
     // Assert the *schema* carries the isolation policies.
@@ -361,7 +859,15 @@ async function main(): Promise<void> {
 
     const residual = await withTenant(database, orgId, async (tx) => {
       const [row] = await tx
-        .select({ residual: sql<string>`coalesce(sum(${schema.accounts.balanceMinor}), 0)::text` })
+        // Summed in the *functional* currency.
+        //
+        // `balance_minor` is in each account's own currency, so adding a
+        // dollar balance to a dong one produces a number with no meaning —
+        // which is what this assertion used to do, and it only ever looked
+        // right because every account was USD.
+        .select({
+          residual: sql<string>`coalesce(sum(${schema.accounts.baseBalanceMinor}), 0)::text`,
+        })
         .from(schema.accounts);
       return row?.residual;
     });

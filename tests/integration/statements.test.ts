@@ -66,7 +66,7 @@ describe('financial statements', () => {
 
   describe('balance sheet', () => {
     it('balances an empty ledger', async () => {
-      const sheet = await services.reporting.balanceSheet('USD');
+      const sheet = await services.reporting.balanceSheet();
       expect(sheet.balanced).toBe(true);
       expect(sheet.assets.total.amount).toBe('0.00');
     });
@@ -89,7 +89,7 @@ describe('financial statements', () => {
         { accountId: cash.id, amount: -12_000n },
       ]);
 
-      const sheet = await services.reporting.balanceSheet('USD');
+      const sheet = await services.reporting.balanceSheet();
 
       expect(sheet.assets.total.amount).toBe('1680.00');
       expect(sheet.liabilities.total.amount).toBe('500.00');
@@ -106,7 +106,7 @@ describe('financial statements', () => {
         { accountId: capital.id, amount: -100_000n },
       ]);
 
-      const sheet = await services.reporting.balanceSheet('USD');
+      const sheet = await services.reporting.balanceSheet();
       expect(sheet.assets.lines.map((line) => line.accountName)).toEqual(['Cash']);
       expect(sheet.equity.lines.map((line) => line.accountName)).toEqual(['Capital']);
       // Shown in the sign a reader expects, whichever side it sits on.
@@ -121,7 +121,7 @@ describe('financial statements', () => {
       const page = await services.journal.list({ limit: 1 });
       await services.journal.reverseEntry({ transactionId: page.items[0]?.id ?? '' });
 
-      const sheet = await services.reporting.balanceSheet('USD');
+      const sheet = await services.reporting.balanceSheet();
       expect(sheet.balanced).toBe(true);
       expect(sheet.retainedEarnings.amount).toBe('0.00');
     });
@@ -148,7 +148,7 @@ describe('financial statements', () => {
         new Date('2026-03-15T12:00:00Z'),
       );
 
-      const statement = await services.reporting.incomeStatement('USD', march);
+      const statement = await services.reporting.incomeStatement(march);
       expect(statement.revenue.total.amount).toBe('250.00');
       expect(statement.netIncome.amount).toBe('250.00');
       expect(statement.profitable).toBe(true);
@@ -182,7 +182,7 @@ describe('financial statements', () => {
         new Date('2026-03-20T12:00:00Z'),
       );
 
-      const statement = await services.reporting.incomeStatement('USD', march);
+      const statement = await services.reporting.incomeStatement(march);
       expect(statement.revenue.total.amount).toBe('250.00');
       expect(statement.expenses.total.amount).toBe('400.00');
       expect(statement.netIncome.amount).toBe('-150.00');
@@ -190,7 +190,7 @@ describe('financial statements', () => {
     });
 
     it('includes accounts with no activity, so the shape of the period is visible', async () => {
-      const statement = await services.reporting.incomeStatement('USD', march);
+      const statement = await services.reporting.incomeStatement(march);
       expect(statement.revenue.lines.map((line) => line.accountName)).toEqual(['Sales']);
       expect(statement.revenue.lines[0]?.amount.amount).toBe('0.00');
       expect(statement.netIncome.amount).toBe('0.00');
@@ -210,8 +210,8 @@ describe('financial statements', () => {
         from: new Date('2000-01-01T00:00:00Z'),
         to: new Date('2100-01-01T00:00:00Z'),
       };
-      const income = await services.reporting.incomeStatement('USD', allTime);
-      const sheet = await services.reporting.balanceSheet('USD');
+      const income = await services.reporting.incomeStatement(allTime);
+      const sheet = await services.reporting.balanceSheet();
 
       // Retained earnings is net income when nothing has been closed out.
       expect(sheet.retainedEarnings.amount).toBe(income.netIncome.amount);

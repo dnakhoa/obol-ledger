@@ -4,9 +4,9 @@ import { newId } from '@/lib/id';
 import type { CurrencyCode } from '@/lib/money';
 import type { AccountType } from '@/server/domain/account';
 import type { LedgerError } from '@/server/domain/errors';
-import { accounts } from '@/server/db/schema';
+import { accounts, organizations } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
-import type { Database } from '@/server/db/types';
+import type { Database, Transactional } from '@/server/db/types';
 import { toAccountDto } from './serialize';
 import { enqueue } from './outbox';
 import type { AccountDto } from './dto';
@@ -40,7 +40,24 @@ export type CreateAccountInput = {
  * every one of them runs inside `withTenant`, which is what makes the
  * row-level security policies engage.
  */
+/**
+ * The currency this tenant keeps its books in.
+ *
+ * Read per call rather than cached: it is one indexed lookup of a one-row
+ * table, and a cached copy is a stale identity waiting to happen.
+ */
+async function functionalCurrencyFor(tx: Transactional, orgId: string): Promise<CurrencyCode> {
+  const [row] = await tx
+    .select({ currency: organizations.functionalCurrency })
+    .from(organizations)
+    .where(eq(organizations.id, orgId))
+    .limit(1);
+  return (row?.currency ?? 'USD') as CurrencyCode;
+}
+
 export function createAccountService(database: Database, orgId: string) {
+  const functionalCurrency = (tx: Transactional) => functionalCurrencyFor(tx, orgId);
+
   return {
     async list(): Promise<AccountDto[]> {
       return withTenant(database, orgId, async (tx) => {
@@ -58,7 +75,8 @@ export function createAccountService(database: Database, orgId: string) {
           .select()
           .from(accounts)
           .orderBy(sql`${accounts.code} asc nulls last`, asc(accounts.name));
-        return rows.map(toAccountDto);
+        const functional = await functionalCurrency(tx);
+        return rows.map((row) => toAccountDto(row, functional));
       });
     },
 
@@ -68,7 +86,9 @@ export function createAccountService(database: Database, orgId: string) {
         // An account belonging to another tenant is filtered out by the policy
         // before this code sees it, so it is reported as not found — which is
         // also the right answer to give a caller who should not know it exists.
-        return row ? ok(toAccountDto(row)) : err({ code: 'account_not_found', accountId: id });
+        return row
+          ? ok(toAccountDto(row, await functionalCurrency(tx)))
+          : err({ code: 'account_not_found', accountId: id });
       });
     },
 
@@ -94,7 +114,7 @@ export function createAccountService(database: Database, orgId: string) {
         // an empty result would mean the driver lied to us.
         if (!row) throw new Error('INSERT ... RETURNING produced no row');
 
-        const dto = toAccountDto(row);
+        const dto = toAccountDto(row, await functionalCurrency(tx));
         await enqueue(tx, orgId, { type: 'account.opened', data: { account: dto } });
         return dto;
       });
@@ -111,7 +131,9 @@ export function createAccountService(database: Database, orgId: string) {
           .set({ status: 'closed', updatedAt: new Date() })
           .where(eq(accounts.id, id))
           .returning();
-        return row ? ok(toAccountDto(row)) : err({ code: 'account_not_found', accountId: id });
+        return row
+          ? ok(toAccountDto(row, await functionalCurrency(tx)))
+          : err({ code: 'account_not_found', accountId: id });
       });
     },
   };

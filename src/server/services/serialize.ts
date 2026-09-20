@@ -1,5 +1,5 @@
 import { toDecimalString, type CurrencyCode, type MinorUnits } from '@/lib/money';
-import { deriveBalances, type AccountType } from '@/server/domain/account';
+import { deriveBalances, presentedBalance, type AccountType } from '@/server/domain/account';
 import type { AccountDto, MoneyDto, PostingDto, TransactionDto } from './dto';
 import type { AccountRow, PostingRow, TransactionRow } from '@/server/db/schema';
 
@@ -18,7 +18,10 @@ export function toMoneyDto(amount: MinorUnits, currency: CurrencyCode): MoneyDto
   };
 }
 
-export function toAccountDto(row: AccountRow): AccountDto {
+export function toAccountDto(
+  row: AccountRow,
+  functionalCurrency: CurrencyCode = row.currency as CurrencyCode,
+): AccountDto {
   const currency = row.currency as CurrencyCode;
   const balances = deriveBalances({
     signedPosted: row.balanceMinor as MinorUnits,
@@ -35,6 +38,13 @@ export function toAccountDto(row: AccountRow): AccountDto {
     status: row.status,
     overdraftAllowed: row.overdraftAllowed,
     balance: toMoneyDto(balances.posted, currency),
+    // Presented the same way — positive means healthy whichever side the
+    // account normally sits on — but denominated in the functional currency,
+    // so class totals mean something.
+    baseBalance: toMoneyDto(
+      presentedBalance(row.baseBalanceMinor as MinorUnits, row.type as AccountType),
+      functionalCurrency,
+    ),
     pendingBalance: toMoneyDto(balances.pending, currency),
     availableBalance: toMoneyDto(balances.available, currency),
     version: row.version,

@@ -17,7 +17,7 @@ export const GET = defineRoute(
     const query = parseQuery(request, querySchema, requestId);
     if (!query.ok) return query.response;
 
-    const sheet = await services.reporting.balanceSheet(query.data.currency);
+    const sheet = await services.reporting.balanceSheet();
     return json({ data: sheet, meta: { balanced: sheet.balanced } });
   },
 );

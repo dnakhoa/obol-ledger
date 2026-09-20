@@ -36,7 +36,14 @@ export type DashboardModel = {
   readonly chart: { columns: VolumeColumn[]; ticks: string[]; currency: CurrencyCode };
 };
 
-export async function loadDashboard(currency: CurrencyCode = 'USD'): Promise<DashboardModel> {
+/**
+ * Everything the overview needs, in the currency the books are kept in.
+ *
+ * No currency argument. A dashboard for a dong exporter that quietly reported
+ * only its dollar accounts would be worse than no dashboard, and that is what
+ * a default of `'USD'` produced.
+ */
+export async function loadDashboard(): Promise<DashboardModel> {
   const { accounts, journal, reporting } = await demoServices();
 
   // Independent reads, issued together: awaiting them in sequence would make the
@@ -46,11 +53,15 @@ export async function loadDashboard(currency: CurrencyCode = 'USD'): Promise<Das
     reporting.trialBalance(),
     journal.list({ limit: 6 }),
     reporting.summary(),
-    reporting.dailyVolume(currency, 30),
+    reporting.dailyVolume(30),
   ]);
 
   const values = volume.map((point) => BigInt(point.volume.minorUnits) as MinorUnits);
   const scale = buildLinearScale(values);
+
+  // The chart's unit comes from the data rather than from an argument: every
+  // figure it plots is already in the functional currency.
+  const currency = (volume[0]?.volume.currency ?? 'USD') as CurrencyCode;
 
   return {
     accounts: accountRows,
@@ -79,6 +90,8 @@ export type PositionRow = {
 };
 
 export type Position = {
+  /** The currency every total here is stated in: the tenant's functional one. */
+  readonly currency: CurrencyCode;
   readonly rows: PositionRow[];
   /** Assets + Expenses — the debit-normal side of the equation. */
   readonly debitSide: MoneyDto;
@@ -104,14 +117,26 @@ const TYPE_LABELS: Record<AccountType, string> = {
  * stated the way a reader of a balance sheet expects it. Showing both sides
  * makes the invariant legible rather than something taken on trust.
  */
-export function buildPosition(accounts: readonly AccountDto[], currency: CurrencyCode): Position {
+export function buildPosition(accounts: readonly AccountDto[]): Position {
   const totals = new Map<AccountType, bigint>();
   const counts = new Map<AccountType, number>();
 
+  /*
+   * Summed from the functional-currency balance, and every account counts.
+   *
+   * This used to skip any account whose currency was not the one passed in,
+   * which on a single-currency ledger was invisible and on a multi-currency
+   * one silently left most of the balance sheet out of the balance sheet —
+   * a dong exporter's dollar and euro receivables simply did not appear in
+   * the accounting equation. Summing the base balance is the only way the
+   * identity holds across currencies, and it is the same number the trial
+   * balance and the residual gauge use.
+   */
+  const currency = (accounts[0]?.baseBalance.currency ?? 'USD') as CurrencyCode;
+
   for (const account of accounts) {
-    if (account.balance.currency !== currency) continue;
     const type = account.type;
-    totals.set(type, (totals.get(type) ?? 0n) + BigInt(account.balance.minorUnits));
+    totals.set(type, (totals.get(type) ?? 0n) + BigInt(account.baseBalance.minorUnits));
     counts.set(type, (counts.get(type) ?? 0) + 1);
   }
 
@@ -120,6 +145,7 @@ export function buildPosition(accounts: readonly AccountDto[], currency: Currenc
   const creditSide = totalOf('liability') + totalOf('equity') + totalOf('revenue');
 
   return {
+    currency,
     rows: ACCOUNT_TYPES.map((type) => ({
       type,
       label: TYPE_LABELS[type],
