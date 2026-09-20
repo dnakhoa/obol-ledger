@@ -9,6 +9,7 @@ import { createReportingService } from './services/reporting';
 import { createPeriodService } from './services/periods';
 import { createRateService } from './services/rates';
 import { createRevaluationService } from './services/revaluation';
+import { createInventoryService } from '@/server/services/inventory';
 import { createWebhookService } from './services/webhooks';
 import { SetupRequiredError } from './setup-error';
 import { currentViewer, type Viewer } from './auth/viewer';
@@ -36,6 +37,7 @@ export function servicesFor(orgId: string) {
     rates: createRateService(database, orgId),
     revaluation: createRevaluationService(database, orgId),
     webhooks: createWebhookService(database, orgId),
+    inventory: createInventoryService(database, orgId),
   };
 }
 

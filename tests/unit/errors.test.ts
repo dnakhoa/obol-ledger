@@ -81,6 +81,36 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
     currency: 'USD',
   },
   currency_imbalance: { code: 'currency_imbalance', currency: 'USD', residual: '1.00' },
+  item_not_found: { code: 'item_not_found', itemId: 'item_x' },
+  item_archived: { code: 'item_archived', itemId: 'item_x' },
+  sku_taken: { code: 'sku_taken', sku: 'GRN-60x60' },
+  insufficient_stock: {
+    code: 'insufficient_stock',
+    itemId: 'item_x',
+    requested: '24687',
+    available: '12000',
+    precision: 3,
+    unit: 't',
+  },
+  cost_layer_not_found: { code: 'cost_layer_not_found', layerId: 'layer_x' },
+  cost_layer_required: { code: 'cost_layer_required', itemId: 'item_x' },
+  costing_method_not_permitted: {
+    code: 'costing_method_not_permitted',
+    method: 'lifo',
+    chartTemplate: 'vn_tt200',
+  },
+  inventory_account_not_functional: {
+    code: 'inventory_account_not_functional',
+    accountId: 'acct_x',
+    currency: 'USD',
+    functional: 'VND',
+  },
+  account_wrong_type: {
+    code: 'account_wrong_type',
+    accountId: 'acct_x',
+    expected: 'asset',
+    actual: 'revenue',
+  },
 };
 
 const variants = Object.values(EVERY_VARIANT);

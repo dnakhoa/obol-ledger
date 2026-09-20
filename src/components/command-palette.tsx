@@ -8,6 +8,7 @@ import {
   GaugeIcon,
   JournalIcon,
   ReportsIcon,
+  StockIcon,
   SearchIcon,
   SettingsIcon,
   TransferIcon,
@@ -49,6 +50,7 @@ type Item = {
 const PAGES: Item[] = [
   { id: 'p-overview', href: '/', label: 'Overview', group: 'Pages', Icon: GaugeIcon },
   { id: 'p-accounts', href: '/accounts', label: 'Accounts', group: 'Pages', Icon: AccountsIcon },
+  { id: 'p-stock', href: '/stock', label: 'Stock', group: 'Pages', Icon: StockIcon },
   { id: 'p-journal', href: '/journal', label: 'Journal', group: 'Pages', Icon: JournalIcon },
   { id: 'p-reports', href: '/reports', label: 'Reports', group: 'Pages', Icon: ReportsIcon },
   {

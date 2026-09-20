@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq, sql } from 'drizzle-orm';
 import * as schema from '../src/server/db/schema';
 import { createAccountService } from '../src/server/services/accounts';
+import { createInventoryService } from '../src/server/services/inventory';
 import { digestToken } from '../src/server/services/authentication';
 import { newId } from '../src/lib/id';
 import { createJournalService } from '../src/server/services/journal';
@@ -256,6 +257,46 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/**
+ * What the factory makes, as things with quantities rather than amounts.
+ *
+ * The demo has always had a finished-goods account; what it has not had is any
+ * idea *how much stone* that account represents, which is the number the
+ * business actually manages. Unit costs rise across the quarter — deliberately,
+ * because that is when the costing method stops being a formality and starts
+ * changing the profit.
+ */
+const PRODUCTS: {
+  key: string;
+  sku: string;
+  name: string;
+  unit: 'm2' | 'm3';
+  /** Dong per unit on the first production run; later runs cost more. */
+  unitCost: number;
+}[] = [
+  {
+    key: 'pavers',
+    sku: 'PAV-600',
+    name: 'Đá lát granite 600×600 — granite pavers',
+    unit: 'm2',
+    unitCost: 690_000,
+  },
+  {
+    key: 'cladding',
+    sku: 'CLD-PNL',
+    name: 'Tấm ốp tường — wall cladding panels',
+    unit: 'm2',
+    unitCost: 845_000,
+  },
+  {
+    key: 'kerbs',
+    sku: 'BLK-STR',
+    name: 'Đá bậc và bó vỉa — stair and kerb blocks',
+    unit: 'm3',
+    unitCost: 5_600_000,
+  },
+];
+
 const random = mulberry32(20260919);
 
 function between(low: number, high: number): number {
@@ -485,8 +526,32 @@ async function main(): Promise<void> {
     // not exist is refused, which is how the seed found out it had the two
     // loops the wrong way round.
 
+    // Stock, as things with quantities.
+    //
+    // Opened against the same two accounts the hand-posted entries used, so
+    // nothing about the chart changes: what changes is that 155 now has a
+    // quantity behind it and 632 is derived from the lots rather than from a
+    // percentage somebody chose.
+    const inventory = createInventoryService(database, orgId);
+    const itemIds: Record<string, string> = {};
+    for (const product of PRODUCTS) {
+      const created = await inventory.createItem({
+        sku: product.sku,
+        name: product.name,
+        unit: product.unit,
+        inventoryAccountId: ids['finished'] ?? '',
+        cogsAccountId: ids['cogs'] ?? '',
+      });
+      if (!created.ok) throw new Error(`could not open ${product.sku}: ${created.error.code}`);
+      itemIds[product.key] = created.value.id;
+    }
+    // Quantities are scaled integers, like money: m² to two places, m³ to three.
+    const SCALE: Record<string, bigint> = { m2: 100n, m3: 1000n };
+    const produced: Record<string, bigint> = {};
+    console.log(`opened ${PRODUCTS.length} stock items`);
+
     // Quarry blocks bought, and the factory turning them into product.
-    for (const day of [95, 80, 65, 50, 35, 20, 6]) {
+    for (const [run, day] of [95, 80, 65, 50, 35, 20, 6].entries()) {
       const blocks = between(1_400_000_000, 2_900_000_000);
       await post('Mua đá khối từ mỏ — granite blocks from the quarry', daysAgo(day, 8), [
         { account: 'blocks', amount: dong(blocks) },
@@ -503,16 +568,42 @@ async function main(): Promise<void> {
         { account: 'wip', amount: dong(labour) },
         { account: 'payroll', amount: dong(-labour) },
       ]);
-      await post('Nhập kho thành phẩm — finished goods to store', daysAgo(day - 2, 16), [
-        { account: 'finished', amount: dong(processed + labour) },
-        { account: 'wip', amount: dong(-(processed + labour)) },
-      ]);
+      // The run comes off the line as a *lot*: a quantity at a price, priced
+      // a little higher than the run before it. The entry posted is the one
+      // that was posted before — debit 155, credit 154 — but it now opens a
+      // cost layer at the same time, in the same transaction, so the stock
+      // records and the account cannot come apart.
+      const product = PRODUCTS[run % PRODUCTS.length];
+      if (!product) throw new Error('no product for run');
+      const cost = processed + labour;
+      const perUnit = Math.round(product.unitCost * (0.9 + run * 0.035));
+      const quantity = (BigInt(Math.round(cost / perUnit)) * (SCALE[product.unit] ?? 1n)) as never;
+
+      const received = await inventory.receive({
+        itemId: itemIds[product.key] ?? '',
+        quantity,
+        cost: BigInt(cost),
+        currency: 'VND',
+        creditAccountId: ids['wip'] ?? '',
+        occurredAt: daysAgo(day - 2, 16),
+        reference: `LOT-${String(run + 1).padStart(3, '0')}`,
+        description: 'Nhập kho thành phẩm — finished goods to store',
+      });
+      if (!received.ok) throw new Error(`receipt failed: ${received.error.code}`);
+      entries += 1;
+      produced[product.key] = (produced[product.key] ?? 0n) + quantity;
     }
 
     const CONTAINERS: {
       day: number;
       currency: 'USD' | 'EUR' | 'AUD';
       account: string;
+      /** Which of the three product lines left in this container. */
+      item: string;
+      /** How much of everything ever made of it — kept as a share so the seed
+       * cannot ask for stone it never cut, whatever the random costs came out
+       * at. */
+      share: number;
       amount: number;
       rate: string;
       buyer: string;
@@ -529,6 +620,8 @@ async function main(): Promise<void> {
         rate: '16420',
         buyer: 'Southern Landscape Supplies, Brisbane',
         product: 'Granite pavers 400x400x30',
+        item: 'pavers',
+        share: 0.17,
         invoice: 'INV-2601',
       },
       {
@@ -539,6 +632,8 @@ async function main(): Promise<void> {
         rate: '27450',
         buyer: 'Steinhandel Nord, Hamburg',
         product: 'Basalt cubes 100x100x100',
+        item: 'kerbs',
+        share: 0.15,
         invoice: 'INV-2602',
       },
       {
@@ -549,6 +644,8 @@ async function main(): Promise<void> {
         rate: '16510',
         buyer: 'Kerb & Co, Melbourne',
         product: 'Kerbstones 1000x300x150',
+        item: 'kerbs',
+        share: 0.16,
         invoice: 'INV-2603',
       },
       {
@@ -559,6 +656,8 @@ async function main(): Promise<void> {
         rate: '25510',
         buyer: 'Pacific Stone Imports, Seattle',
         product: 'Flagstones, bush hammered',
+        item: 'cladding',
+        share: 0.19,
         invoice: 'INV-2604',
       },
       {
@@ -569,6 +668,8 @@ async function main(): Promise<void> {
         rate: '16610',
         buyer: 'Auckland Paving Centre',
         product: 'Granite pavers 600x300x30',
+        item: 'pavers',
+        share: 0.18,
         invoice: 'INV-2605',
       },
       {
@@ -579,6 +680,8 @@ async function main(): Promise<void> {
         rate: '27780',
         buyer: 'Pierre Naturelle SA, Lyon',
         product: 'Palisades 100x100x1000',
+        item: 'kerbs',
+        share: 0.14,
         invoice: 'INV-2606',
       },
       {
@@ -589,6 +692,8 @@ async function main(): Promise<void> {
         rate: '16700',
         buyer: 'Southern Landscape Supplies, Brisbane',
         product: 'Wall cladding panels',
+        item: 'cladding',
+        share: 0.21,
         invoice: 'INV-2607',
       },
       {
@@ -599,6 +704,8 @@ async function main(): Promise<void> {
         rate: '25580',
         buyer: 'Pacific Stone Imports, Seattle',
         product: 'Stair blocks, 5 sides chiselled',
+        item: 'kerbs',
+        share: 0.13,
         invoice: 'INV-2608',
       },
       {
@@ -609,6 +716,8 @@ async function main(): Promise<void> {
         rate: '16780',
         buyer: 'Kerb & Co, Melbourne',
         product: 'Kerbstones, saw cut',
+        item: 'kerbs',
+        share: 0.12,
         invoice: 'INV-2609',
       },
       {
@@ -619,6 +728,8 @@ async function main(): Promise<void> {
         rate: '28040',
         buyer: 'Steinhandel Nord, Hamburg',
         product: 'Basalt cubes, split face',
+        item: 'cladding',
+        share: 0.18,
         invoice: 'INV-2610',
       },
       {
@@ -629,6 +740,8 @@ async function main(): Promise<void> {
         rate: '16880',
         buyer: 'Auckland Paving Centre',
         product: 'Garden landscaping sets',
+        item: 'pavers',
+        share: 0.16,
         invoice: 'INV-2611',
       },
       {
@@ -639,6 +752,8 @@ async function main(): Promise<void> {
         rate: '16950',
         buyer: 'Southern Landscape Supplies, Brisbane',
         product: 'Granite pavers 450x900x60',
+        item: 'pavers',
+        share: 0.19,
         invoice: 'INV-2612',
       },
     ];
@@ -662,12 +777,24 @@ async function main(): Promise<void> {
         { metadata: { invoice: container.invoice, market: container.currency } },
       );
 
-      // Cost of the stone that left, at what it actually cost to make.
-      const cost = Math.round(revenueVnd * 0.52);
-      await post(`Giá vốn — ${container.invoice}`, daysAgo(container.day, 10), [
-        { account: 'cogs', amount: dong(cost) },
-        { account: 'finished', amount: dong(-cost) },
-      ]);
+      // The cost of the stone that left — worked out from the lots it came
+      // out of rather than from a percentage of the sale.
+      //
+      // This is the substance of the change. The old line took 52% of revenue,
+      // which is a number nobody could check and which quietly made every
+      // container equally profitable. Now the earliest lots go first, the
+      // later ones cost more, and the margin on each container differs because
+      // the stone in it genuinely did.
+      const shipped = ((produced[container.item] ?? 0n) * BigInt(Math.round(container.share * 1000))) / 1000n;
+      const issued = await inventory.issue({
+        itemId: itemIds[container.item] ?? '',
+        quantity: shipped as never,
+        occurredAt: daysAgo(container.day, 10),
+        reference: container.invoice,
+        description: `Giá vốn — ${container.invoice}`,
+      });
+      if (!issued.ok) throw new Error(`issue failed for ${container.invoice}: ${issued.error.code}`);
+      entries += 1;
 
       // Freight and customs, paid in dong to a local forwarder.
       const freight = between(48_000_000, 96_000_000);
@@ -846,7 +973,7 @@ async function main(): Promise<void> {
     const policies = await checkTenantPolicies(database);
     if (!policies.configured) {
       throw new Error(
-        `tenant isolation is not configured: ${policies.tablesWithRls}/4 tables with RLS, ` +
+        `tenant isolation is not configured: ${policies.tablesWithRls}/${TENANT_TABLE_COUNT} tables with RLS, ` +
           `${policies.tablesForced}/${TENANT_TABLE_COUNT} forced, ${policies.policies} policies`,
       );
     }

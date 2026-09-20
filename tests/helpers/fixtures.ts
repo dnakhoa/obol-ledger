@@ -8,6 +8,7 @@ import { createReportingService } from '@/server/services/reporting';
 import { createPeriodService } from '@/server/services/periods';
 import { createRateService } from '@/server/services/rates';
 import { createRevaluationService } from '@/server/services/revaluation';
+import { createInventoryService } from '@/server/services/inventory';
 import { createWebhookService } from '@/server/services/webhooks';
 import type { Database } from '@/server/db/types';
 import type { AccountType } from '@/server/domain/account';
@@ -23,6 +24,7 @@ export function servicesFor(database: Database, orgId: string) {
     rates: createRateService(database, orgId),
     revaluation: createRevaluationService(database, orgId),
     webhooks: createWebhookService(database, orgId),
+    inventory: createInventoryService(database, orgId),
   };
 }
 

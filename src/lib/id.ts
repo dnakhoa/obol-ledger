@@ -53,6 +53,10 @@ export const ID_PREFIXES = {
   period: 'per',
   membership: 'mem',
   rate: 'rate',
+  inventoryItem: 'item',
+  costLayer: 'layer',
+  inventoryMovement: 'move',
+  layerConsumption: 'draw',
 } as const;
 
 export type EntityKind = keyof typeof ID_PREFIXES;

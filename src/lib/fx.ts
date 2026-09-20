@@ -52,8 +52,12 @@ export function formatRate(scaled: bigint): string {
  * half *up* — so -0.5 becomes -0 and 0.5 becomes 1. Applied to money that
  * makes a credit and its mirrored debit round to different magnitudes, and an
  * entry that was balanced before conversion is unbalanced after it.
+ *
+ * Exported because it is the ledger's rounding *policy*, not an FX detail:
+ * inventory costing apportions a layer's cost across a partial issue and has
+ * to round the same way, or the two halves of one purchase disagree.
  */
-function divideRounding(numerator: bigint, denominator: bigint): bigint {
+export function divideRounding(numerator: bigint, denominator: bigint): bigint {
   const negative = numerator < 0n !== denominator < 0n;
   const absolute = (numerator < 0n ? -numerator : numerator) * 2n;
   const divisor = denominator < 0n ? -denominator : denominator;

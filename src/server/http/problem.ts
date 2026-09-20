@@ -59,6 +59,17 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   revaluation_required: 409,
   amount_not_representable: 422,
   currency_imbalance: 422,
+  item_not_found: 404,
+  item_archived: 409,
+  sku_taken: 409,
+  // 409 rather than 422: the request is well formed and would have been
+  // accepted an hour ago. What changed is the state of the yard.
+  insufficient_stock: 409,
+  cost_layer_not_found: 404,
+  cost_layer_required: 422,
+  costing_method_not_permitted: 422,
+  inventory_account_not_functional: 422,
+  account_wrong_type: 422,
 };
 
 export function statusFor(error: LedgerError): number {
