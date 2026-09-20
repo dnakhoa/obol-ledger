@@ -10,7 +10,7 @@ import { CompactAmount, DirectionalAmount } from '@/components/money';
 import { CursorPagination } from '@/components/pagination';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
-import { ArrowRightIcon, CheckIcon } from '@/components/icons';
+import { ArrowRightIcon, CheckIcon, DownloadIcon } from '@/components/icons';
 import { cn } from '@/lib/cn';
 import { demoServices } from '@/server/container';
 import type { AccountDto, Page, TransactionDto } from '@/server/services/dto';
@@ -80,10 +80,31 @@ export default async function JournalPage({ searchParams }: PageProps) {
         title="Journal"
         description="Every entry, newest first, with its postings. Entries are append-only: a mistake is corrected by posting a reversing entry, never by editing history."
         actions={
-          <ButtonLink href="/transfer" variant="primary">
-            Post an entry
-            <ArrowRightIcon />
-          </ButtonLink>
+          <>
+            {/*
+              A plain link, not a fetch-and-blob dance: the response already
+              carries Content-Disposition, so the browser's own download
+              machinery handles it — including resuming and the "where do you
+              want this?" dialog that a JavaScript download cannot offer.
+            */}
+            <ButtonLink
+              href={`/api/v1/entries?${new URLSearchParams({
+                format: 'csv',
+                ...(query.accountId ? { accountId: query.accountId } : {}),
+                ...(query.search ? { search: query.search } : {}),
+                ...(query.metadataKey && query.metadataValue
+                  ? { metadataKey: query.metadataKey, metadataValue: query.metadataValue }
+                  : {}),
+              }).toString()}`}
+            >
+              <DownloadIcon />
+              Export CSV
+            </ButtonLink>
+            <ButtonLink href="/transfer" variant="primary">
+              Post an entry
+              <ArrowRightIcon />
+            </ButtonLink>
+          </>
         }
       />
 

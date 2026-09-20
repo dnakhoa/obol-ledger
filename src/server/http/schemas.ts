@@ -106,6 +106,16 @@ export const createTransferSchema = z.object({
 
 export type CreateTransferBody = z.infer<typeof createTransferSchema>;
 
+/**
+ * `?format=csv` turns a listing into a download.
+ *
+ * A query parameter rather than content negotiation on `Accept`, because the
+ * consumer is a link in a page. A browser sends its own `Accept` header on a
+ * plain navigation and the person clicking cannot change it, so an
+ * `Accept`-only design is one that works from curl and not from the product.
+ */
+export const formatSchema = z.enum(['json', 'csv']).default('json');
+
 export const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
   // Cursors are base64url of `<timestamp>|<id>`; 256 leaves headroom without
@@ -114,6 +124,7 @@ export const paginationSchema = z.object({
   // Which side of the cursor to read. Ignored without one — there is nothing
   // before the first page.
   direction: z.enum(['forward', 'backward']).default('forward'),
+  format: formatSchema,
 });
 
 /**

