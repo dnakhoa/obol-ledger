@@ -23,6 +23,7 @@ import { DELIVERY_STATUSES } from '@/server/domain/webhook';
 import { ACCOUNT_ROLES, PERIOD_STATUSES } from '@/server/domain/period';
 import type { CostingMethod } from '@/server/domain/costing';
 import type { AllocationBasis } from '@/server/domain/landed-cost';
+import type { TaxTreatment } from '@/server/domain/tax';
 import type { Unit } from '@/lib/quantity';
 import type { Locale } from '@/lib/i18n/locales';
 
@@ -809,6 +810,44 @@ export const costLayers = pgTable(
 );
 
 /**
+ * How a consumption tax behaves, which is three different things.
+ *
+ * The `CHECK` in migration 0022 is the substance: a sales-tax code may not
+ * have an input account, because US sales tax is never reclaimable and a
+ * business given one accumulates a receivable from a state that does not owe
+ * it — while the accounts balance perfectly. See `domain/tax.ts`.
+ */
+export const taxCodes = pgTable(
+  'tax_codes',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    name: text('name').notNull(),
+    /** Basis points: 10% is 1000, 8.25% is 825. Never a float. */
+    rateBasisPoints: integer('rate_basis_points').notNull(),
+    treatment: text('treatment').$type<TaxTreatment>().notNull(),
+    inputAccountId: text('input_account_id'),
+    outputAccountId: text('output_account_id'),
+    status: text('status').$type<'active' | 'archived'>().notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('tax_codes_id_org_key').on(table.id, table.orgId),
+    uniqueIndex('tax_codes_org_name_key').on(table.orgId, table.name),
+    foreignKey({
+      name: 'tax_codes_input_account_fk',
+      columns: [table.inputAccountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'tax_codes_output_account_fk',
+      columns: [table.outputAccountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/**
  * The lots that arrived together, and the charges that attach to them.
  *
  * `reference` is what the business already calls it — a bill of lading, a
@@ -1036,4 +1075,5 @@ export type InventoryItemRow = typeof inventoryItems.$inferSelect;
 export type CostLayerRow = typeof costLayers.$inferSelect;
 export type InventoryMovementRow = typeof inventoryMovements.$inferSelect;
 export type ShipmentRow = typeof shipments.$inferSelect;
+export type TaxCodeRow = typeof taxCodes.$inferSelect;
 export type LandedCostChargeRow = typeof landedCostCharges.$inferSelect;

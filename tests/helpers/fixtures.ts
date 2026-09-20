@@ -12,6 +12,7 @@ import { createInventoryService } from '@/server/services/inventory';
 import { createStockImportService } from '@/server/services/stock-import';
 import { createLandedCostService } from '@/server/services/landed-cost';
 import { createAgingService } from '@/server/services/aging';
+import { createTaxService } from '@/server/services/tax';
 import { createWebhookService } from '@/server/services/webhooks';
 import type { Database } from '@/server/db/types';
 import type { AccountType } from '@/server/domain/account';
@@ -31,6 +32,7 @@ export function servicesFor(database: Database, orgId: string) {
     stockImport: createStockImportService(database, orgId),
     landedCost: createLandedCostService(database, orgId),
     aging: createAgingService(database, orgId),
+    tax: createTaxService(database, orgId),
   };
 }
 

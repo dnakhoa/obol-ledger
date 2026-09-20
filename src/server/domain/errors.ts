@@ -124,7 +124,15 @@ export type LedgerError =
   | { readonly code: 'shipment_has_no_stock'; readonly shipmentId: string }
   | { readonly code: 'mixed_units'; readonly units: readonly string[] }
   | { readonly code: 'weight_missing'; readonly layerIds: readonly string[] }
-  | { readonly code: 'debit_account_required' };
+  | { readonly code: 'debit_account_required' }
+  | { readonly code: 'tax_code_name_taken'; readonly name: string }
+  | { readonly code: 'tax_code_not_found'; readonly taxCodeId: string }
+  | { readonly code: 'sales_tax_is_not_reclaimable' }
+  | {
+      readonly code: 'tax_account_missing';
+      readonly treatment: string;
+      readonly side: 'input' | 'output';
+    };
 
 export type LedgerErrorCode = LedgerError['code'];
 
@@ -176,6 +184,10 @@ const TITLES: Record<LedgerErrorCode, string> = {
   mixed_units: 'Those lots are not measured in the same unit',
   weight_missing: 'Some lots have no weight recorded',
   debit_account_required: 'A charge that is not part of the cost of goods needs an account',
+  tax_code_name_taken: 'That tax code name is already in use',
+  tax_code_not_found: 'Tax code not found',
+  sales_tax_is_not_reclaimable: 'Sales tax cannot have a reclaimable account',
+  tax_account_missing: 'The tax code has no account for that side',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -274,6 +286,14 @@ export function describe(error: LedgerError): string {
       return `${error.layerIds.length} of the lots on this shipment have no weight recorded, and treating them as weightless would push the whole charge onto the rest. Record the weights, or spread the charge by value.`;
     case 'debit_account_required':
       return 'A charge that is not part of the cost of the goods — recoverable import VAT, for instance — needs an account of its own to be debited to.';
+    case 'tax_code_name_taken':
+      return `Another tax code is already called ${error.name}.`;
+    case 'tax_code_not_found':
+      return `No active tax code with id ${error.taxCodeId}.`;
+    case 'sales_tax_is_not_reclaimable':
+      return 'United States sales tax is never reclaimable on a purchase, so a sales-tax code has no input account. A business given one accumulates a receivable from a state that does not owe it, and the accounts balance perfectly while the asset is fictional.';
+    case 'tax_account_missing':
+      return `This ${error.treatment} code has no ${error.side} tax account, so it cannot post that side of the entry.`;
   }
 }
 

@@ -76,6 +76,10 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   mixed_units: 422,
   weight_missing: 422,
   debit_account_required: 422,
+  tax_code_name_taken: 409,
+  tax_code_not_found: 404,
+  sales_tax_is_not_reclaimable: 422,
+  tax_account_missing: 422,
 };
 
 export function statusFor(error: LedgerError): number {

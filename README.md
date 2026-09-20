@@ -446,6 +446,7 @@ including the metadata filter and every problem type, are in the
 - [ADR 13](docs/adr/0013-inventory-costing.md) — inventory as layers, costing as a policy
 - [ADR 14](docs/adr/0014-two-locales.md) — the viewer's language is not the books' language
 - [ADR 15](docs/adr/0015-landed-cost.md) — freight and duty belong in the cost of the goods
+- [ADR 16](docs/adr/0016-consumption-tax.md) — three tax mechanisms, one name
 
 ## Licence
 
