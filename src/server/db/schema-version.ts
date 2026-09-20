@@ -39,6 +39,17 @@ export type SchemaVersion = {
    * somebody rolled back the code but not the schema if it persists.
    */
   readonly ahead: boolean;
+  /**
+   * Whether the bookkeeping table could be read at all.
+   *
+   * Not the same question as whether anything is pending, and conflating them
+   * is how this check first shipped: the application connects as a role with
+   * no rights on the `drizzle` schema, the query threw, and the probe
+   * confidently reported that a fully migrated production database had never
+   * been migrated. A diagnostic that lies in the direction of alarm is worse
+   * than none, because the next person to see it believes it.
+   */
+  readonly readable: boolean;
 };
 
 /**
@@ -49,9 +60,14 @@ export type SchemaVersion = {
  * question about arithmetic on a list, and needing Postgres to answer it is
  * how that path ends up untested.
  */
-export function compareSchema(appliedAt: number | null): SchemaVersion {
+export function compareSchema(appliedAt: number | null, readable = true): SchemaVersion {
   const latest = ENTRIES.at(-1) ?? null;
   const expected = latest?.tag ?? null;
+
+  if (!readable) {
+    // Nothing is claimed about what is pending, because nothing is known.
+    return { expected, applied: null, upToDate: false, pending: [], ahead: false, readable: false };
+  }
 
   if (appliedAt === null) {
     return {
@@ -60,6 +76,7 @@ export function compareSchema(appliedAt: number | null): SchemaVersion {
       upToDate: false,
       pending: ENTRIES.map((entry) => entry.tag),
       ahead: false,
+      readable: true,
     };
   }
 
@@ -72,6 +89,7 @@ export function compareSchema(appliedAt: number | null): SchemaVersion {
     upToDate: pending.length === 0 && known !== undefined,
     pending,
     ahead: known === undefined && appliedAt > (latest?.when ?? 0),
+    readable: true,
   };
 }
 
@@ -85,7 +103,9 @@ export async function checkSchemaVersion(database: Database): Promise<SchemaVers
     const row = (result as unknown as { rows?: { created_at: string | number }[] }).rows?.[0];
     return compareSchema(row ? Number(row.created_at) : null);
   } catch {
-    // No bookkeeping table at all: the database has never been migrated.
-    return compareSchema(null);
+    // Could not read it. That is not the same as "never migrated" — the
+    // application's role may simply have no rights on the `drizzle` schema —
+    // and saying so is the whole point of the distinction.
+    return compareSchema(null, false);
   }
 }

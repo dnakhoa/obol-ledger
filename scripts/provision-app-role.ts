@@ -65,6 +65,15 @@ async function main(): Promise<void> {
     );
     await pool.query(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${ROLE}`);
 
+    // The migrator keeps its bookkeeping in its own schema, and the health
+    // probe reads it to report schema drift. Without these the probe cannot
+    // tell "behind" from "not allowed to look", which is how it first shipped.
+    await pool.query(`GRANT USAGE ON SCHEMA drizzle TO ${ROLE}`);
+    await pool.query(`GRANT SELECT ON ALL TABLES IN SCHEMA drizzle TO ${ROLE}`);
+    await pool.query(
+      `ALTER DEFAULT PRIVILEGES IN SCHEMA drizzle GRANT SELECT ON TABLES TO ${ROLE}`,
+    );
+
     // Tables created by future migrations need the same grants, or the next
     // deploy breaks in a way that looks like a code bug.
     await pool.query(

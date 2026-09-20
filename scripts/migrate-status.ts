@@ -13,7 +13,13 @@ async function main(): Promise<void> {
     console.log(`${describeTarget(url)}`);
     console.log(`  this checkout expects: ${version.expected ?? 'nothing'}`);
     console.log(`  the database has:      ${version.applied ?? 'nothing'}`);
-    if (version.pending.length > 0) {
+    if (!version.readable) {
+      console.log('  could not read drizzle.__drizzle_migrations.');
+      console.log('\n  This is a permissions gap, not a migration gap: the role needs');
+      console.log('  USAGE on schema drizzle and SELECT on that table.');
+      console.log('  Run `pnpm tsx scripts/provision-app-role.ts` against this database.');
+      process.exitCode = 1;
+    } else if (version.pending.length > 0) {
       console.log(`  pending (${version.pending.length}): ${version.pending.join(', ')}`);
       console.log('\n  run `pnpm db:migrate` to apply them.');
       process.exitCode = 1;
