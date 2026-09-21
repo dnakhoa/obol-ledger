@@ -8,6 +8,8 @@ import { DirectionalAmount, Money } from '@/components/money';
 import { ReverseEntry } from '@/components/reverse-entry';
 import { ArrowLeftIcon, CheckIcon } from '@/components/icons';
 import { viewerServices } from '@/server/container';
+import { translations } from '@/server/i18n';
+import { dateFormats } from '@/lib/i18n';
 import { toMoneyDto } from '@/server/services/serialize';
 import type { MinorUnits } from '@/lib/money';
 import { reverseEntryAction } from './actions';
@@ -18,12 +20,6 @@ type PageProps = { params: Promise<{ entryId: string }> };
 
 export const dynamic = 'force-dynamic';
 
-const FULL_DATE = new Intl.DateTimeFormat('en-US', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-  timeZone: 'UTC',
-});
-
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { entryId } = await params;
   const entry = await (await viewerServices()).services.journal.byId(entryId);
@@ -31,6 +27,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function EntryPage({ params }: PageProps) {
+  const { locale, t } = await translations();
+  const format = dateFormats(locale);
   const { entryId } = await params;
   const entry = await (await viewerServices()).services.journal.byId(entryId);
   if (!entry) notFound();
@@ -59,7 +57,7 @@ export default async function EntryPage({ params }: PageProps) {
           className="text-ink-muted hover:text-ink inline-flex items-center gap-1.5 text-xs transition-colors duration-150"
         >
           <ArrowLeftIcon width={13} height={13} />
-          Journal
+          {t.journal.title}
         </Link>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1">
@@ -68,14 +66,14 @@ export default async function EntryPage({ params }: PageProps) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge>{entry.currency}</Badge>
-            {isPending ? <Badge tone="caution">Pending</Badge> : null}
-            {isArchived ? <Badge tone="neutral">Cancelled</Badge> : null}
-            {reversed ? <Badge tone="caution">Reversed</Badge> : null}
-            {isReversal ? <Badge tone="neutral">Reversing entry</Badge> : null}
+            {isPending ? <Badge tone="caution">{t.entry.pending}</Badge> : null}
+            {isArchived ? <Badge tone="neutral">{t.entry.cancelled}</Badge> : null}
+            {reversed ? <Badge tone="caution">{t.entry.reversed}</Badge> : null}
+            {isReversal ? <Badge tone="neutral">{t.entry.reversingEntry}</Badge> : null}
             {!reversed && !isReversal && !isPending && !isArchived ? (
               <Badge tone="positive">
                 <CheckIcon width={11} height={11} />
-                In effect
+                {t.misc.inEffect}
               </Badge>
             ) : null}
           </div>
@@ -107,7 +105,9 @@ export default async function EntryPage({ params }: PageProps) {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-card border-line bg-surface border px-4 py-3.5">
-          <p className="text-ink-muted text-[11px] font-medium tracking-wide uppercase">Amount</p>
+          <p className="text-ink-muted text-[11px] font-medium tracking-wide uppercase">
+            {t.entry.amount}
+          </p>
           <p className="mt-1.5 text-2xl font-semibold tracking-tight">
             <Money value={totalDebits} />
           </p>
@@ -120,18 +120,20 @@ export default async function EntryPage({ params }: PageProps) {
           </p>
         </div>
         <div className="rounded-card border-line bg-surface border px-4 py-3.5">
-          <p className="text-ink-muted text-[11px] font-medium tracking-wide uppercase">Occurred</p>
-          <p className="mt-1.5 text-sm font-medium">
-            {FULL_DATE.format(new Date(entry.occurredAt))}
+          <p className="text-ink-muted text-[11px] font-medium tracking-wide uppercase">
+            {t.entry.occurred}
           </p>
+          <p className="mt-1.5 text-sm font-medium">{format.full(new Date(entry.occurredAt))}</p>
           <p className="text-ink-muted mt-1 text-xs">
-            Recorded {FULL_DATE.format(new Date(entry.createdAt))}
+            Recorded {format.full(new Date(entry.createdAt))}
           </p>
         </div>
         <div className="rounded-card border-line bg-surface border px-4 py-3.5">
-          <p className="text-ink-muted text-[11px] font-medium tracking-wide uppercase">Postings</p>
+          <p className="text-ink-muted text-[11px] font-medium tracking-wide uppercase">
+            {t.entry.postings}
+          </p>
           <p className="mt-1.5 text-sm font-medium">{entry.postings.length} lines</p>
-          <p className="text-ink-muted mt-1 text-xs">Summing to zero, verified at COMMIT</p>
+          <p className="text-ink-muted mt-1 text-xs">{t.entry.sumsToZero}</p>
         </div>
       </div>
 
@@ -139,7 +141,7 @@ export default async function EntryPage({ params }: PageProps) {
         <Card>
           <CardHeader>
             <div className="space-y-0.5">
-              <CardTitle>Metadata</CardTitle>
+              <CardTitle>{t.entry.metadata}</CardTitle>
               <CardDescription>
                 The caller&rsquo;s own references. Opaque to the ledger, and searchable —{' '}
                 <code className="font-mono text-[11px]">?metadataKey=&amp;metadataValue=</code> on
@@ -165,8 +167,8 @@ export default async function EntryPage({ params }: PageProps) {
       <Card>
         <CardHeader>
           <div className="space-y-0.5">
-            <CardTitle>Postings</CardTitle>
-            <CardDescription>In the order the entry was written.</CardDescription>
+            <CardTitle>{t.entry.postings}</CardTitle>
+            <CardDescription>{t.entry.postingsHint}</CardDescription>
           </div>
         </CardHeader>
         <TableScroll>
@@ -174,9 +176,9 @@ export default async function EntryPage({ params }: PageProps) {
             <thead>
               <tr>
                 <Th>#</Th>
-                <Th>Account</Th>
-                <Th align="right">Debit</Th>
-                <Th align="right">Credit</Th>
+                <Th>{t.entry.account}</Th>
+                <Th align="right">{t.journal.debit}</Th>
+                <Th align="right">{t.journal.credit}</Th>
               </tr>
             </thead>
             <tbody>
@@ -212,12 +214,13 @@ export default async function EntryPage({ params }: PageProps) {
       <Card>
         <CardBody>
           {isPending ? (
-            <SettleEntry transactionId={entry.id} action={transitionEntryAction} />
+            <SettleEntry
+              transactionId={entry.id}
+              action={transitionEntryAction}
+              labels={{ pending: t.misc.entryPending, cancel: t.misc.cancelIt }}
+            />
           ) : isArchived ? (
-            <p className="text-ink-muted text-xs">
-              This entry was cancelled before it settled, so it never reached the balances. There is
-              nothing to reverse — a reversal cancels money that moved, and none did.
-            </p>
+            <p className="text-ink-muted text-xs">{t.misc.cancelledNote}</p>
           ) : reversed ? (
             <p className="text-ink-muted text-xs">
               This entry has already been reversed, and an entry can only be reversed once —
@@ -228,6 +231,16 @@ export default async function EntryPage({ params }: PageProps) {
               transactionId={entry.id}
               description={entry.description}
               action={reverseEntryAction}
+              labels={{
+                description: t.forms.reversalDescription,
+                hint: t.forms.reversalHint,
+                posting: t.forms.posting,
+                submit: t.forms.postReversal,
+                viewReversal: t.misc.viewReversal,
+                noEditing: t.misc.noEditing,
+                reverseThis: t.misc.reverseThis,
+                note: t.misc.reverseNote,
+              }}
             />
           )}
         </CardBody>

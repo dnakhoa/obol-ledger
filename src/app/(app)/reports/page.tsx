@@ -143,9 +143,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           <div className="border-line flex items-center justify-between border-t px-4 py-3 sm:px-5">
             <div>
               <p className="text-sm font-medium">{t.reports.retainedEarnings}</p>
-              <p className="text-ink-muted text-xs">
-                Revenue less expenses, folded into equity as it would be at period close
-              </p>
+              <p className="text-ink-muted text-xs">{t.misc.retainedNote}</p>
             </div>
             <span className="numeric text-sm font-medium">
               <Money value={sheet.retainedEarnings} signed />

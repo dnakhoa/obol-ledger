@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AccountsIcon,
@@ -47,23 +47,48 @@ type Item = {
   Icon: (props: { width?: number; height?: number }) => React.ReactElement;
 };
 
-const PAGES: Item[] = [
-  { id: 'p-overview', href: '/', label: 'Overview', group: 'Pages', Icon: GaugeIcon },
-  { id: 'p-accounts', href: '/accounts', label: 'Accounts', group: 'Pages', Icon: AccountsIcon },
-  { id: 'p-stock', href: '/stock', label: 'Stock', group: 'Pages', Icon: StockIcon },
-  { id: 'p-journal', href: '/journal', label: 'Journal', group: 'Pages', Icon: JournalIcon },
-  { id: 'p-reports', href: '/reports', label: 'Reports', group: 'Pages', Icon: ReportsIcon },
-  {
-    id: 'p-transfer',
-    href: '/transfer',
-    label: 'Post an entry',
-    group: 'Pages',
-    Icon: TransferIcon,
-  },
-  { id: 'p-webhooks', href: '/webhooks', label: 'Webhooks', group: 'Pages', Icon: WebhookIcon },
-  { id: 'p-api', href: '/api-reference', label: 'API reference', group: 'Pages', Icon: ApiIcon },
-  { id: 'p-settings', href: '/settings', label: 'Settings', group: 'Pages', Icon: SettingsIcon },
-];
+/**
+ * The destinations, named from the same dictionary the navigation uses.
+ *
+ * A function rather than a constant because the names depend on the reader,
+ * and a palette that searched English labels while the sidebar showed
+ * Vietnamese ones would be a search box that cannot find the page you are
+ * looking at.
+ */
+function pagesFor(nav: PaletteLabels['nav'], group: string): Item[] {
+  return [
+    { id: 'p-overview', href: '/', label: nav.overview, group, Icon: GaugeIcon },
+    { id: 'p-accounts', href: '/accounts', label: nav.accounts, group, Icon: AccountsIcon },
+    { id: 'p-stock', href: '/stock', label: nav.stock, group, Icon: StockIcon },
+    { id: 'p-journal', href: '/journal', label: nav.journal, group, Icon: JournalIcon },
+    { id: 'p-reports', href: '/reports', label: nav.reports, group, Icon: ReportsIcon },
+    { id: 'p-transfer', href: '/transfer', label: nav.newEntry, group, Icon: TransferIcon },
+    { id: 'p-webhooks', href: '/webhooks', label: nav.webhooks, group, Icon: WebhookIcon },
+    { id: 'p-api', href: '/api-reference', label: nav.api, group, Icon: ApiIcon },
+    { id: 'p-settings', href: '/settings', label: nav.settings, group, Icon: SettingsIcon },
+  ];
+}
+
+export type PaletteLabels = {
+  readonly label: string;
+  readonly placeholder: string;
+  readonly results: string;
+  readonly searching: string;
+  readonly pages: string;
+  readonly accounts: string;
+  readonly entries: string;
+  readonly nav: {
+    readonly overview: string;
+    readonly accounts: string;
+    readonly stock: string;
+    readonly journal: string;
+    readonly reports: string;
+    readonly newEntry: string;
+    readonly webhooks: string;
+    readonly api: string;
+    readonly settings: string;
+  };
+};
 
 const EMPTY_RESULTS: SearchResults = { accounts: [], entries: [] };
 
@@ -88,7 +113,8 @@ export function openCommandPalette(): void {
   window.dispatchEvent(new Event(OPEN_EVENT));
 }
 
-export function CommandPalette() {
+export function CommandPalette({ labels }: { labels: PaletteLabels }) {
+  const allPages = pagesFor(labels.nav, labels.pages);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -100,8 +126,8 @@ export function CommandPalette() {
 
   const needle = query.trim().toLowerCase();
   const pages = needle
-    ? PAGES.filter((page) => page.label.toLowerCase().includes(needle))
-    : PAGES.slice(0, 5);
+    ? allPages.filter((page) => page.label.toLowerCase().includes(needle))
+    : allPages.slice(0, 5);
 
   /*
    * Derived, not stored. Clearing `results` from an effect when the query gets
@@ -118,7 +144,7 @@ export function CommandPalette() {
       href: `/accounts/${account.id}`,
       label: account.name,
       hint: `${account.type} · ${groupDecimalString(account.balance)} ${account.currency}`,
-      group: 'Accounts',
+      group: labels.accounts,
       Icon: AccountsIcon,
     })),
     ...visible.entries.map((entry) => ({
@@ -126,17 +152,21 @@ export function CommandPalette() {
       href: `/journal/${entry.id}`,
       label: entry.description,
       hint: `${DAY.format(new Date(entry.occurredAt))} · ${entry.status}`,
-      group: 'Entries',
+      group: labels.entries,
       Icon: JournalIcon,
     })),
   ];
 
-  const close = useCallback(() => {
+  // A plain function, not a `useCallback`. The React Compiler memoizes this
+  // component itself, and a manual `useCallback` it cannot reconcile makes it
+  // bail out of compiling the whole component — which costs more than the
+  // stable identity was buying.
+  const close = () => {
     setOpen(false);
     setQuery('');
     setResults(EMPTY_RESULTS);
     setActive(0);
-  }, []);
+  };
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -225,7 +255,7 @@ export function CommandPalette() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Search and commands"
+        aria-label={labels.label}
         className="rounded-card border-line bg-surface w-full max-w-xl overflow-hidden border shadow-2xl"
       >
         <div className="border-line flex items-center gap-2.5 border-b px-4">
@@ -243,7 +273,7 @@ export function CommandPalette() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onInputKeyDown}
-            placeholder="Search accounts, entries and pages…"
+            placeholder={labels.placeholder}
             className="text-ink placeholder:text-ink-muted h-12 flex-1 bg-transparent text-sm outline-none"
           />
           <kbd className="border-line text-ink-muted hidden rounded border px-1.5 py-0.5 text-[10px] sm:block">
@@ -254,12 +284,12 @@ export function CommandPalette() {
         <ul
           id={listId}
           role="listbox"
-          aria-label="Results"
+          aria-label={labels.results}
           className="max-h-80 overflow-y-auto p-2"
         >
           {items.length === 0 ? (
             <li className="text-ink-muted px-3 py-6 text-center text-sm">
-              {loading ? 'Searching…' : `Nothing matches “${query}”.`}
+              {loading ? labels.searching : `Nothing matches “${query}”.`}
             </li>
           ) : (
             items.map((item, index) => {
@@ -316,13 +346,20 @@ export function CommandPalette() {
  * clicked. On a phone there is no shortcut to print and no room to print it,
  * so the same control becomes an icon with an accessible name.
  */
-export function PaletteTrigger({ variant = 'bar' }: { variant?: 'bar' | 'icon' }) {
+export function PaletteTrigger({
+  label,
+  variant = 'bar',
+}: {
+  /** Resolved on the server, like every other label here. */
+  label: string;
+  variant?: 'bar' | 'icon';
+}) {
   if (variant === 'icon') {
     return (
       <button
         type="button"
         onClick={openCommandPalette}
-        aria-label="Search"
+        aria-label={label}
         className="border-line bg-surface text-ink-muted hover:bg-surface-hover hover:text-ink-secondary flex size-9 items-center justify-center rounded-lg border transition-colors duration-150"
       >
         <SearchIcon width={15} height={15} />
@@ -337,7 +374,7 @@ export function PaletteTrigger({ variant = 'bar' }: { variant?: 'bar' | 'icon' }
       className="border-line bg-surface text-ink-muted hover:bg-surface-hover hover:text-ink-secondary flex h-9 w-full items-center gap-2 rounded-lg border px-2.5 text-sm transition-colors duration-150"
     >
       <SearchIcon width={14} height={14} />
-      <span className="flex-1 text-left">Search…</span>
+      <span className="flex-1 text-left">{label}</span>
       <kbd className="border-line rounded border px-1.5 py-0.5 font-sans text-[10px]">⌘K</kbd>
     </button>
   );

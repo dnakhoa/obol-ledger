@@ -29,6 +29,12 @@ export const dynamic = 'force-dynamic';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const { locale, t } = await translations();
+  const themeLabels = {
+    legend: t.common.colourTheme,
+    light: t.common.themeLight,
+    system: t.common.themeSystem,
+    dark: t.common.themeDark,
+  };
   const viewer = await currentViewer();
   // An unenrolled account has no ledger to render a shell around, so the
   // pages send it to onboarding; the shell still needs a name for the header.
@@ -59,15 +65,19 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           </Link>
         </div>
         <div className="px-3 pt-3">
-          <PaletteTrigger />
+          <PaletteTrigger label={t.common.search} />
         </div>
         <div className="flex-1 overflow-y-auto p-3">
           <SidebarNav labels={t.nav} />
         </div>
         <div className="border-line space-y-3 border-t p-3">
-          <ViewerMenu {...identity} orgName={ledgerName} />
+          <ViewerMenu
+            {...identity}
+            orgName={ledgerName}
+            labels={{ reading: t.misc.reading, signIn: t.common.signIn }}
+          />
           <LanguageToggle current={locale} label={t.common.language} />
-          <ThemeToggle />
+          <ThemeToggle labels={themeLabels} />
         </div>
       </aside>
 
@@ -80,9 +90,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             {t.common.appName}
           </Link>
           <div className="flex items-center gap-2">
-            <PaletteTrigger variant="icon" />
+            <PaletteTrigger label={t.common.search} variant="icon" />
             <LanguageToggle current={locale} label={t.common.language} />
-            <ThemeToggle />
+            <ThemeToggle labels={themeLabels} />
           </div>
         </header>
 
@@ -91,7 +101,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           is `display: none` below `lg`, and a dialog inside a hidden ancestor
           is a dialog nobody on a phone can see.
         */}
-        <CommandPalette />
+        <CommandPalette
+          labels={{
+            label: t.palette.label,
+            placeholder: t.palette.placeholder,
+            results: t.palette.results,
+            searching: t.palette.searching,
+            pages: t.palette.pages,
+            accounts: t.palette.accounts,
+            entries: t.palette.entries,
+            nav: t.nav,
+          }}
+        />
 
         <main id="main" className="flex-1 px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:py-8 lg:pb-8">
           <div className="mx-auto w-full max-w-6xl space-y-6">

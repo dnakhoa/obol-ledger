@@ -15,6 +15,7 @@ import { ArrowLeftIcon, ArrowRightIcon } from './icons';
  * no information about what came before it, so there is no way to fake this.
  */
 export function CursorPagination({
+  label,
   basePath,
   nextCursor,
   previousCursor,
@@ -22,6 +23,8 @@ export function CursorPagination({
   noun = 'row',
   preserve,
 }: {
+  /** Resolved on the server; a client component holds no dictionary. */
+  label: string;
   basePath: string;
   nextCursor: string | null;
   previousCursor: string | null;
@@ -42,7 +45,7 @@ export function CursorPagination({
 
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={label}
       className="border-line flex items-center justify-between gap-3 border-t px-4 py-3 sm:px-5"
     >
       <p className="text-ink-muted text-xs">

@@ -231,7 +231,7 @@ export default async function MonthEndPage() {
                         action={reopenMonthAction}
                         month={period.periodMonth.slice(0, 7)}
                         label={t.monthEnd.reopen}
-                        pendingLabel="Reopening…"
+                        pendingLabel={t.statement.reopening}
                         variant="secondary"
                         confirm={`Reopen ${format.month(
                           new Date(`${period.periodMonth}T00:00:00Z`),

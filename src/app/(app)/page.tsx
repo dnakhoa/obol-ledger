@@ -23,9 +23,11 @@ export async function generateMetadata(): Promise<Metadata> {
 export const dynamic = 'force-dynamic';
 
 export default async function OverviewPage() {
+  const { locale, t } = await translations();
+  const format = dateFormats(locale);
   let model;
   try {
-    model = await loadDashboard();
+    model = await loadDashboard(locale);
   } catch (error) {
     if (error instanceof Error && error.message.includes('DATABASE_URL')) {
       return <SetupNotice detail={error.message} />;
@@ -37,8 +39,6 @@ export default async function OverviewPage() {
   // One row: the trial balance is stated in the functional currency and
   // nothing else, because that is the only unit it means anything in.
   const books = trialBalance[0];
-  const { locale, t } = await translations();
-  const format = dateFormats(locale);
   const position = buildPosition(accounts);
   const allBalanced = trialBalance.every((row) => row.balanced);
 
@@ -157,7 +157,13 @@ export default async function OverviewPage() {
             <Badge>{chart.currency}</Badge>
           </CardHeader>
           <CardBody>
-            <VolumeChart columns={chart.columns} ticks={chart.ticks} currency={chart.currency} />
+            <VolumeChart
+              columns={chart.columns}
+              ticks={chart.ticks}
+              currency={chart.currency}
+              locale={locale}
+              labels={{ noActivity: t.misc.noActivity, viewAsTable: t.misc.viewAsTable }}
+            />
           </CardBody>
         </Card>
 
@@ -177,7 +183,7 @@ export default async function OverviewPage() {
               href="/accounts"
               className="text-ink-muted hover:text-ink text-xs transition-colors duration-150"
             >
-              All accounts
+              {t.misc.allAccounts}
             </Link>
           </CardHeader>
           {accounts.length === 0 ? (

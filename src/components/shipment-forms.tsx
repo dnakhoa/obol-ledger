@@ -70,6 +70,7 @@ export function RecordShipmentForm({ today, labels }: { today: string; labels: S
 export type ChargeLabels = {
   readonly kind: string;
   readonly description: string;
+  readonly descriptionPlaceholder: string;
   readonly amount: string;
   readonly currency: string;
   readonly basis: string;
@@ -131,7 +132,12 @@ export function AddChargeForm({
           </Select>
         </Field>
         <Field label={labels.description} htmlFor={`${id}-desc`}>
-          <Input id={`${id}-desc`} name="description" required placeholder="Ocean freight" />
+          <Input
+            id={`${id}-desc`}
+            name="description"
+            required
+            placeholder={labels.descriptionPlaceholder}
+          />
         </Field>
         <Field label={labels.amount} htmlFor={`${id}-amount`}>
           <Input

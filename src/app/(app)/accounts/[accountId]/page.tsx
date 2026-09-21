@@ -11,6 +11,8 @@ import { CursorPagination } from '@/components/pagination';
 import { ArrowLeftIcon, DownloadIcon } from '@/components/icons';
 import { ButtonLink } from '@/components/ui/button';
 import { viewerServices } from '@/server/container';
+import { translations } from '@/server/i18n';
+import { dateFormats } from '@/lib/i18n';
 import { normalBalanceOf, type AccountType } from '@/server/domain/account';
 
 type PageProps = {
@@ -19,13 +21,6 @@ type PageProps = {
 };
 
 const PAGE_SIZE = 25;
-
-const LINE_DATE = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { accountId } = await params;
@@ -36,6 +31,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export const dynamic = 'force-dynamic';
 
 export default async function AccountStatementPage({ params, searchParams }: PageProps) {
+  const { locale, t } = await translations();
+  const format = dateFormats(locale);
   const [{ accountId }, query] = await Promise.all([params, searchParams]);
 
   const { services } = await viewerServices();
@@ -57,7 +54,7 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
           className="text-ink-muted hover:text-ink inline-flex items-center gap-1.5 text-xs transition-colors duration-150"
         >
           <ArrowLeftIcon width={13} height={13} />
-          Chart of accounts
+          {t.accounts.title}
         </Link>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-1">
@@ -67,21 +64,23 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
           <div className="flex items-center gap-2">
             <Badge>{account.type}</Badge>
             <Badge>{normal}-normal</Badge>
-            {account.status === 'closed' ? <Badge tone="caution">Closed</Badge> : null}
+            {account.status === 'closed' ? (
+              <Badge tone="caution">{t.statement.closed}</Badge>
+            ) : null}
           </div>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile
-          label="Posted balance"
+          label={t.statement.postedBalance}
           value={<Money value={account.balance} signed />}
           unit={account.balance.currency}
-          detail="Settled entries only — what is actually there"
+          detail={t.statement.postedHint}
           emphasis
         />
         <StatTile
-          label="Available"
+          label={t.statement.available}
           value={<Money value={account.availableBalance} signed />}
           unit={account.balance.currency}
           detail={
@@ -91,10 +90,10 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
           }
         />
         <StatTile
-          label="Pending"
+          label={t.statement.pending}
           value={<Money value={account.pendingBalance} signed />}
           unit={account.balance.currency}
-          detail="Settled plus in-flight — what it becomes if everything lands"
+          detail={t.statement.pendingHint}
         />
       </div>
 
@@ -108,10 +107,9 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
         <Card className="border-caution">
           <CardHeader>
             <div className="space-y-0.5">
-              <CardTitle>Pending — not yet in the balance</CardTitle>
+              <CardTitle>{t.statement.pendingNote}</CardTitle>
               <CardDescription>
-                Funds are reserved, so they are already out of <strong>available</strong>, but
-                nothing has moved.
+                {t.misc.fundsReserved} <strong>available</strong>, but nothing has moved.
               </CardDescription>
             </div>
             <Badge tone="caution">{pending.length} in flight</Badge>
@@ -120,16 +118,16 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
             <Table caption={`Pending entries for ${account.name}`}>
               <thead>
                 <tr>
-                  <Th>Date</Th>
-                  <Th>Description</Th>
-                  <Th align="right">Amount</Th>
+                  <Th>{t.statement.date}</Th>
+                  <Th>{t.statement.description}</Th>
+                  <Th align="right">{t.statement.amount}</Th>
                 </tr>
               </thead>
               <tbody>
                 {pending.map((line) => (
                   <Tr key={line.postingId}>
                     <Td className="text-ink-muted whitespace-nowrap">
-                      {LINE_DATE.format(new Date(line.occurredAt))}
+                      {format.day(new Date(line.occurredAt))}
                     </Td>
                     <Td>
                       <Link href={`/journal/${line.transactionId}`} className="hover:underline">
@@ -150,7 +148,7 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
       <Card>
         <CardHeader>
           <div className="space-y-0.5">
-            <CardTitle>Statement</CardTitle>
+            <CardTitle>{t.statement.title}</CardTitle>
             <CardDescription>
               Settled entries, newest first. The running balance is computed by Postgres over this
               account&rsquo;s own postings, so it reconciles with the posted balance above.
@@ -158,38 +156,35 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
           </div>
           <ButtonLink href={`/api/v1/accounts/${account.id}/statement?format=csv`} size="sm">
             <DownloadIcon width={13} height={13} />
-            Export CSV
+            {t.misc.exportCsv}
           </ButtonLink>
         </CardHeader>
 
         {lines.items.length === 0 ? (
-          <EmptyState
-            title="No postings yet"
-            description="Nothing has been posted to this account. It will appear here the moment something is."
-          />
+          <EmptyState title={t.statement.emptyTitle} description={t.statement.emptyBody} />
         ) : (
           <>
             <TableScroll>
               <Table caption={`Statement for ${account.name}`}>
                 <thead>
                   <tr>
-                    <Th>Date</Th>
-                    <Th>Description</Th>
+                    <Th>{t.statement.date}</Th>
+                    <Th>{t.statement.description}</Th>
                     <Th align="right">
-                      <span className="sm:hidden">Amount</span>
-                      <span className="hidden sm:inline">Debit</span>
+                      <span className="sm:hidden">{t.statement.amount}</span>
+                      <span className="hidden sm:inline">{t.journal.debit}</span>
                     </Th>
                     <Th align="right" className="hidden sm:table-cell">
                       Credit
                     </Th>
-                    <Th align="right">Balance</Th>
+                    <Th align="right">{t.statement.balance}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {lines.items.map((line) => (
                     <Tr key={line.postingId}>
                       <Td className="text-ink-muted whitespace-nowrap">
-                        {LINE_DATE.format(new Date(line.occurredAt))}
+                        {format.day(new Date(line.occurredAt))}
                       </Td>
                       <Td>
                         <Link
@@ -228,11 +223,12 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
             </TableScroll>
 
             <CursorPagination
+              label={t.forms.pagination}
               basePath={`/accounts/${account.id}`}
               nextCursor={lines.nextCursor}
               previousCursor={lines.previousCursor}
               showing={lines.items.length}
-              noun="line"
+              noun={t.statement.line}
             />
           </>
         )}

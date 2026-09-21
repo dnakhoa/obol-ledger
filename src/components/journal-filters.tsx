@@ -16,6 +16,7 @@ import type { AccountDto } from '@/server/services/dto';
  * empty page.
  */
 export function JournalFilters({
+  labels,
   accounts,
   accountId,
   search,
@@ -23,6 +24,14 @@ export function JournalFilters({
   metadataValue,
   resultCount,
 }: {
+  /** Resolved on the server; a client component holds no dictionary. */
+  labels: {
+    search: string;
+    anyAccount: string;
+    noMatch: string;
+    description: string;
+    account: string;
+  };
   accounts: readonly AccountDto[];
   accountId?: string | undefined;
   search?: string | undefined;
@@ -41,7 +50,7 @@ export function JournalFilters({
     >
       <div className="min-w-[10rem] flex-1 space-y-1.5">
         <label htmlFor="search" className="text-ink-secondary block text-xs font-medium">
-          Description
+          {labels.description}
         </label>
         <div className="relative">
           <span className="text-ink-muted pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2">
@@ -52,7 +61,7 @@ export function JournalFilters({
             name="search"
             type="search"
             defaultValue={search ?? ''}
-            placeholder="Search entries…"
+            placeholder={labels.search}
             className="border-line bg-surface placeholder:text-ink-muted h-9 w-full rounded-lg border pr-3 pl-8 text-sm"
           />
         </div>
@@ -60,10 +69,10 @@ export function JournalFilters({
 
       <div className="min-w-[12rem] flex-1 space-y-1.5">
         <label htmlFor="accountId" className="text-ink-secondary block text-xs font-medium">
-          Account
+          {labels.account}
         </label>
         <Select id="accountId" name="accountId" defaultValue={accountId ?? ''}>
-          <option value="">Any account</option>
+          <option value="">{labels.anyAccount}</option>
           {accounts.map((account) => (
             <option key={account.id} value={account.id}>
               {account.name}
@@ -125,9 +134,7 @@ export function JournalFilters({
 
       {filtered ? (
         <p aria-live="polite" className="text-ink-muted w-full text-xs">
-          {resultCount === 0
-            ? 'No entries match. Try a shorter search term, or clear the filters.'
-            : `Showing entries matching the filters below.`}
+          {resultCount === 0 ? labels.noMatch : `Showing entries matching the filters below.`}
         </p>
       ) : null}
     </form>

@@ -1,3 +1,4 @@
+import { translations } from '@/server/i18n';
 import { Card, CardBody } from './ui/card';
 import { AlertIcon } from './icons';
 
@@ -9,7 +10,10 @@ import { AlertIcon } from './icons';
  * is down" is also the difference between a five-minute fix and a support
  * ticket.
  */
-export function SetupNotice({ detail }: { detail: string }) {
+export async function SetupNotice({ detail }: { detail: string }) {
+  // A Server Component, so it reads the locale itself rather than making
+  // fourteen callers remember to pass it.
+  const { t } = await translations();
   return (
     <Card>
       <CardBody className="space-y-4">
@@ -18,7 +22,7 @@ export function SetupNotice({ detail }: { detail: string }) {
             <AlertIcon />
           </span>
           <div className="space-y-1">
-            <h2 className="text-sm font-semibold">The ledger has no database yet</h2>
+            <h2 className="text-sm font-semibold">{t.misc.noDatabase}</h2>
             <p className="text-ink-muted text-xs">{detail}</p>
           </div>
         </div>

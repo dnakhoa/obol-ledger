@@ -18,9 +18,12 @@ const INITIAL: SettleFormState = { status: 'idle' };
  * new entry.
  */
 export function SettleEntry({
+  labels,
   transactionId,
   action,
 }: {
+  /** Resolved on the server; a client component holds no dictionary. */
+  labels: { pending: string; cancel: string };
   transactionId: string;
   action: (state: SettleFormState, formData: FormData) => Promise<SettleFormState>;
 }) {
@@ -45,7 +48,7 @@ export function SettleEntry({
       <div className="border-caution bg-caution-soft space-y-1 rounded-lg border px-4 py-3">
         <p className="text-ink flex items-center gap-2 text-sm font-medium">
           <AlertIcon width={14} height={14} />
-          This entry is pending
+          {labels.pending}
         </p>
         <p className="text-ink-secondary text-xs">
           Its funds are reserved but have not moved. The accounts show a reduced{' '}
@@ -68,7 +71,7 @@ export function SettleEntry({
           {pending ? 'Working…' : 'Settle this entry'}
         </Button>
         <Button type="submit" name="intent" value="archive" variant="secondary" disabled={pending}>
-          Cancel it
+          {labels.cancel}
         </Button>
         <p className="text-ink-muted text-xs">
           Settling re-checks the overdraft rule — funds available at authorisation may be gone by
