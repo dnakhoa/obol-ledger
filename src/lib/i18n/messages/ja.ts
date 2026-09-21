@@ -36,6 +36,9 @@ export const ja: Messages = {
     language: '言語',
     skipToContent: '本文へスキップ',
     somethingWentWrong: 'エラーが発生しました',
+    routeErrorBody:
+      'このページを読み込めませんでした。帳簿には何も書き込まれていません — 変更はすべてデータベースのトランザクション内で行われるため、失敗しても中途半端な仕訳は残りません。',
+    errorReference: '参照番号',
     pageNotFound: 'そのページは存在しません',
     keepYourOwnBooks: '自分の帳簿をつける',
     working: '処理中…',
@@ -371,6 +374,31 @@ export const ja: Messages = {
   },
 
   misc: {
+    entriesNote:
+      '各仕訳の明細行の合計は 0 になります — COMMIT 時に遅延制約でデータベースが検証します。',
+    statementNote:
+      '記帳済みの仕訳を新しい順に。残高は Postgres がこの勘定自身の明細行から計算するため、上の記帳済み残高と一致します。',
+    filterMatchNote: '下の絞り込み条件に一致する仕訳を表示しています。',
+    newer: '新しい方へ',
+    older: '古い方へ',
+    showingEntries: (count) => `仕訳 ${count} 件を表示中`,
+    showingLines: (count) => `${count} 行を表示中`,
+    applyFilters: '適用',
+    clearFilters: 'クリア',
+    chartDay: '日付',
+    chartVolume: (currency) => `金額（${currency}）`,
+    chartCaption: (currency) => `${currency} 建ての日次仕訳金額`,
+    alreadyReversedNote:
+      'この仕訳はすでに赤伝処理済みで、赤伝は一度しか切れません — でなければ訂正が二重に効いてしまいます。',
+    reopenNote:
+      '締めた月は再開できます。元の締め仕訳は帳簿に残したまま、取消仕訳で相殺するので、経緯は必ず追えます。',
+    signInPitch:
+      'サインインすると自分の帳簿が持てます — 自分の勘定科目、自分の仕訳、自分の通貨で。デモはそのまま残ります。',
+    overdraftNote:
+      'オフのとき、この勘定をマイナスにする仕訳は拒否されます — アプリケーションだけでなく Postgres の CHECK 制約によって。評価勘定、および負債・純資産・収益の多くはオンが必要です。',
+    settleNote:
+      '決済時にマイナス残高の可否を再確認します — 承認時点で足りていた資金が、いまは無いかもしれません。',
+    starterChartNote: '初期の勘定科目表が付いてきます。あとから名称変更、追加、閉鎖ができます。',
     exportCsv: 'CSV を書き出す',
     tryAgain: '再試行',
     inEffect: '有効',
@@ -452,7 +480,7 @@ export const ja: Messages = {
     postings: '明細行',
     postingsHint:
       '借方合計と貸方合計は一致していなければなりません。一致しないものは仕訳ではありません。',
-    lineAccount: (n) => `${n} 行目の勘定科目`,
+    lineAccount: '{n} 行目の勘定科目',
     sumToZero: '明細行の合計が 0 になったときにのみ、仕訳として受け付けられます。',
     selectAccount: '勘定科目を選択\u2026',
     side: '貸借',

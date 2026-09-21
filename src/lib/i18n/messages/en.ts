@@ -29,6 +29,9 @@ export const en = {
     language: 'Language',
     skipToContent: 'Skip to content',
     somethingWentWrong: 'Something went wrong',
+    routeErrorBody:
+      'This page could not be loaded. Nothing was written to the ledger — every mutation happens inside a database transaction, so a failure leaves no partial entry behind.',
+    errorReference: 'Reference',
     pageNotFound: 'That page does not exist',
     keepYourOwnBooks: 'Keep your own books',
     working: 'Working…',
@@ -372,6 +375,32 @@ export const en = {
   },
 
   misc: {
+    entriesNote:
+      'Each entry’s postings sum to zero — verified at COMMIT by a deferred database constraint.',
+    statementNote:
+      'Settled entries, newest first. The running balance is computed by Postgres over this account’s own postings, so it reconciles with the posted balance above.',
+    filterMatchNote: 'Showing entries matching the filters below.',
+    newer: 'Newer',
+    older: 'Older',
+    showingEntries: (count: number) => `Showing ${count} ${count === 1 ? 'entry' : 'entries'}`,
+    showingLines: (count: number) => `Showing ${count} ${count === 1 ? 'line' : 'lines'}`,
+    applyFilters: 'Apply',
+    clearFilters: 'Clear',
+    chartDay: 'Day',
+    chartVolume: (currency: string) => `Volume (${currency})`,
+    chartCaption: (currency: string) => `Daily posting volume in ${currency}`,
+    alreadyReversedNote:
+      'This entry has already been reversed, and an entry can only be reversed once — otherwise the correction would be applied twice.',
+    reopenNote:
+      'A closed month can be reopened. The original closing entry stays on the record and a reversing one cancels it, so there is always a trail.',
+    signInPitch:
+      'Sign in and you get a ledger of your own — your chart of accounts, your entries, your currency. The demo stays where it is.',
+    overdraftNote:
+      'When off, a posting that would take this account below zero is refused — by a CHECK constraint in Postgres as well as by the application. Contra accounts and most liability, equity and revenue accounts need this on.',
+    settleNote:
+      'Settling re-checks the overdraft rule — funds available at authorisation may be gone by now.',
+    starterChartNote:
+      'A starter chart of accounts comes with it. You can rename, add and close accounts afterwards.',
     exportCsv: 'Export CSV',
     tryAgain: 'Try again',
     inEffect: 'In effect',
@@ -454,7 +483,7 @@ export const en = {
     currency: 'Currency',
     postings: 'Postings',
     postingsHint: 'Debits and credits must total the same amount. Nothing else is a valid entry.',
-    lineAccount: (n: number) => `Line ${n} account`,
+    lineAccount: 'Line {n} account',
     sumToZero: 'An entry is only accepted when its postings sum to zero.',
     selectAccount: 'Select an account\u2026',
     side: 'Side',

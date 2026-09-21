@@ -31,6 +31,10 @@ export function JournalFilters({
     noMatch: string;
     description: string;
     account: string;
+    apply: string;
+    clear: string;
+    remove: string;
+    matchNote: string;
   };
   accounts: readonly AccountDto[];
   accountId?: string | undefined;
@@ -99,14 +103,14 @@ export function JournalFilters({
           type="submit"
           className="bg-action text-action-ink hover:bg-action-hover h-9 cursor-pointer rounded-lg px-4 text-sm font-medium transition-colors duration-150"
         >
-          Apply
+          {labels.apply}
         </button>
         {filtered ? (
           <Link
             href="/journal"
             className="text-ink-muted hover:text-ink h-9 rounded-lg px-2 text-sm leading-9 transition-colors duration-150"
           >
-            Clear
+            {labels.clear}
           </Link>
         ) : null}
       </div>
@@ -127,14 +131,14 @@ export function JournalFilters({
             }}
             className="text-ink-muted hover:text-ink text-xs transition-colors duration-150"
           >
-            Remove
+            {labels.remove}
           </Link>
         </div>
       ) : null}
 
       {filtered ? (
         <p aria-live="polite" className="text-ink-muted w-full text-xs">
-          {resultCount === 0 ? labels.noMatch : `Showing entries matching the filters below.`}
+          {resultCount === 0 ? labels.noMatch : labels.matchNote}
         </p>
       ) : null}
     </form>

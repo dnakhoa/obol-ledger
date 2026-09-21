@@ -217,15 +217,16 @@ export default async function EntryPage({ params }: PageProps) {
             <SettleEntry
               transactionId={entry.id}
               action={transitionEntryAction}
-              labels={{ pending: t.misc.entryPending, cancel: t.misc.cancelIt }}
+              labels={{
+                pending: t.misc.entryPending,
+                cancel: t.misc.cancelIt,
+                note: t.misc.settleNote,
+              }}
             />
           ) : isArchived ? (
             <p className="text-ink-muted text-xs">{t.misc.cancelledNote}</p>
           ) : reversed ? (
-            <p className="text-ink-muted text-xs">
-              This entry has already been reversed, and an entry can only be reversed once —
-              otherwise the correction would be applied twice.
-            </p>
+            <p className="text-ink-muted text-xs">{t.misc.alreadyReversedNote}</p>
           ) : (
             <ReverseEntry
               transactionId={entry.id}
@@ -240,6 +241,7 @@ export default async function EntryPage({ params }: PageProps) {
                 noEditing: t.misc.noEditing,
                 reverseThis: t.misc.reverseThis,
                 note: t.misc.reverseNote,
+                cancel: t.common.cancel,
               }}
             />
           )}

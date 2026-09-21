@@ -23,7 +23,7 @@ export function SettleEntry({
   action,
 }: {
   /** Resolved on the server; a client component holds no dictionary. */
-  labels: { pending: string; cancel: string };
+  labels: { pending: string; cancel: string; note: string };
   transactionId: string;
   action: (state: SettleFormState, formData: FormData) => Promise<SettleFormState>;
 }) {
@@ -73,10 +73,7 @@ export function SettleEntry({
         <Button type="submit" name="intent" value="archive" variant="secondary" disabled={pending}>
           {labels.cancel}
         </Button>
-        <p className="text-ink-muted text-xs">
-          Settling re-checks the overdraft rule — funds available at authorisation may be gone by
-          now.
-        </p>
+        <p className="text-ink-muted text-xs">{labels.note}</p>
       </div>
     </form>
   );

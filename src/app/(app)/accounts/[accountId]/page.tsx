@@ -149,10 +149,7 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
         <CardHeader>
           <div className="space-y-0.5">
             <CardTitle>{t.statement.title}</CardTitle>
-            <CardDescription>
-              Settled entries, newest first. The running balance is computed by Postgres over this
-              account&rsquo;s own postings, so it reconciles with the posted balance above.
-            </CardDescription>
+            <CardDescription>{t.misc.statementNote}</CardDescription>
           </div>
           <ButtonLink href={`/api/v1/accounts/${account.id}/statement?format=csv`} size="sm">
             <DownloadIcon width={13} height={13} />
@@ -175,7 +172,7 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
                       <span className="hidden sm:inline">{t.journal.debit}</span>
                     </Th>
                     <Th align="right" className="hidden sm:table-cell">
-                      Credit
+                      {t.journal.credit}
                     </Th>
                     <Th align="right">{t.statement.balance}</Th>
                   </tr>
@@ -227,8 +224,9 @@ export default async function AccountStatementPage({ params, searchParams }: Pag
               basePath={`/accounts/${account.id}`}
               nextCursor={lines.nextCursor}
               previousCursor={lines.previousCursor}
-              showing={lines.items.length}
-              noun={t.statement.line}
+              showingLabel={t.misc.showingLines(lines.items.length)}
+              newerLabel={t.misc.newer}
+              olderLabel={t.misc.older}
             />
           </>
         )}

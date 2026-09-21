@@ -39,6 +39,7 @@ export default async function NewAccountPage() {
           currency: t.forms.currency,
           klass: t.forms.accountClass,
           allowOverdraft: t.forms.allowOverdraft,
+          overdraftNote: t.misc.overdraftNote,
           failed: t.forms.accountFailed,
           submit: t.forms.openAccount,
           opening: t.forms.opening,

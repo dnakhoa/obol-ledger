@@ -162,7 +162,13 @@ export default async function OverviewPage() {
               ticks={chart.ticks}
               currency={chart.currency}
               locale={locale}
-              labels={{ noActivity: t.misc.noActivity, viewAsTable: t.misc.viewAsTable }}
+              labels={{
+                noActivity: t.misc.noActivity,
+                viewAsTable: t.misc.viewAsTable,
+                day: t.misc.chartDay,
+                volume: t.misc.chartVolume(chart.currency),
+                caption: t.misc.chartCaption(chart.currency),
+              }}
             />
           </CardBody>
         </Card>
