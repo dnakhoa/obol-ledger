@@ -45,6 +45,31 @@ export default async function PostEntryPage() {
         // Denominated in the currency the books are kept in. Hard-coding USD
         // meant a dong ledger offered a form nobody could post an entry with.
         <EntryComposer
+          labels={{
+            entryDetails: t.forms.entryDetails,
+            entryDetailsHint: t.forms.entryDetailsHint,
+            description: t.forms.description,
+            descriptionHint: t.forms.descriptionHint,
+            descriptionPlaceholder: t.forms.descriptionPlaceholder,
+            currency: t.forms.currency,
+            postings: t.forms.postings,
+            postingsHint: t.forms.postingsHint,
+            lineAccount: t.forms.lineAccount,
+            sumToZero: t.forms.sumToZero,
+            selectAccount: t.forms.selectAccount,
+            side: t.forms.side,
+            debit: t.journal.debit,
+            credit: t.journal.credit,
+            amount: t.forms.amount,
+            addPosting: t.forms.addPosting,
+            remove: t.forms.remove,
+            incomplete: t.forms.incomplete,
+            balanced: t.journal.balanced,
+            failed: t.forms.entryFailed,
+            submit: t.forms.postEntry,
+            posting: t.forms.posting,
+            viewJournal: t.misc.viewJournal,
+          }}
           accounts={accounts}
           currency={accounts[0]?.baseBalance.currency ?? 'USD'}
           action={postEntryAction}

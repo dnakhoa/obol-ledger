@@ -1,4 +1,6 @@
 import { toDecimalString, type CurrencyCode, type MinorUnits } from './money';
+import { separatorsFor, type Separators } from './i18n/separators';
+import type { Locale } from './i18n/locales';
 
 /**
  * Presentation formatting for money.
@@ -15,21 +17,48 @@ import { toDecimalString, type CurrencyCode, type MinorUnits } from './money';
 
 const GROUPS = /\B(?=(\d{3})+(?!\d))/gu;
 
-function group(digits: string): string {
-  return digits.replace(GROUPS, ',');
+const ENGLISH: Separators = { group: ',', decimal: '.' };
+
+function group(digits: string, mark: string): string {
+  return digits.replace(GROUPS, mark);
 }
 
-/** `-1234567.5` becomes `-1,234,567.5`. */
-export function groupDecimalString(value: string): string {
+/**
+ * `-1234567.5` becomes `-1,234,567.5`, or `-1.234.567,5` in Vietnamese.
+ *
+ * The separators are supplied rather than looked up from a locale, so this
+ * stays a pure function of its arguments — which is what lets the server and
+ * the browser render a figure identically. A mismatch would be a hydration
+ * error on every page showing money.
+ */
+export function groupDecimalString(value: string, separators: Separators = ENGLISH): string {
   const negative = value.startsWith('-');
   const magnitude = negative ? value.slice(1) : value;
+  // Split on the ASCII point, which is what the domain always produces; the
+  // locale's mark is only ever written, never read.
   const [whole = '0', fraction] = magnitude.split('.');
-  const grouped = fraction ? `${group(whole)}.${fraction}` : group(whole);
+  const grouped = fraction
+    ? `${group(whole, separators.group)}${separators.decimal}${fraction}`
+    : group(whole, separators.group);
   return negative ? `-${grouped}` : grouped;
 }
 
-export function formatMinorUnits(amount: MinorUnits, currency: CurrencyCode): string {
-  return groupDecimalString(toDecimalString(amount, currency));
+/**
+ * A money value as a person in this language reads it.
+ *
+ * Takes the shape rather than the `MoneyDto` type, so this module stays free
+ * of any import from the server — the boundary the architecture test keeps.
+ */
+export function formatAmount(value: { readonly amount: string }, locale: Locale = 'en'): string {
+  return groupDecimalString(value.amount, separatorsFor(locale));
+}
+
+export function formatMinorUnits(
+  amount: MinorUnits,
+  currency: CurrencyCode,
+  locale: Locale = 'en',
+): string {
+  return groupDecimalString(toDecimalString(amount, currency), separatorsFor(locale));
 }
 
 const COMPACT_STEPS = [
@@ -46,7 +75,12 @@ const COMPACT_STEPS = [
  * away precision for nothing. Past a million the labels would crowd the gutter,
  * so they compact to `1.4M`.
  */
-export function formatAxisTick(amount: MinorUnits, currency: CurrencyCode): string {
+export function formatAxisTick(
+  amount: MinorUnits,
+  currency: CurrencyCode,
+  locale: Locale = 'en',
+): string {
+  const separators = separatorsFor(locale);
   const decimal = toDecimalString(amount, currency);
   const whole = decimal.split('.')[0] ?? '0';
   const negative = whole.startsWith('-');
@@ -61,5 +95,5 @@ export function formatAxisTick(amount: MinorUnits, currency: CurrencyCode): stri
     return negative ? `-${rendered}` : rendered;
   }
 
-  return negative ? `-${group(digits)}` : group(digits);
+  return negative ? `-${group(digits, separators.group)}` : group(digits, separators.group);
 }

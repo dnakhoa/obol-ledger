@@ -107,10 +107,10 @@ export default async function JournalPage({ searchParams }: PageProps) {
               }).toString()}`}
             >
               <DownloadIcon />
-              Export CSV
+              {t.misc.exportCsv}
             </ButtonLink>
             <ButtonLink href="/transfer" variant="primary">
-              Post an entry
+              {t.journal.postEntry}
               <ArrowRightIcon />
             </ButtonLink>
           </>
@@ -129,6 +129,13 @@ export default async function JournalPage({ searchParams }: PageProps) {
         </CardHeader>
 
         <JournalFilters
+          labels={{
+            search: t.forms.searchEntries,
+            anyAccount: t.forms.anyAccount,
+            noMatch: t.forms.noMatch,
+            description: t.misc.filterDescription,
+            account: t.misc.filterAccount,
+          }}
           accounts={accounts}
           accountId={query.accountId}
           search={query.search}
@@ -264,6 +271,7 @@ export default async function JournalPage({ searchParams }: PageProps) {
             </TableScroll>
 
             <CursorPagination
+              label={t.forms.pagination}
               basePath="/journal"
               nextCursor={page.nextCursor}
               previousCursor={page.previousCursor}

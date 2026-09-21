@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
-import { formatAmount } from './money';
+import { formatAmount } from '@/lib/format';
+import type { Locale } from '@/lib/i18n';
 import type { MoneyDto } from '@/server/services/dto';
 
 /**
@@ -39,15 +40,26 @@ export function VolumeChart({
   columns,
   ticks,
   currency,
+  locale,
+  labels,
 }: {
   columns: readonly VolumeColumn[];
   ticks: readonly string[];
   currency: string;
+  /**
+   * Passed in rather than read here.
+   *
+   * This is the one chart that runs in the browser, so it cannot reach for the
+   * cookie the way `Money` does — and pulling a server module in to try would
+   * drag `next/headers` into the client bundle.
+   */
+  locale: Locale;
+  labels: { noActivity: string; viewAsTable: string };
 }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
   if (columns.length === 0) {
-    return <p className="text-ink-muted py-12 text-center text-xs">No activity to plot yet.</p>;
+    return <p className="text-ink-muted py-12 text-center text-xs">{labels.noActivity}</p>;
   }
 
   const active = hovered === null ? null : columns[hovered];
@@ -100,7 +112,7 @@ export function VolumeChart({
                     className="numeric bg-surface text-ink-secondary absolute left-1/2 -translate-x-1/2 -translate-y-1.5 rounded px-1 text-[10px] font-medium whitespace-nowrap"
                     style={{ bottom: `${column.heightPercent}%` }}
                   >
-                    {formatAmount(column.value)}
+                    {formatAmount(column.value, locale)}
                   </span>
                 ) : null}
               </div>
@@ -120,7 +132,7 @@ export function VolumeChart({
             >
               <span className="text-ink-muted">{active.label}</span>
               <span className="numeric ml-2 font-medium">
-                {formatAmount(active.value)} {currency}
+                {formatAmount(active.value, locale)} {currency}
               </span>
             </div>
           ) : null}
@@ -143,7 +155,7 @@ export function VolumeChart({
           >
             ›
           </span>
-          View as table
+          {labels.viewAsTable}
         </summary>
         <div className="border-line mt-2 max-h-56 overflow-y-auto rounded-lg border">
           <table className="w-full text-xs">
@@ -162,7 +174,9 @@ export function VolumeChart({
               {columns.map((column) => (
                 <tr key={column.day} className="border-line border-t">
                   <td className="px-3 py-1.5">{column.day}</td>
-                  <td className="numeric px-3 py-1.5 text-right">{formatAmount(column.value)}</td>
+                  <td className="numeric px-3 py-1.5 text-right">
+                    {formatAmount(column.value, locale)}
+                  </td>
                 </tr>
               ))}
             </tbody>

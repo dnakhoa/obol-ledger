@@ -41,14 +41,43 @@ const emptyRow = (direction: 'debit' | 'credit'): Row => ({
 
 const freshRows = (): Row[] => [emptyRow('debit'), emptyRow('credit')];
 
+/** Resolved on the server, so no dictionary reaches the client bundle. */
+export type ComposerLabels = {
+  readonly entryDetails: string;
+  readonly entryDetailsHint: string;
+  readonly description: string;
+  readonly descriptionHint: string;
+  readonly descriptionPlaceholder: string;
+  readonly currency: string;
+  readonly postings: string;
+  readonly postingsHint: string;
+  readonly lineAccount: (n: number) => string;
+  readonly sumToZero: string;
+  readonly selectAccount: string;
+  readonly side: string;
+  readonly debit: string;
+  readonly credit: string;
+  readonly amount: string;
+  readonly addPosting: string;
+  readonly remove: string;
+  readonly incomplete: string;
+  readonly balanced: string;
+  readonly failed: string;
+  readonly submit: string;
+  readonly posting: string;
+  readonly viewJournal: string;
+};
+
 export function EntryComposer({
   accounts,
   currency,
   action,
+  labels,
 }: {
   accounts: AccountDto[];
   currency: CurrencyCode;
   action: (state: EntryFormState, formData: FormData) => Promise<EntryFormState>;
+  labels: ComposerLabels;
 }) {
   const [description, setDescription] = useState('');
   const [rows, setRows] = useState<Row[]>(freshRows);
@@ -114,9 +143,9 @@ export function EntryComposer({
 
   const balanceTone = !balance.complete ? 'neutral' : balance.balanced ? 'positive' : 'caution';
   const balanceLabel = !balance.complete
-    ? 'Incomplete'
+    ? labels.incomplete
     : balance.balanced
-      ? 'Balanced'
+      ? labels.balanced
       : `Out by ${groupDecimalString(toDecimalString(balance.residual, currency))}`;
 
   const errorFor = (field: string): string | undefined =>
@@ -131,7 +160,7 @@ export function EntryComposer({
         <div ref={summaryRef} tabIndex={-1}>
           <ErrorSummary
             id="entry-errors"
-            title={state.message ?? 'The entry could not be posted.'}
+            title={state.message ?? labels.failed}
             errors={state.fieldErrors ?? []}
           />
         </div>
@@ -145,7 +174,7 @@ export function EntryComposer({
           <CheckIcon />
           <span>{state.message}</span>
           <Link href="/journal" className="ml-auto font-medium underline">
-            View journal
+            {labels.viewJournal}
           </Link>
         </div>
       ) : null}
@@ -154,15 +183,15 @@ export function EntryComposer({
         <Card>
           <CardHeader>
             <div className="space-y-0.5">
-              <CardTitle>Entry details</CardTitle>
-              <CardDescription>What happened, and when it is denominated.</CardDescription>
+              <CardTitle>{labels.entryDetails}</CardTitle>
+              <CardDescription>{labels.entryDetailsHint}</CardDescription>
             </div>
           </CardHeader>
           <CardBody className="grid gap-4 sm:grid-cols-[1fr_8rem]">
             <Field
-              label="Description"
+              label={labels.description}
               htmlFor="description"
-              hint="What this entry records, e.g. “Invoice 1042 settled”."
+              hint={labels.descriptionHint}
               error={errorFor('description')}
             >
               <Input
@@ -170,7 +199,7 @@ export function EntryComposer({
                 name="description"
                 required
                 maxLength={280}
-                placeholder="Coffee beans purchased"
+                placeholder={labels.descriptionPlaceholder}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 invalid={Boolean(errorFor('description'))}
@@ -181,7 +210,7 @@ export function EntryComposer({
                 )}
               />
             </Field>
-            <Field label="Currency" htmlFor="currency">
+            <Field label={labels.currency} htmlFor="currency">
               {/*
               One currency per entry is a domain rule, not a UI simplification:
               a composite foreign key means a posting in a currency its account
@@ -197,10 +226,8 @@ export function EntryComposer({
         <Card>
           <CardHeader>
             <div className="space-y-0.5">
-              <CardTitle>Postings</CardTitle>
-              <CardDescription>
-                Debits and credits must total the same amount. Nothing else is a valid entry.
-              </CardDescription>
+              <CardTitle>{labels.postings}</CardTitle>
+              <CardDescription>{labels.postingsHint}</CardDescription>
             </div>
             {/*
             Three states, not two. "Out by 0.00" on an untouched form reads as
@@ -227,7 +254,7 @@ export function EntryComposer({
                   className="grid gap-3 sm:grid-cols-[1fr_7.5rem_9rem_2.25rem] sm:items-start"
                 >
                   <Field
-                    label={`Line ${index + 1} account`}
+                    label={labels.lineAccount(index + 1)}
                     htmlFor={`postings-${index}-accountId`}
                     error={errorFor(`postings.${index}.accountId`)}
                   >
@@ -247,7 +274,7 @@ export function EntryComposer({
                         )
                       }
                     >
-                      <option value="">Select an account…</option>
+                      <option value="">{labels.selectAccount}</option>
                       {usable.map((account) => (
                         <option key={account.id} value={account.id}>
                           {account.name} · {account.type}
@@ -256,7 +283,7 @@ export function EntryComposer({
                     </Select>
                   </Field>
 
-                  <Field label="Side" htmlFor={`postings-${index}-direction`}>
+                  <Field label={labels.side} htmlFor={`postings-${index}-direction`}>
                     <Select
                       id={`postings-${index}-direction`}
                       name="direction"
@@ -271,12 +298,12 @@ export function EntryComposer({
                         )
                       }
                     >
-                      <option value="debit">Debit</option>
-                      <option value="credit">Credit</option>
+                      <option value="debit">{labels.debit}</option>
+                      <option value="credit">{labels.credit}</option>
                     </Select>
                   </Field>
 
-                  <Field label="Amount" htmlFor={amountId} error={amountError}>
+                  <Field label={labels.amount} htmlFor={amountId} error={amountError}>
                     <Input
                       id={amountId}
                       name="amount"
@@ -314,7 +341,9 @@ export function EntryComposer({
                       )}
                     >
                       <span aria-hidden="true">&times;</span>
-                      <span className="sr-only">Remove line {index + 1}</span>
+                      <span className="sr-only">
+                        {labels.remove} {index + 1}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -327,7 +356,7 @@ export function EntryComposer({
               size="sm"
               onClick={() => setRows((current) => [...current, emptyRow('credit')])}
             >
-              Add a line
+              {labels.addPosting}
             </Button>
           </CardBody>
 
@@ -335,10 +364,10 @@ export function EntryComposer({
             <p className="text-ink-muted text-xs">
               {balance.complete && balance.balanced
                 ? 'Debits equal credits. This entry is ready to post.'
-                : 'An entry is only accepted when its postings sum to zero.'}
+                : labels.sumToZero}
             </p>
             <Button type="submit" disabled={pending || !canSubmit}>
-              {pending ? 'Posting…' : 'Post entry'}
+              {pending ? labels.posting : labels.submit}
             </Button>
           </div>
         </Card>

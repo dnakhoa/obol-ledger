@@ -22,10 +22,22 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 
 export const THEME_STORAGE_KEY = 'obol-theme';
 
-const OPTIONS: { value: ThemePreference; label: string; Icon: typeof SunIcon }[] = [
-  { value: 'light', label: 'Light', Icon: SunIcon },
-  { value: 'system', label: 'System', Icon: MonitorIcon },
-  { value: 'dark', label: 'Dark', Icon: MoonIcon },
+/** Labels come from the server, so no dictionary reaches the client bundle. */
+export type ThemeLabels = {
+  readonly legend: string;
+  readonly light: string;
+  readonly system: string;
+  readonly dark: string;
+};
+
+const OPTIONS: {
+  value: ThemePreference;
+  key: 'light' | 'system' | 'dark';
+  Icon: typeof SunIcon;
+}[] = [
+  { value: 'light', key: 'light', Icon: SunIcon },
+  { value: 'system', key: 'system', Icon: MonitorIcon },
+  { value: 'dark', key: 'dark', Icon: MoonIcon },
 ];
 
 function isPreference(value: string | null): value is ThemePreference {
@@ -73,7 +85,7 @@ function applyToDocument(preference: ThemePreference): void {
   document.documentElement.dataset['theme'] = resolved;
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({ labels }: { labels: ThemeLabels }) {
   const preference = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const choose = useCallback((next: ThemePreference) => {
@@ -88,13 +100,13 @@ export function ThemeToggle() {
 
   return (
     <fieldset className="border-line bg-surface-sunken flex items-center gap-0.5 rounded-lg border p-0.5">
-      <legend className="sr-only">Colour theme</legend>
-      {OPTIONS.map(({ value, label, Icon }) => {
+      <legend className="sr-only">{labels.legend}</legend>
+      {OPTIONS.map(({ value, key, Icon }) => {
         const selected = preference === value;
         return (
           <label
             key={value}
-            title={label}
+            title={labels[key]}
             className={cn(
               'flex h-7 w-8 cursor-pointer items-center justify-center rounded-md transition-colors duration-150',
               selected
@@ -111,7 +123,7 @@ export function ThemeToggle() {
               className="sr-only"
             />
             <Icon />
-            <span className="sr-only">{label}</span>
+            <span className="sr-only">{labels[key]}</span>
           </label>
         );
       })}

@@ -221,6 +221,7 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
               labels={{
                 kind: t.shipments.kind,
                 description: t.shipments.chargeDescription,
+                descriptionPlaceholder: t.shipments.kindFreight,
                 amount: t.shipments.amount,
                 currency: t.product.paidIn,
                 basis: t.shipments.basis,

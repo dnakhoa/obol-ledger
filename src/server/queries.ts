@@ -4,6 +4,7 @@ import { demoServices } from './container';
 import { buildLinearScale, heightPercent } from '@/lib/chart-scale';
 import { type CurrencyCode, type MinorUnits } from '@/lib/money';
 import { formatAxisTick } from '@/lib/format';
+import type { Locale } from '@/lib/i18n';
 import { toMoneyDto } from './services/serialize';
 import type { AccountDto, MoneyDto, TrialBalanceRow, TransactionDto } from './services/dto';
 import { ACCOUNT_TYPES, type AccountType } from './domain/account';
@@ -22,12 +23,6 @@ import type { VolumeColumn } from '@/components/volume-chart';
  * the server, so the client bundle never has to reconstruct a money value.
  */
 
-const DAY_LABEL = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  timeZone: 'UTC',
-});
-
 export type DashboardModel = {
   readonly accounts: AccountDto[];
   readonly trialBalance: TrialBalanceRow[];
@@ -43,7 +38,15 @@ export type DashboardModel = {
  * only its dollar accounts would be worse than no dashboard, and that is what
  * a default of `'USD'` produced.
  */
-export async function loadDashboard(): Promise<DashboardModel> {
+/**
+ * `locale` only reaches the axis labels.
+ *
+ * Without it the ticks down the side of the chart would group in English
+ * while the bars beside them grouped in Vietnamese, which is worse than either
+ * one alone — the reader has no way to know which convention a given figure
+ * is in.
+ */
+export async function loadDashboard(locale: Locale = 'en'): Promise<DashboardModel> {
   const { accounts, journal, reporting } = await demoServices();
 
   // Independent reads, issued together: awaiting them in sequence would make the
@@ -55,6 +58,17 @@ export async function loadDashboard(): Promise<DashboardModel> {
     reporting.summary(),
     reporting.dailyVolume(30),
   ]);
+
+  // The day labels along the chart follow the reader too. Without this they
+  // grouped in English under bars whose figures grouped in Vietnamese.
+  const dayLabel = new Intl.DateTimeFormat(
+    locale === 'vi' ? 'vi-VN' : locale === 'ja' ? 'ja-JP' : 'en-GB',
+    {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    },
+  );
 
   const values = volume.map((point) => BigInt(point.volume.minorUnits) as MinorUnits);
   const scale = buildLinearScale(values);
@@ -70,10 +84,10 @@ export async function loadDashboard(): Promise<DashboardModel> {
     summary,
     chart: {
       currency,
-      ticks: scale.ticks.map((tick) => formatAxisTick(tick, currency)),
+      ticks: scale.ticks.map((tick) => formatAxisTick(tick, currency, locale)),
       columns: volume.map((point, index) => ({
         day: point.day,
-        label: DAY_LABEL.format(new Date(`${point.day}T00:00:00Z`)),
+        label: dayLabel.format(new Date(`${point.day}T00:00:00Z`)),
         value: point.volume,
         heightPercent: heightPercent(values[index] ?? (0n as MinorUnits), scale.top),
         isPeak: index === scale.peakIndex,

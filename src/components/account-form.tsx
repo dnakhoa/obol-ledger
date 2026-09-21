@@ -17,19 +17,49 @@ const INITIAL: AccountFormState = { status: 'idle' };
  * debits increase it — because the debit/credit convention is the single thing
  * newcomers get wrong, and a form is where they are deciding.
  */
-const CLASS_HINT: Record<AccountType, string> = {
-  asset: 'What the business owns. Debits increase it.',
-  liability: 'What the business owes. Credits increase it.',
-  equity: 'The owners’ residual claim. Credits increase it.',
-  revenue: 'Income earned. Credits increase it.',
-  expense: 'Costs incurred. Debits increase it.',
+/** Resolved on the server, so no dictionary reaches the client bundle. */
+export type AccountFormLabels = {
+  readonly details: string;
+  readonly intro: string;
+  readonly neverDeleted: string;
+  readonly name: string;
+  readonly nameHint: string;
+  readonly namePlaceholder: string;
+  readonly currency: string;
+  readonly klass: string;
+  readonly allowOverdraft: string;
+  readonly failed: string;
+  readonly submit: string;
+  readonly opening: string;
+  readonly asset: string;
+  readonly liability: string;
+  readonly equity: string;
+  readonly revenue: string;
+  readonly expense: string;
+  readonly assetBlurb: string;
+  readonly liabilityBlurb: string;
+  readonly equityBlurb: string;
+  readonly revenueBlurb: string;
+  readonly expenseBlurb: string;
 };
 
 export function AccountForm({
   action,
+  labels,
 }: {
   action: (state: AccountFormState, formData: FormData) => Promise<AccountFormState>;
+  labels: AccountFormLabels;
 }) {
+  // The class name and its one-line explanation, both from the dictionary —
+  // the same pair the chart of accounts shows, so the two cannot disagree.
+  const klass = (type: AccountType) =>
+    ({
+      asset: [labels.asset, labels.assetBlurb],
+      liability: [labels.liability, labels.liabilityBlurb],
+      equity: [labels.equity, labels.equityBlurb],
+      revenue: [labels.revenue, labels.revenueBlurb],
+      expense: [labels.expense, labels.expenseBlurb],
+    })[type];
   const [state, submit, pending] = useActionState(action, INITIAL);
   const errorFor = (field: string) => state.fieldErrors?.find((e) => e.field === field)?.message;
 
@@ -38,7 +68,7 @@ export function AccountForm({
       {state.status === 'error' ? (
         <ErrorSummary
           id="account-errors"
-          title={state.message ?? 'The account could not be opened.'}
+          title={state.message ?? labels.failed}
           errors={state.fieldErrors ?? []}
         />
       ) : null}
@@ -46,32 +76,25 @@ export function AccountForm({
       <Card>
         <CardHeader>
           <div className="space-y-0.5">
-            <CardTitle>Account details</CardTitle>
-            <CardDescription>
-              A name and a class. The class determines which side increases the balance.
-            </CardDescription>
+            <CardTitle>{labels.details}</CardTitle>
+            <CardDescription>{labels.intro}</CardDescription>
           </div>
         </CardHeader>
 
         <CardBody className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label="Name"
-            htmlFor="name"
-            hint="Unique within its currency, e.g. “Operating Cash”."
-            error={errorFor('name')}
-          >
+          <Field label={labels.name} htmlFor="name" hint={labels.nameHint} error={errorFor('name')}>
             <Input
               id="name"
               name="name"
               required
               maxLength={120}
-              placeholder="Operating Cash"
+              placeholder={labels.namePlaceholder}
               invalid={Boolean(errorFor('name'))}
               aria-describedby={describedBy('name', 'hint', errorFor('name'))}
             />
           </Field>
 
-          <Field label="Currency" htmlFor="currency" error={errorFor('currency')}>
+          <Field label={labels.currency} htmlFor="currency" error={errorFor('currency')}>
             <Select id="currency" name="currency" defaultValue="USD">
               {SUPPORTED_CURRENCIES.map((currency) => (
                 <option key={currency} value={currency}>
@@ -81,11 +104,16 @@ export function AccountForm({
             </Select>
           </Field>
 
-          <Field label="Class" htmlFor="type" className="sm:col-span-2" error={errorFor('type')}>
+          <Field
+            label={labels.klass}
+            htmlFor="type"
+            className="sm:col-span-2"
+            error={errorFor('type')}
+          >
             <Select id="type" name="type" defaultValue="asset">
               {ACCOUNT_TYPES.map((type) => (
                 <option key={type} value={type}>
-                  {type.charAt(0).toUpperCase() + type.slice(1)} — {CLASS_HINT[type]}
+                  {klass(type)[0]} — {klass(type)[1]}
                 </option>
               ))}
             </Select>
@@ -100,7 +128,7 @@ export function AccountForm({
               className="border-line text-action mt-0.5 size-4 rounded"
             />
             <span>
-              <span className="block text-sm font-medium">Allow overdraft</span>
+              <span className="block text-sm font-medium">{labels.allowOverdraft}</span>
               <span className="text-ink-muted block text-xs">
                 When off, a posting that would take this account below zero is refused — by a CHECK
                 constraint in Postgres as well as by the application. Contra accounts and most
@@ -111,11 +139,9 @@ export function AccountForm({
         </div>
 
         <div className="border-line flex items-center justify-between border-t px-4 py-3 sm:px-5">
-          <p className="text-ink-muted text-xs">
-            Accounts are never deleted. They can be closed, which keeps their history intact.
-          </p>
+          <p className="text-ink-muted text-xs">{labels.neverDeleted}</p>
           <Button type="submit" disabled={pending}>
-            {pending ? 'Opening…' : 'Open account'}
+            {pending ? labels.opening : labels.submit}
           </Button>
         </div>
       </Card>

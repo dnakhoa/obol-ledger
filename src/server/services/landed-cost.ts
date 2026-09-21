@@ -202,7 +202,15 @@ export function createLandedCostService(database: Database, orgId: string) {
         // shipment shows the whole customs declaration rather than most of it.
         if (!capitalise) {
           if (!input.debitAccountId) return err({ code: 'debit_account_required' });
-          return postNonCapitalising(tx, orgId, input, base.value, occurredAt, org.locale);
+          return postNonCapitalising(
+            tx,
+            orgId,
+            input,
+            input.debitAccountId,
+            base.value,
+            occurredAt,
+            org.locale,
+          );
         }
 
         const preview = await computePreview(tx, orgId, input);
@@ -537,6 +545,15 @@ async function postNonCapitalising(
   tx: Transactional,
   orgId: string,
   input: AddChargeInput,
+  /**
+   * Taken as its own argument, already checked.
+   *
+   * Reading it off `input` here would need a `?? ''` that the caller has
+   * already made impossible — and an empty account id reaches the journal as
+   * `account_not_found`, which is a confusing way to be told about a guard
+   * that in fact held.
+   */
+  debitAccountId: string,
   base: { amount: bigint; rate: string },
   occurredAt: Date,
   locale: Locale,
@@ -551,7 +568,7 @@ async function postNonCapitalising(
     metadata: { shipment: input.shipmentId, landedCostCharge: chargeId },
     postings: [
       {
-        accountId: input.debitAccountId ?? '',
+        accountId: debitAccountId,
         amount: base.amount as MinorUnits,
         baseAmount: base.amount as MinorUnits,
         fxRate: '1',
@@ -578,7 +595,7 @@ async function postNonCapitalising(
     baseAmountMinor: base.amount,
     basis: input.basis,
     capitalise: false,
-    debitAccountId: input.debitAccountId ?? null,
+    debitAccountId,
     transactionId: entry.value.transaction.id,
   });
 

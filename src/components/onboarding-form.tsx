@@ -9,11 +9,25 @@ import type { OnboardingState } from '@/app/onboarding/actions';
 const INITIAL: OnboardingState = { status: 'idle' };
 
 export function OnboardingForm({
+  labels,
   action,
   currencies,
   templates,
   suggestedName,
 }: {
+  /** Resolved on the server; a client component holds no dictionary. */
+  labels: {
+    yourLedger: string;
+    name: string;
+    nameHint: string;
+    chartOfAccounts: string;
+    currency: string;
+    currencyHint: string;
+    creating: string;
+    submit: string;
+    failed: string;
+    chartIsAStart: string;
+  };
   action: (state: OnboardingState, formData: FormData) => Promise<OnboardingState>;
   currencies: readonly string[];
   templates: readonly { id: string; label: string; summary: string; statutory: boolean }[];
@@ -24,17 +38,13 @@ export function OnboardingForm({
   return (
     <form action={submit} className="space-y-4">
       {state.status === 'error' ? (
-        <ErrorSummary
-          id="onboarding-errors"
-          title={state.message ?? 'Something went wrong.'}
-          errors={[]}
-        />
+        <ErrorSummary id="onboarding-errors" title={state.message ?? labels.failed} errors={[]} />
       ) : null}
 
       <Card>
         <CardHeader>
           <div className="space-y-0.5">
-            <CardTitle>Your ledger</CardTitle>
+            <CardTitle>{labels.yourLedger}</CardTitle>
             <CardDescription>
               A starter chart of accounts comes with it. You can rename, add and close accounts
               afterwards.
@@ -43,15 +53,15 @@ export function OnboardingForm({
         </CardHeader>
 
         <CardBody className="space-y-4">
-          <Field label="Name" htmlFor="name" hint="Only you will see this.">
+          <Field label={labels.name} htmlFor="name" hint={labels.nameHint}>
             <Input id="name" name="name" required maxLength={80} defaultValue={suggestedName} />
           </Field>
 
           <fieldset className="space-y-2">
-            <legend className="text-ink-secondary text-xs font-medium">Chart of accounts</legend>
-            <p className="text-ink-muted text-[11px]">
-              A starting point, not a cage — except where the law says otherwise.
-            </p>
+            <legend className="text-ink-secondary text-xs font-medium">
+              {labels.chartOfAccounts}
+            </legend>
+            <p className="text-ink-muted text-[11px]">{labels.chartIsAStart}</p>
             <div className="space-y-2">
               {templates.map((template, index) => (
                 <label
@@ -82,11 +92,11 @@ export function OnboardingForm({
           </fieldset>
 
           <Field
-            label="Functional currency"
+            label={labels.currency}
             htmlFor="functionalCurrency"
             // Said plainly, because it is true and because a setting that
             // cannot be changed should say so before it is chosen, not after.
-            hint="The currency your books are kept in. Every entry balances in it, so this cannot be changed later without restating everything you have posted."
+            hint={labels.currencyHint}
           >
             <Select id="functionalCurrency" name="functionalCurrency" defaultValue="USD">
               {currencies.map((currency) => (
@@ -100,7 +110,7 @@ export function OnboardingForm({
       </Card>
 
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? 'Creating…' : 'Create my ledger'}
+        {pending ? labels.creating : labels.submit}
       </Button>
     </form>
   );

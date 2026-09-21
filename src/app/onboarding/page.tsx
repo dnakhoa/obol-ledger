@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { currentViewer } from '@/server/auth/viewer';
 import { OnboardingForm } from '@/components/onboarding-form';
+import { translations } from '@/server/i18n';
 import { createLedgerAction } from './actions';
 import { ScaleIcon } from '@/components/icons';
 import { SUPPORTED_CURRENCIES } from '@/lib/money';
@@ -11,6 +12,7 @@ export const metadata: Metadata = { title: 'Create your ledger' };
 export const dynamic = 'force-dynamic';
 
 export default async function OnboardingPage() {
+  const { t } = await translations();
   const viewer = await currentViewer();
   if (viewer.kind === 'guest') redirect('/sign-in');
   if (viewer.kind === 'member') redirect('/');
@@ -24,12 +26,22 @@ export default async function OnboardingPage() {
           <ScaleIcon width={20} height={20} />
         </span>
         <h1 className="text-2xl font-semibold tracking-tight">Welcome, {firstName}</h1>
-        <p className="text-ink-secondary text-sm">
-          One question before you start, because it is the one that cannot be changed later.
-        </p>
+        <p className="text-ink-secondary text-sm">{t.misc.onboardingIntro}</p>
       </div>
 
       <OnboardingForm
+        labels={{
+          yourLedger: t.forms.yourLedger,
+          name: t.forms.ledgerName,
+          nameHint: t.forms.ledgerNameHint,
+          chartOfAccounts: t.forms.chartOfAccounts,
+          currency: t.forms.functionalCurrency,
+          currencyHint: t.forms.functionalCurrencyHint,
+          creating: t.forms.creating,
+          submit: t.forms.createLedger,
+          failed: t.forms.somethingWrong,
+          chartIsAStart: t.misc.chartIsAStart,
+        }}
         action={createLedgerAction}
         currencies={SUPPORTED_CURRENCIES}
         templates={Object.values(CHART_TEMPLATE_DEFINITIONS).map((template) => ({

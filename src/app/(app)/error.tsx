@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { browserLocale, messagesFor } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
 import { AlertIcon } from '@/components/icons';
@@ -33,7 +34,9 @@ export default function RouteError({
           <AlertIcon width={20} height={20} />
         </span>
         <div className="space-y-1">
-          <h1 className="text-sm font-semibold">Something went wrong</h1>
+          <h1 className="text-sm font-semibold">
+            {messagesFor(browserLocale()).common.somethingWentWrong}
+          </h1>
           <p className="text-ink-muted mx-auto max-w-md text-xs">
             This page could not be loaded. Nothing was written to the ledger — every mutation
             happens inside a database transaction, so a failure leaves no partial entry behind.
@@ -42,7 +45,7 @@ export default function RouteError({
         {error.digest ? (
           <p className="text-ink-muted font-mono text-[11px]">Reference: {error.digest}</p>
         ) : null}
-        <Button onClick={reset}>Try again</Button>
+        <Button onClick={reset}>{messagesFor(browserLocale()).misc.tryAgain}</Button>
       </CardBody>
     </Card>
   );

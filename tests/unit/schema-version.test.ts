@@ -44,6 +44,17 @@ describe('schema version', () => {
     expect(version.pending).toHaveLength(entries.length);
   });
 
+  it('says nothing is pending when it could not look', () => {
+    // The flaw this replaced: the application's role had no rights on the
+    // `drizzle` schema, the query threw, and the probe reported that a fully
+    // migrated production database had never been migrated. A diagnostic that
+    // lies in the direction of alarm is worse than none.
+    const version = compareSchema(null, false);
+    expect(version.readable).toBe(false);
+    expect(version.pending).toEqual([]);
+    expect(version.upToDate).toBe(false);
+  });
+
   it('notices a database that is ahead of the code', () => {
     // Somebody rolled the deployment back and left the schema where it was.
     // Harmless for a few seconds mid-deploy; a real problem if it persists,

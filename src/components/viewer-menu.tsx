@@ -18,7 +18,10 @@ export function ViewerMenu({
   email,
   image,
   orgName,
+  labels,
 }: {
+  /** Resolved on the server; a client component holds no dictionary. */
+  labels: { reading: string; signIn: string };
   name?: string;
   email?: string;
   image?: string | null;
@@ -32,13 +35,13 @@ export function ViewerMenu({
     return (
       <div className="space-y-2">
         <p className="text-ink-muted px-1 text-[11px]">
-          Reading <span className="text-ink-secondary font-medium">{orgName}</span>
+          {labels.reading} <span className="text-ink-secondary font-medium">{orgName}</span>
         </p>
         <Link
           href="/sign-in"
           className="bg-action text-action-ink hover:bg-action-hover flex h-9 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors duration-150"
         >
-          Sign in
+          {labels.signIn}
         </Link>
       </div>
     );

@@ -45,7 +45,10 @@ export const GET = defineRoute(
       // says the migration has not run, which is the actionable fact.
       const schema = await checkSchemaVersion(db());
 
-      const healthy = isolation.enforced && schema.upToDate;
+      // An unreadable bookkeeping table is a configuration gap, not a
+      // migration gap, and reporting it as pending work would send an
+      // operator to run migrations that have already run.
+      const healthy = isolation.enforced && (schema.upToDate || !schema.readable);
 
       return json(
         {

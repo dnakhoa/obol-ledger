@@ -22,10 +22,22 @@ const INITIAL: ReverseFormState = { status: 'idle' };
  * cannot be edited afterwards: the only way back is to reverse the reversal.
  */
 export function ReverseEntry({
+  labels,
   transactionId,
   description,
   action,
 }: {
+  /** Resolved on the server; a client component holds no dictionary. */
+  labels: {
+    description: string;
+    hint: string;
+    posting: string;
+    submit: string;
+    viewReversal: string;
+    noEditing: string;
+    reverseThis: string;
+    note: string;
+  };
   transactionId: string;
   description: string;
   action: (state: ReverseFormState, formData: FormData) => Promise<ReverseFormState>;
@@ -43,7 +55,7 @@ export function ReverseEntry({
         <span>{state.message}</span>
         {state.reversalId ? (
           <Link href={`/journal/${state.reversalId}`} className="ml-auto font-medium underline">
-            View the reversal
+            {labels.viewReversal}
           </Link>
         ) : null}
       </div>
@@ -53,11 +65,9 @@ export function ReverseEntry({
   if (!confirming) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-ink-muted text-xs">
-          Entries cannot be edited. A mistake is corrected by posting a reversing entry.
-        </p>
+        <p className="text-ink-muted text-xs">{labels.noEditing}</p>
         <Button type="button" variant="secondary" onClick={() => setConfirming(true)}>
-          Reverse this entry
+          {labels.reverseThis}
         </Button>
       </div>
     );
@@ -70,7 +80,7 @@ export function ReverseEntry({
       <div className="border-caution bg-caution-soft space-y-1 rounded-lg border px-4 py-3">
         <p className="text-ink flex items-center gap-2 text-sm font-medium">
           <AlertIcon width={14} height={14} />
-          This posts a new entry, it does not delete this one
+          {labels.note}
         </p>
         <p className="text-ink-secondary text-xs">
           A mirror of &ldquo;{description}&rdquo; will be written with every amount negated. Both
@@ -88,11 +98,7 @@ export function ReverseEntry({
         </div>
       ) : null}
 
-      <Field
-        label="Description for the reversing entry"
-        htmlFor="reason"
-        hint="Optional. Defaults to “Reversal of …”, which is usually what you want."
-      >
+      <Field label={labels.description} htmlFor="reason" hint={labels.hint}>
         <Input
           id="reason"
           name="reason"
@@ -104,7 +110,7 @@ export function ReverseEntry({
 
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={pending}>
-          {pending ? 'Posting…' : 'Post the reversing entry'}
+          {pending ? labels.posting : labels.submit}
         </Button>
         <Button
           type="button"
