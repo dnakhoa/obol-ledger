@@ -38,10 +38,20 @@ const DELIBERATELY_ENGLISH = [
 ];
 
 /** Text that is not prose: identifiers, format examples, units. */
-const NOT_PROSE = /^(?:CONT-|GRN-|SO-|INV-|LOT-|PAV-|BLK-|MRB-|Obol$|API$|Webhook$|CSV$|Dr$|Cr$)/u;
+const NOT_PROSE =
+  /^(?:CONT-|GRN-|SO-|INV-|LOT-|PAV-|BLK-|MRB-|Obol$|API$|Webhook$|CSV$|Dr$|Cr$|ESC$)/u;
 
-/** JSX text nodes, across line breaks. */
-const TEXT = />\s*([A-Z][A-Za-z0-9 ,.'’—–&/()-]{6,}?)\s*</gsu;
+/**
+ * JSX text nodes, across line breaks.
+ *
+ * The class has to include `\s`, not a literal space. It did not, which meant
+ * this test could not see any text node containing a newline — which is to say
+ * every sentence long enough to wrap, which is every sentence worth
+ * translating. It shipped an untranslated paragraph onto the error page and
+ * reported 421 passing tests while doing it. The `s` flag does not help: there
+ * is no `.` here for it to widen.
+ */
+const TEXT = />\s*([A-Z][A-Za-z0-9\s,.'’—–&;:!?%/()-]{6,}?)\s*</gsu;
 
 /** Props whose value is shown to a person. */
 const PROP =
@@ -67,7 +77,9 @@ function englishIn(source: string): string[] {
 
   const found: string[] = [];
   for (const match of code.matchAll(TEXT)) {
-    const text = (match[1] ?? '').split(/\s+/u).join(' ');
+    // Trimmed, not just collapsed: an untrimmed `ESC ` fails to match an
+    // anchored exemption, which is a confusing way to be told nothing is wrong.
+    const text = (match[1] ?? '').trim().split(/\s+/u).join(' ');
     if (text.includes('{') || text.includes('}')) continue;
     if (NOT_PROSE.test(text)) continue;
     found.push(text);

@@ -18,6 +18,7 @@ export function OnboardingForm({
   /** Resolved on the server; a client component holds no dictionary. */
   labels: {
     yourLedger: string;
+    starterChart: string;
     name: string;
     nameHint: string;
     chartOfAccounts: string;
@@ -45,10 +46,7 @@ export function OnboardingForm({
         <CardHeader>
           <div className="space-y-0.5">
             <CardTitle>{labels.yourLedger}</CardTitle>
-            <CardDescription>
-              A starter chart of accounts comes with it. You can rename, add and close accounts
-              afterwards.
-            </CardDescription>
+            <CardDescription>{labels.starterChart}</CardDescription>
           </div>
         </CardHeader>
 

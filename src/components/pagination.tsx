@@ -19,8 +19,9 @@ export function CursorPagination({
   basePath,
   nextCursor,
   previousCursor,
-  showing,
-  noun = 'row',
+  showingLabel,
+  newerLabel,
+  olderLabel,
   preserve,
 }: {
   /** Resolved on the server; a client component holds no dictionary. */
@@ -28,8 +29,17 @@ export function CursorPagination({
   basePath: string;
   nextCursor: string | null;
   previousCursor: string | null;
-  showing: number;
-  noun?: string;
+  /**
+   * Already a finished sentence.
+   *
+   * It used to be a count plus a noun the component pluralised by appending
+   * an `s`, which turned `dòng` into `dòngs` and `仕訳` into `仕訳s`. Neither
+   * language inflects for number at all, so the only correct place to build
+   * this is the dictionary.
+   */
+  showingLabel: string;
+  newerLabel: string;
+  olderLabel: string;
   /** Query parameters to carry across pages, such as active filters. */
   preserve?: Record<string, string>;
 }) {
@@ -48,31 +58,29 @@ export function CursorPagination({
       aria-label={label}
       className="border-line flex items-center justify-between gap-3 border-t px-4 py-3 sm:px-5"
     >
-      <p className="text-ink-muted text-xs">
-        Showing {showing} {showing === 1 ? noun : `${noun}s`}
-      </p>
+      <p className="text-ink-muted text-xs">{showingLabel}</p>
 
       <div className="flex items-center gap-2">
         {previousCursor ? (
           <Link href={href(previousCursor, 'backward')} className={linkClass} rel="prev">
             <ArrowLeftIcon width={13} height={13} />
-            Newer
+            {newerLabel}
           </Link>
         ) : (
           <span className={cn(linkClass, disabledClass)} aria-hidden="true">
             <ArrowLeftIcon width={13} height={13} />
-            Newer
+            {newerLabel}
           </span>
         )}
 
         {nextCursor ? (
           <Link href={href(nextCursor)} className={linkClass} rel="next">
-            Older
+            {olderLabel}
             <ArrowRightIcon width={13} height={13} />
           </Link>
         ) : (
           <span className={cn(linkClass, disabledClass)} aria-hidden="true">
-            Older
+            {olderLabel}
             <ArrowRightIcon width={13} height={13} />
           </span>
         )}

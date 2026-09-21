@@ -37,6 +37,7 @@ export function ReverseEntry({
     noEditing: string;
     reverseThis: string;
     note: string;
+    cancel: string;
   };
   transactionId: string;
   description: string;
@@ -118,7 +119,7 @@ export function ReverseEntry({
           onClick={() => setConfirming(false)}
           disabled={pending}
         >
-          Cancel
+          {labels.cancel}
         </Button>
       </div>
     </form>

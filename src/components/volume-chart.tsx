@@ -54,7 +54,7 @@ export function VolumeChart({
    * drag `next/headers` into the client bundle.
    */
   locale: Locale;
-  labels: { noActivity: string; viewAsTable: string };
+  labels: { noActivity: string; viewAsTable: string; day: string; volume: string; caption: string };
 }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
@@ -159,14 +159,14 @@ export function VolumeChart({
         </summary>
         <div className="border-line mt-2 max-h-56 overflow-y-auto rounded-lg border">
           <table className="w-full text-xs">
-            <caption className="sr-only">Daily posting volume in {currency}</caption>
+            <caption className="sr-only">{labels.caption}</caption>
             <thead className="bg-surface-sunken sticky top-0">
               <tr>
                 <th scope="col" className="text-ink-muted px-3 py-1.5 text-left font-medium">
-                  Day
+                  {labels.day}
                 </th>
                 <th scope="col" className="text-ink-muted px-3 py-1.5 text-right font-medium">
-                  Volume ({currency})
+                  {labels.volume}
                 </th>
               </tr>
             </thead>

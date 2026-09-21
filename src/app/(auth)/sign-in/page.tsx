@@ -26,10 +26,7 @@ export default async function SignInPage() {
           <ScaleIcon width={20} height={20} />
         </span>
         <h1 className="text-2xl font-semibold tracking-tight">{t.common.keepYourOwnBooks}</h1>
-        <p className="text-ink-secondary text-sm">
-          Sign in and you get a ledger of your own — your chart of accounts, your entries, your
-          currency. The demo stays where it is.
-        </p>
+        <p className="text-ink-secondary text-sm">{t.misc.signInPitch}</p>
       </div>
 
       <Card>

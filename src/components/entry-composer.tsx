@@ -8,6 +8,7 @@ import { Card, CardBody, CardDescription, CardHeader, CardTitle } from './ui/car
 import { Badge } from './ui/badge';
 import { AlertIcon, CheckIcon } from './icons';
 import { cn } from '@/lib/cn';
+import { fill } from '@/lib/i18n';
 import { groupDecimalString } from '@/lib/format';
 import { parseDecimal, toDecimalString, ZERO, type CurrencyCode } from '@/lib/money';
 import type { EntryFormState } from '@/app/(app)/transfer/actions';
@@ -51,7 +52,8 @@ export type ComposerLabels = {
   readonly currency: string;
   readonly postings: string;
   readonly postingsHint: string;
-  readonly lineAccount: (n: number) => string;
+  /** A template: `Line {n} account`. See `fill`. */
+  readonly lineAccount: string;
   readonly sumToZero: string;
   readonly selectAccount: string;
   readonly side: string;
@@ -254,7 +256,7 @@ export function EntryComposer({
                   className="grid gap-3 sm:grid-cols-[1fr_7.5rem_9rem_2.25rem] sm:items-start"
                 >
                   <Field
-                    label={labels.lineAccount(index + 1)}
+                    label={fill(labels.lineAccount, { n: index + 1 })}
                     htmlFor={`postings-${index}-accountId`}
                     error={errorFor(`postings.${index}.accountId`)}
                   >

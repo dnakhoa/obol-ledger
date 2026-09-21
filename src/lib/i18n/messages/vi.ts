@@ -39,6 +39,9 @@ export const vi: Messages = {
     language: 'Ngôn ngữ',
     skipToContent: 'Bỏ qua, tới nội dung chính',
     somethingWentWrong: 'Đã có lỗi xảy ra',
+    routeErrorBody:
+      'Không tải được trang này. Sổ sách không bị ghi gì thêm — mọi thay đổi đều nằm trong một giao dịch cơ sở dữ liệu, nên khi lỗi xảy ra sẽ không còn lại bút toán dở dang nào.',
+    errorReference: 'Mã tham chiếu',
     pageNotFound: 'Trang này không tồn tại',
     keepYourOwnBooks: 'Ghi sổ của riêng bạn',
     working: 'Đang xử lý…',
@@ -378,6 +381,32 @@ export const vi: Messages = {
   },
 
   misc: {
+    entriesNote:
+      'Tổng các dòng hạch toán của mỗi bút toán bằng 0 — được kiểm tra tại thời điểm COMMIT bằng ràng buộc trì hoãn của cơ sở dữ liệu.',
+    statementNote:
+      'Các bút toán đã hạch toán, mới nhất trước. Số dư lũy kế do Postgres tính trên chính các dòng của tài khoản này, nên khớp với số dư đã hạch toán ở trên.',
+    filterMatchNote: 'Đang hiển thị các bút toán khớp với bộ lọc bên dưới.',
+    newer: 'Mới hơn',
+    older: 'Cũ hơn',
+    showingEntries: (count) => `Đang hiển thị ${count} bút toán`,
+    showingLines: (count) => `Đang hiển thị ${count} dòng`,
+    applyFilters: 'Áp dụng',
+    clearFilters: 'Xóa lọc',
+    chartDay: 'Ngày',
+    chartVolume: (currency) => `Giá trị (${currency})`,
+    chartCaption: (currency) => `Giá trị bút toán theo ngày, tính bằng ${currency}`,
+    alreadyReversedNote:
+      'Bút toán này đã được ghi đảo rồi, và mỗi bút toán chỉ được ghi đảo một lần — nếu không thì khoản điều chỉnh sẽ bị tính hai lần.',
+    reopenNote:
+      'Kỳ đã khóa vẫn mở lại được. Bút toán kết chuyển ban đầu vẫn nằm nguyên trên sổ và một bút toán đảo sẽ triệt tiêu nó, nên luôn có dấu vết để lần lại.',
+    signInPitch:
+      'Đăng nhập để có sổ sách của riêng bạn — hệ thống tài khoản của bạn, bút toán của bạn, đơn vị tiền của bạn. Bản demo vẫn giữ nguyên như cũ.',
+    overdraftNote:
+      'Khi tắt, mọi bút toán làm tài khoản này âm đều bị từ chối — bởi ràng buộc CHECK trong Postgres chứ không chỉ bởi ứng dụng. Các tài khoản điều chỉnh giảm và phần lớn tài khoản nợ phải trả, vốn chủ sở hữu, doanh thu đều cần bật mục này.',
+    settleNote:
+      'Khi tất toán, hệ thống kiểm tra lại quy tắc thấu chi — số dư khả dụng lúc duyệt có thể đã không còn.',
+    starterChartNote:
+      'Kèm theo là một hệ thống tài khoản mẫu. Sau đó bạn vẫn đổi tên, thêm mới và đóng tài khoản được.',
     exportCsv: 'Xuất CSV',
     tryAgain: 'Thử lại',
     inEffect: 'Đang hiệu lực',
@@ -459,7 +488,7 @@ export const vi: Messages = {
     postings: 'Các dòng hạch toán',
     postingsHint:
       'Tổng bên Nợ phải bằng tổng bên Có. Không cân thì không phải là một bút toán hợp lệ.',
-    lineAccount: (n) => `Tài khoản dòng ${n}`,
+    lineAccount: 'Tài khoản dòng {n}',
     sumToZero: 'Bút toán chỉ được ghi nhận khi các dòng hạch toán cộng lại bằng 0.',
     selectAccount: 'Chọn tài khoản\u2026',
     side: 'Bên',

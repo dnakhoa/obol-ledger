@@ -28,6 +28,7 @@ export type AccountFormLabels = {
   readonly currency: string;
   readonly klass: string;
   readonly allowOverdraft: string;
+  readonly overdraftNote: string;
   readonly failed: string;
   readonly submit: string;
   readonly opening: string;
@@ -129,11 +130,7 @@ export function AccountForm({
             />
             <span>
               <span className="block text-sm font-medium">{labels.allowOverdraft}</span>
-              <span className="text-ink-muted block text-xs">
-                When off, a posting that would take this account below zero is refused — by a CHECK
-                constraint in Postgres as well as by the application. Contra accounts and most
-                liability, equity and revenue accounts need this on.
-              </span>
+              <span className="text-ink-muted block text-xs">{labels.overdraftNote}</span>
             </span>
           </label>
         </div>

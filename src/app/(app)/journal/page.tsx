@@ -121,10 +121,7 @@ export default async function JournalPage({ searchParams }: PageProps) {
         <CardHeader>
           <div className="space-y-0.5">
             <CardTitle>{t.journal.entries}</CardTitle>
-            <CardDescription>
-              Each entry&rsquo;s postings sum to zero — verified at COMMIT by a deferred database
-              constraint.
-            </CardDescription>
+            <CardDescription>{t.misc.entriesNote}</CardDescription>
           </div>
         </CardHeader>
 
@@ -135,6 +132,10 @@ export default async function JournalPage({ searchParams }: PageProps) {
             noMatch: t.forms.noMatch,
             description: t.misc.filterDescription,
             account: t.misc.filterAccount,
+            apply: t.misc.applyFilters,
+            clear: t.misc.clearFilters,
+            remove: t.forms.remove,
+            matchNote: t.misc.filterMatchNote,
           }}
           accounts={accounts}
           accountId={query.accountId}
@@ -275,8 +276,9 @@ export default async function JournalPage({ searchParams }: PageProps) {
               basePath="/journal"
               nextCursor={page.nextCursor}
               previousCursor={page.previousCursor}
-              showing={page.items.length}
-              noun="entry"
+              showingLabel={t.misc.showingEntries(page.items.length)}
+              newerLabel={t.misc.newer}
+              olderLabel={t.misc.older}
               // Paging must not silently drop the filters the reader applied.
               preserve={{
                 ...(query.accountId ? { accountId: query.accountId } : {}),

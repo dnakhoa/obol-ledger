@@ -198,10 +198,7 @@ export default async function MonthEndPage() {
         <CardHeader>
           <div className="space-y-0.5">
             <CardTitle>{t.monthEnd.months}</CardTitle>
-            <CardDescription>
-              A closed month can be reopened. The original closing entry stays on the record and a
-              reversing one cancels it, so there is always a trail.
-            </CardDescription>
+            <CardDescription>{t.misc.reopenNote}</CardDescription>
           </div>
         </CardHeader>
         <CardBody className="space-y-2">

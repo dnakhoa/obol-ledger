@@ -27,6 +27,8 @@ export default function RouteError({
     );
   }, [error]);
 
+  const t = messagesFor(browserLocale());
+
   return (
     <Card>
       <CardBody className="space-y-4 py-10 text-center">
@@ -34,18 +36,15 @@ export default function RouteError({
           <AlertIcon width={20} height={20} />
         </span>
         <div className="space-y-1">
-          <h1 className="text-sm font-semibold">
-            {messagesFor(browserLocale()).common.somethingWentWrong}
-          </h1>
-          <p className="text-ink-muted mx-auto max-w-md text-xs">
-            This page could not be loaded. Nothing was written to the ledger — every mutation
-            happens inside a database transaction, so a failure leaves no partial entry behind.
-          </p>
+          <h1 className="text-sm font-semibold">{t.common.somethingWentWrong}</h1>
+          <p className="text-ink-muted mx-auto max-w-md text-xs">{t.common.routeErrorBody}</p>
         </div>
         {error.digest ? (
-          <p className="text-ink-muted font-mono text-[11px]">Reference: {error.digest}</p>
+          <p className="text-ink-muted font-mono text-[11px]">
+            {t.common.errorReference}: {error.digest}
+          </p>
         ) : null}
-        <Button onClick={reset}>{messagesFor(browserLocale()).misc.tryAgain}</Button>
+        <Button onClick={reset}>{t.misc.tryAgain}</Button>
       </CardBody>
     </Card>
   );

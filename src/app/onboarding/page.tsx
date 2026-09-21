@@ -32,6 +32,7 @@ export default async function OnboardingPage() {
       <OnboardingForm
         labels={{
           yourLedger: t.forms.yourLedger,
+          starterChart: t.misc.starterChartNote,
           name: t.forms.ledgerName,
           nameHint: t.forms.ledgerNameHint,
           chartOfAccounts: t.forms.chartOfAccounts,
