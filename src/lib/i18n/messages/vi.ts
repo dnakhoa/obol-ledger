@@ -52,6 +52,7 @@ export const vi: Messages = {
     journal: 'Sổ nhật ký',
     reports: 'Báo cáo',
     monthEnd: 'Khóa sổ',
+    tax: 'Thuế',
     newEntry: 'Bút toán mới',
     webhooks: 'Webhook',
     api: 'API',
@@ -534,6 +535,61 @@ export const vi: Messages = {
     convention:
       'Hệ thống không ghi nhận khoản thanh toán ứng với hóa đơn nào, nên mặc định trừ vào hóa đơn cũ nhất trước. Đó là quy ước chứ không phải sự thật — điều này quan trọng khi khách trả hóa đơn sau nhưng đang khiếu nại hóa đơn trước.',
     credit: 'trả thừa',
+  },
+
+  tax: {
+    title: 'Tờ khai thuế GTGT',
+    description:
+      'Thuế đầu ra, thuế đầu vào và số còn phải nộp. Khi kết chuyển, hệ thống ghi bút toán khấu trừ hai tài khoản thuế, nên số thuế chưa khấu trừ hết nằm luôn trên sổ chứ không chỉ trên tờ khai.',
+    codes: 'Thuế suất',
+    codesDescription:
+      'Các mức thuế suất doanh nghiệp xuất và được khấu trừ. Mỗi mức đã gắn sẵn tài khoản hạch toán, nên khi ghi hóa đơn không phải chọn lại.',
+    noCodes: 'Chưa khai báo thuế suất',
+    noCodesBody: 'Khai báo thuế suất trước khi ghi hóa đơn bán ra hoặc mua vào có thuế.',
+    addCode: 'Thêm thuế suất',
+    codeName: 'Tên',
+    rate: 'Thuế suất',
+    treatment: 'Loại',
+    vat: 'Thuế GTGT',
+    reverseCharge: 'Thuế nhà thầu nước ngoài',
+    salesTax: 'Thuế bán hàng (Hoa Kỳ)',
+    inputAccount: 'Thuế GTGT được khấu trừ',
+    outputAccount: 'Thuế GTGT đầu ra',
+    none: 'Không có',
+    vatHint: 'Xuất khi bán ra, được khấu trừ khi mua vào. Trường hợp thông thường.',
+    reverseChargeHint:
+      'Mua dịch vụ của nhà cung cấp nước ngoài: doanh nghiệp tự kê khai cả đầu ra lẫn đầu vào, hai bên bù trừ nhau.',
+    salesTaxHint:
+      'Áp dụng tại Hoa Kỳ. Thu hộ của khách rồi nộp lại; thuế trả khi mua vào là chi phí, không được khấu trừ.',
+    period: 'Kỳ kê khai',
+    periodReady: (month: string) => `Kỳ ${month} đã đủ điều kiện kê khai`,
+    nothingDue: 'Không có kỳ nào cần kê khai',
+    nothingDueBody: 'Mọi kỳ đã kết thúc đều đã kê khai. Kỳ hiện tại kê khai được sau khi kết thúc.',
+    sales: 'Thuế GTGT đầu ra',
+    purchases: 'Thuế GTGT đầu vào được khấu trừ',
+    base: 'Giá trị chưa thuế',
+    taxAmount: 'Tiền thuế',
+    outputTax: 'Thuế GTGT đầu ra',
+    inputTax: 'Thuế GTGT đầu vào được khấu trừ',
+    broughtForward: 'Thuế GTGT chưa khấu trừ hết kỳ trước',
+    payable: 'Thuế GTGT phải nộp',
+    carriedForward: 'Thuế GTGT chưa khấu trừ hết chuyển kỳ sau',
+    fileReturn: 'Kê khai kỳ này',
+    filing: 'Đang kê khai…',
+    filed: 'Các kỳ đã kê khai',
+    filedCaption: 'Các kỳ đã kê khai, mới nhất trước',
+    filedOn: 'Ngày kê khai',
+    periodColumn: 'Kỳ',
+    noReturns: 'Chưa kê khai kỳ nào',
+    noReturnsBody: 'Sau khi một kỳ có phát sinh thuế kết thúc, kê khai kỳ đó tại đây.',
+    viewEntry: 'Xem bút toán',
+    noEntry: 'Không phát sinh bút toán',
+    noEntryHint:
+      'Kỳ này không có thuế đầu ra nên không có gì để khấu trừ. Toàn bộ thuế đầu vào chuyển sang kỳ sau.',
+    inOrder:
+      'Các kỳ được kê khai lần lượt từ cũ đến mới. Số thuế chưa khấu trừ hết chuyển từ kỳ này sang kỳ kế tiếp, nên bỏ qua một kỳ sẽ làm kỳ sau thiếu số đầu kỳ mà không có dấu hiệu nào.',
+    carriedExplainer:
+      'Thuế đầu vào lớn hơn thuế đầu ra nên kỳ này không phải nộp. Phần chênh lệch không được hoàn mà để lại khấu trừ vào kỳ sau.',
   },
 
   shipments: {

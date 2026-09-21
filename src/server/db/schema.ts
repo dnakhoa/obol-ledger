@@ -23,7 +23,7 @@ import { DELIVERY_STATUSES } from '@/server/domain/webhook';
 import { ACCOUNT_ROLES, PERIOD_STATUSES } from '@/server/domain/period';
 import type { CostingMethod } from '@/server/domain/costing';
 import type { AllocationBasis } from '@/server/domain/landed-cost';
-import type { TaxTreatment } from '@/server/domain/tax';
+import type { Supply, TaxTreatment } from '@/server/domain/tax';
 import type { Unit } from '@/lib/quantity';
 import type { Locale } from '@/lib/i18n/locales';
 
@@ -1083,6 +1083,112 @@ export const layerConsumptions = pgTable(
   ],
 );
 
+/**
+ * What tax a particular entry attracted.
+ *
+ * The tax accounts alone cannot answer a return. A balance of 4,200 says
+ * nothing about which rate produced it or whether it arose on a sale or a
+ * purchase, and every return form asks exactly that. So the split is recorded
+ * when it is known — at the moment of posting — rather than reconstructed
+ * later from evidence that no longer exists.
+ */
+export const taxEntries = pgTable(
+  'tax_entries',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    transactionId: text('transaction_id').notNull(),
+    taxCodeId: text('tax_code_id').notNull(),
+    supply: text('supply').$type<Supply>().notNull(),
+    /** The amount before tax, which the form asks for beside the tax. */
+    baseMinor: bigint('base_minor', { mode: 'bigint' }).notNull(),
+    taxMinor: bigint('tax_minor', { mode: 'bigint' }).notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('tax_entries_id_org_key').on(table.id, table.orgId),
+    index('tax_entries_period_idx').on(table.orgId, table.occurredAt, table.id),
+    foreignKey({
+      name: 'tax_entries_transaction_fk',
+      columns: [table.transactionId, table.orgId],
+      foreignColumns: [transactions.id, transactions.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'tax_entries_code_fk',
+      columns: [table.taxCodeId, table.orgId],
+      foreignColumns: [taxCodes.id, taxCodes.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/**
+ * A filed return.
+ *
+ * `carriedForwardMinor` is the column that makes this a chain rather than a
+ * list: when input tax exceeds output tax the excess is generally not
+ * refunded but set against the next period, so each return opens with the
+ * previous one's closing credit. Vietnam's 01/GTGT calls it chi tieu 22.
+ */
+export const taxReturns = pgTable(
+  'tax_returns',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    periodStart: date('period_start').notNull(),
+    periodEnd: date('period_end').notNull(),
+    outputTaxMinor: bigint('output_tax_minor', { mode: 'bigint' }).notNull(),
+    inputTaxMinor: bigint('input_tax_minor', { mode: 'bigint' }).notNull(),
+    broughtForwardMinor: bigint('brought_forward_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    payableMinor: bigint('payable_minor', { mode: 'bigint' }).notNull(),
+    carriedForwardMinor: bigint('carried_forward_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    /** The entry that cleared the tax accounts, when there was one to clear. */
+    transactionId: text('transaction_id'),
+    filedAt: timestamp('filed_at', { withTimezone: true }).notNull().defaultNow(),
+    filedBy: text('filed_by'),
+  },
+  (table) => [
+    unique('tax_returns_id_org_key').on(table.id, table.orgId),
+    index('tax_returns_org_period_idx').on(table.orgId, table.periodStart),
+    foreignKey({
+      name: 'tax_returns_transaction_fk',
+      columns: [table.transactionId, table.orgId],
+      foreignColumns: [transactions.id, transactions.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/**
+ * Which months a return covers, one row each.
+ *
+ * The unique index on (org, month) is the whole point: it makes a second
+ * return over an already-filed month impossible to write, which is a stronger
+ * statement than any check the application could make. It also lets monthly
+ * and quarterly filing share one table — a quarter is a return owning three
+ * of these.
+ */
+export const taxReturnMonths = pgTable(
+  'tax_return_months',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    returnId: text('return_id').notNull(),
+    periodMonth: date('period_month').notNull(),
+  },
+  (table) => [
+    uniqueIndex('tax_return_months_org_month_key').on(table.orgId, table.periodMonth),
+    foreignKey({
+      name: 'tax_return_months_return_fk',
+      columns: [table.returnId, table.orgId],
+      foreignColumns: [taxReturns.id, taxReturns.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
 export type PostingRow = typeof postings.$inferSelect;
 export type NewPostingRow = typeof postings.$inferInsert;
 export type InventoryItemRow = typeof inventoryItems.$inferSelect;
@@ -1091,3 +1197,5 @@ export type InventoryMovementRow = typeof inventoryMovements.$inferSelect;
 export type ShipmentRow = typeof shipments.$inferSelect;
 export type TaxCodeRow = typeof taxCodes.$inferSelect;
 export type LandedCostChargeRow = typeof landedCostCharges.$inferSelect;
+export type TaxEntryRow = typeof taxEntries.$inferSelect;
+export type TaxReturnRow = typeof taxReturns.$inferSelect;

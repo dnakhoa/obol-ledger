@@ -168,6 +168,14 @@ export const DownloadIcon = (props: IconProps) => (
   </Icon>
 );
 
+/** A receipt, torn at the foot — the shape of a filing. */
+export const ReceiptIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M5 3h14v18l-2.5-1.5L14 21l-2-1.5L10 21l-2.5-1.5L5 21Z" />
+    <path d="M9 8h6M9 12h6" />
+  </Icon>
+);
+
 export const CalendarIcon = (props: IconProps) => (
   <Icon {...props}>
     <rect x="3" y="5" width="18" height="16" rx="2" />

@@ -4,7 +4,7 @@ import { newId } from '@/lib/id';
 import type { CurrencyCode, MinorUnits } from '@/lib/money';
 import { applyTax, type Supply, type TaxCode, type TaxTreatment } from '@/server/domain/tax';
 import type { LedgerError } from '@/server/domain/errors';
-import { organizations, taxCodes } from '@/server/db/schema';
+import { organizations, taxCodes, taxEntries } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
 import type { Database, Transactional } from '@/server/db/types';
 import { createJournalService } from './journal';
@@ -60,10 +60,18 @@ export function createTaxService(database: Database, orgId: string) {
           .limit(1);
         if (existing) return err({ code: 'tax_code_name_taken', name: input.name });
 
-        // The shape rule is checked here so the refusal explains itself, and
+        // The shape rules are checked here so the refusal explains itself, and
         // again by a CHECK because this service is not the only writer.
         if (input.treatment === 'sales_tax' && input.inputAccountId) {
           return err({ code: 'sales_tax_is_not_reclaimable' });
+        }
+        if (!input.outputAccountId) {
+          return err({ code: 'tax_account_missing', treatment: input.treatment, side: 'output' });
+        }
+        // Reaching the CHECK for this would be a constraint violation rather
+        // than a refusal — a 500 where the person left a dropdown blank.
+        if (input.treatment !== 'sales_tax' && !input.inputAccountId) {
+          return err({ code: 'tax_account_missing', treatment: input.treatment, side: 'input' });
         }
 
         const id = newId('taxCode');
@@ -148,6 +156,36 @@ export function createTaxService(database: Database, orgId: string) {
           ],
         });
         if (!entry.ok) return entry;
+
+        // What the entry attracted, recorded beside it.
+        //
+        // Nothing in the postings themselves says which code produced the tax
+        // leg — an account balance is a single number and a return needs the
+        // split by code. Derivable now, unrecoverable later, so it is written
+        // now. A zero-rated supply still gets a row: an export at 0% belongs on
+        // the return, and a missing row and a nil row are not the same claim.
+        //
+        // A reverse charge gets *two* rows, one per side. The buyer accounts
+        // for the tax as if it had made the sale itself, so the acquisition
+        // appears on both halves of the return and nets to nothing — which is
+        // what the form expects, and is only visible because the two rows
+        // exist. One row would report the input credit and quietly drop the
+        // output tax that justifies it.
+        const occurredAt = new Date(entry.value.transaction.occurredAt);
+        const sides: Supply[] =
+          row.treatment === 'reverse_charge' ? ['purchase', 'sale'] : [input.supply];
+        await tx.insert(taxEntries).values(
+          sides.map((side) => ({
+            id: newId('taxEntry'),
+            orgId,
+            transactionId: entry.value.transaction.id,
+            taxCodeId: row.id,
+            supply: side,
+            baseMinor: net,
+            taxMinor: calculated.value.tax,
+            occurredAt,
+          })),
+        );
 
         return ok({
           entry: entry.value.transaction,

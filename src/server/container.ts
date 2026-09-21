@@ -14,6 +14,7 @@ import { createStockImportService } from '@/server/services/stock-import';
 import { createLandedCostService } from '@/server/services/landed-cost';
 import { createAgingService } from '@/server/services/aging';
 import { createTaxService } from '@/server/services/tax';
+import { createTaxReturnService } from '@/server/services/tax-return';
 import { createWebhookService } from './services/webhooks';
 import { SetupRequiredError } from './setup-error';
 import { currentViewer, type Viewer } from './auth/viewer';
@@ -46,6 +47,7 @@ export function servicesFor(orgId: string) {
     landedCost: createLandedCostService(database, orgId),
     aging: createAgingService(database, orgId),
     tax: createTaxService(database, orgId),
+    taxReturns: createTaxReturnService(database, orgId),
   };
 }
 

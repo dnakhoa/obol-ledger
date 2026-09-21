@@ -132,6 +132,14 @@ export type LedgerError =
       readonly code: 'tax_account_missing';
       readonly treatment: string;
       readonly side: 'input' | 'output';
+    }
+  | { readonly code: 'period_already_filed'; readonly periodMonth: string }
+  | { readonly code: 'tax_payable_account_missing' }
+  | { readonly code: 'nothing_to_file'; readonly periodStart: string; readonly periodEnd: string }
+  | {
+      readonly code: 'earlier_return_unfiled';
+      readonly periodMonth: string;
+      readonly unfiled: string;
     };
 
 export type LedgerErrorCode = LedgerError['code'];
@@ -188,6 +196,10 @@ const TITLES: Record<LedgerErrorCode, string> = {
   tax_code_not_found: 'Tax code not found',
   sales_tax_is_not_reclaimable: 'Sales tax cannot have a reclaimable account',
   tax_account_missing: 'The tax code has no account for that side',
+  period_already_filed: 'That month is already covered by a filed return',
+  tax_payable_account_missing: 'No tax payable account',
+  nothing_to_file: 'No tax was charged or paid in that period',
+  earlier_return_unfiled: 'An earlier period has not been filed',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -294,6 +306,14 @@ export function describe(error: LedgerError): string {
       return 'United States sales tax is never reclaimable on a purchase, so a sales-tax code has no input account. A business given one accumulates a receivable from a state that does not owe it, and the accounts balance perfectly while the asset is fictional.';
     case 'tax_account_missing':
       return `This ${error.treatment} code has no ${error.side} tax account, so it cannot post that side of the entry.`;
+    case 'period_already_filed':
+      return `${error.periodMonth} is already covered by a filed return. A return is evidence and is never edited — to change it, file an amended return for the same period.`;
+    case 'tax_payable_account_missing':
+      return 'Filing moves what is owed out of the tax accounts and into one liability the business actually settles, so a tax payable account has to exist first.';
+    case 'nothing_to_file':
+      return `No tax was charged or paid between ${error.periodStart} and ${error.periodEnd}, so there is nothing to file.`;
+    case 'earlier_return_unfiled':
+      return `${error.unfiled} has not been filed yet, and filing ${error.periodMonth} first would strand its credit — an unused credit is carried into the next return, so the returns have to be filed in order.`;
   }
 }
 

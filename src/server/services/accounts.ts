@@ -1,5 +1,6 @@
 import { asc, eq, sql } from 'drizzle-orm';
 import { err, ok, type Result } from '@/lib/result';
+import type { AccountRole } from '@/server/domain/period';
 import { newId } from '@/lib/id';
 import type { CurrencyCode } from '@/lib/money';
 import type { AccountType } from '@/server/domain/account';
@@ -18,7 +19,7 @@ export type CreateAccountInput = {
   readonly overdraftAllowed?: boolean;
   readonly metadata?: Record<string, string> | undefined;
   /** Structural job, currently only `retained_earnings`. At most one per tenant. */
-  readonly role?: 'retained_earnings' | 'fx_gain_loss' | undefined;
+  readonly role?: AccountRole | undefined;
   /** The number this is filed under. Required on a statutory chart. */
   readonly code?: string | undefined;
   /**

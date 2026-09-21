@@ -10,6 +10,7 @@ import {
   JournalIcon,
   ReportsIcon,
   CalendarIcon,
+  ReceiptIcon,
   SettingsIcon,
   StockIcon,
   TransferIcon,
@@ -38,6 +39,7 @@ export type NavLabels = {
   readonly journal: string;
   readonly reports: string;
   readonly monthEnd: string;
+  readonly tax: string;
   readonly newEntry: string;
   readonly webhooks: string;
   readonly api: string;
@@ -52,6 +54,7 @@ const LINKS = [
   { href: '/journal', key: 'journal', Icon: JournalIcon, exact: false },
   { href: '/reports', key: 'reports', Icon: ReportsIcon, exact: false },
   { href: '/month-end', key: 'monthEnd', Icon: CalendarIcon, exact: false },
+  { href: '/tax', key: 'tax', Icon: ReceiptIcon, exact: false },
   { href: '/transfer', key: 'newEntry', Icon: TransferIcon, exact: false },
   { href: '/webhooks', key: 'webhooks', Icon: WebhookIcon, exact: false },
   { href: '/api-reference', key: 'api', Icon: ApiIcon, exact: false },
@@ -75,6 +78,7 @@ const LINKS = [
  */
 const DESKTOP_ONLY = new Set([
   '/api-reference',
+  '/tax',
   '/webhooks',
   '/settings',
   '/month-end',

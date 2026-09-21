@@ -80,6 +80,12 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   tax_code_not_found: 404,
   sales_tax_is_not_reclaimable: 422,
   tax_account_missing: 422,
+  // A month already filed is a conflict with what is there, not bad input —
+  // the same shape of refusal as closing a closed period.
+  period_already_filed: 409,
+  earlier_return_unfiled: 409,
+  tax_payable_account_missing: 422,
+  nothing_to_file: 422,
 };
 
 export function statusFor(error: LedgerError): number {
