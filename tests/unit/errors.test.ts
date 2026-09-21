@@ -121,6 +121,14 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
   tax_code_not_found: { code: 'tax_code_not_found', taxCodeId: 'tax_x' },
   sales_tax_is_not_reclaimable: { code: 'sales_tax_is_not_reclaimable' },
   tax_account_missing: { code: 'tax_account_missing', treatment: 'vat', side: 'input' },
+  period_already_filed: { code: 'period_already_filed', periodMonth: '2026-03-01' },
+  tax_payable_account_missing: { code: 'tax_payable_account_missing' },
+  nothing_to_file: { code: 'nothing_to_file', periodStart: '2026-03-01', periodEnd: '2026-03-31' },
+  earlier_return_unfiled: {
+    code: 'earlier_return_unfiled',
+    periodMonth: '2026-03-01',
+    unfiled: '2026-02-01',
+  },
 };
 
 const variants = Object.values(EVERY_VARIANT);

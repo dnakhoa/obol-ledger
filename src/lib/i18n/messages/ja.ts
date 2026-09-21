@@ -49,6 +49,7 @@ export const ja: Messages = {
     journal: '仕訳帳',
     reports: '帳票',
     monthEnd: '月次決算',
+    tax: '消費税',
     newEntry: '仕訳入力',
     webhooks: 'Webhook',
     api: 'API',
@@ -526,6 +527,60 @@ export const ja: Messages = {
     convention:
       '入金がどの請求書に対応するかは記録されていないため、古いものから順に充当しています。これは事実ではなく約束事です — 得意先が後の請求書を支払い、前の請求書に異議を唱えている場合には違いが出ます。',
     credit: '過入金',
+  },
+
+  tax: {
+    title: '消費税申告',
+    description:
+      '預かった消費税、支払った消費税、そして差引の納付額です。申告すると両方の仮勘定を精算する仕訳が起票されるため、控除しきれなかった分は申告書の上ではなく帳簿に残ります。',
+    codes: '税率',
+    codesDescription:
+      '売上に課す税率と仕入で控除する税率です。それぞれに計上先の勘定科目を紐づけてあるので、伝票ごとに指定する必要はありません。',
+    noCodes: '税率が未登録です',
+    noCodesBody: '消費税のある売上・仕入を入力する前に、税率を登録してください。',
+    addCode: '税率を追加',
+    codeName: '名称',
+    rate: '税率',
+    treatment: '区分',
+    vat: '消費税',
+    reverseCharge: 'リバースチャージ',
+    salesTax: '売上税（米国）',
+    inputAccount: '仮払消費税',
+    outputAccount: '仮受消費税',
+    none: 'なし',
+    vatHint: '売上で預かり、仕入で控除します。通常の区分です。',
+    reverseChargeHint:
+      '国外事業者から役務の提供を受けた場合。買手が売手の分もあわせて申告し、両者は相殺されます。',
+    salesTaxHint: '米国。顧客から預かって納付します。仕入で払った税は費用であり、控除できません。',
+    period: '申告対象期間',
+    periodReady: (month: string) => `${month}分を申告できます`,
+    nothingDue: '申告するものはありません',
+    nothingDueBody: '終了した期間はすべて申告済みです。当月は終了後に申告できます。',
+    sales: '課税売上と仮受消費税',
+    purchases: '課税仕入と仮払消費税',
+    base: '税抜金額',
+    taxAmount: '消費税額',
+    outputTax: '仮受消費税',
+    inputTax: '仮払消費税（控除対象）',
+    broughtForward: '前期からの控除不足額',
+    payable: '納付税額',
+    carriedForward: '翌期へ繰り越す控除不足額',
+    fileReturn: 'この期間を申告する',
+    filing: '申告中…',
+    filed: '申告済みの期間',
+    filedCaption: '申告済みの期間、新しい順',
+    filedOn: '申告日',
+    periodColumn: '対象期間',
+    noReturns: '申告済みの期間はありません',
+    noReturnsBody: '消費税の発生した月が終了すると、ここで申告できます。',
+    viewEntry: '仕訳を見る',
+    noEntry: '起票なし',
+    noEntryHint:
+      'この期間は仮受消費税が発生していないため、精算する相手がありません。支払った消費税はそのまま翌期へ繰り越されます。',
+    inOrder:
+      '申告は古い期間から順に行います。控除しきれなかった額は次の期間へ引き継がれるため、間を飛ばすと次の期間の期首額が欠けたまま気づけません。',
+    carriedExplainer:
+      '仮払消費税が仮受消費税を上回ったため、今期の納付はありません。差額は還付されず、翌期の控除に回ります。',
   },
 
   shipments: {

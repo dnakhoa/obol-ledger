@@ -61,6 +61,9 @@ export const ID_PREFIXES = {
   landedCharge: 'chrg',
   landedAllocation: 'alloc',
   taxCode: 'tax',
+  taxEntry: 'txe',
+  taxReturn: 'ret',
+  taxReturnMonth: 'retm',
 } as const;
 
 export type EntityKind = keyof typeof ID_PREFIXES;

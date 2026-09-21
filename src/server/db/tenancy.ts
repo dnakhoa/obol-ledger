@@ -121,6 +121,9 @@ const TENANT_TABLES = [
   'landed_cost_charges',
   'landed_cost_allocations',
   'tax_codes',
+  'tax_entries',
+  'tax_returns',
+  'tax_return_months',
 ] as const;
 
 // A fixed internal constant, inlined rather than bound: drizzle passes a JS

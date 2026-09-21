@@ -13,6 +13,9 @@ import { minorUnits, type MinorUnits } from '../src/lib/money';
 import type { Database } from '../src/server/db/types';
 import { checkTenantPolicies, TENANT_TABLE_COUNT, withTenant } from '../src/server/db/tenancy';
 import type { AccountType } from '../src/server/domain/account';
+import type { AccountRole } from '../src/server/domain/period';
+import { createTaxService } from '../src/server/services/tax';
+import { createTaxReturnService } from '../src/server/services/tax-return';
 import { describeTarget, schemaConnectionString, sslFor } from './connection';
 
 /**
@@ -75,7 +78,7 @@ const ACCOUNTS: {
   overdraft?: boolean;
   monetary?: boolean;
   openItems?: boolean;
-  role?: 'retained_earnings' | 'fx_gain_loss';
+  role?: AccountRole;
 }[] = [
   { key: 'cash', code: '111', name: 'Tiền mặt', type: 'asset', currency: 'VND' },
   {
@@ -129,6 +132,17 @@ const ACCOUNTS: {
     name: 'Thuế GTGT được khấu trừ',
     type: 'asset',
     currency: 'VND',
+  },
+  {
+    key: 'arVnd',
+    // Domestic customers, in dong. The export side is invoiced abroad and
+    // zero-rated; this is the half that actually carries output VAT.
+    openItems: true,
+    code: '131',
+    name: 'Phải thu của khách hàng — VND',
+    type: 'asset',
+    currency: 'VND',
+    overdraft: true,
   },
   {
     key: 'blocks',
@@ -188,6 +202,26 @@ const ACCOUNTS: {
     type: 'liability',
     currency: 'VND',
     overdraft: true,
+  },
+  {
+    key: 'vatOut',
+    code: '33311',
+    name: 'Thuế GTGT đầu ra',
+    type: 'liability',
+    currency: 'VND',
+    overdraft: true,
+  },
+  {
+    key: 'vatPayable',
+    // Where a filed return leaves the debt, kept apart from 33311 so that
+    // "what did this month accrue" and "what do I owe" stay different
+    // questions with different answers.
+    code: '3331',
+    name: 'Thuế GTGT phải nộp',
+    type: 'liability',
+    currency: 'VND',
+    overdraft: true,
+    role: 'tax_payable',
   },
   {
     key: 'payroll',
@@ -1086,6 +1120,118 @@ async function main(): Promise<void> {
       ],
       { status: 'pending', metadata: { invoice: 'INV-2613', market: 'AUD' } },
     );
+
+    // ---- Domestic sales, input VAT, and a quarter actually filed -----------
+    //
+    // The export side of this business is zero-rated, which is realistic and
+    // also means it produces no output VAT at all. A return built from
+    // exports alone would be a page of zeroes, so the domestic half is seeded
+    // too: slabs sold to Vietnamese builders at 10%, and the supplies and
+    // subcontracting bought at 10% that offset them.
+    //
+    // The shape is deliberate. The earliest month buys more than it sells and
+    // so leaves a credit; the next month spends that credit and pays the
+    // difference. That is the whole mechanism of a VAT return in two months,
+    // and it is the part a demo has to show, because "what happened to the
+    // credit I did not use" is the question the spreadsheet never answered.
+
+    const tax = createTaxService(database, orgId);
+    const taxReturns = createTaxReturnService(database, orgId);
+
+    const vat10 = await tax.create({
+      name: 'GTGT 10%',
+      rateBasisPoints: 1000,
+      treatment: 'vat',
+      inputAccountId: ids['vatIn'] ?? '',
+      outputAccountId: ids['vatOut'] ?? '',
+    });
+    if (!vat10.ok) throw new Error(`tax code failed: ${vat10.error.code}`);
+
+    // Exports. Zero-rated rather than untaxed — the distinction matters,
+    // because a zero-rated supply still carries the right to reclaim input
+    // tax and an exempt one does not. It appears on the return at nil.
+    const vat0 = await tax.create({
+      name: 'GTGT 0% — xuất khẩu',
+      rateBasisPoints: 0,
+      treatment: 'vat',
+      // Both accounts, even at 0%. A zero-rated supply is taxable at nil, not
+      // exempt, so the right to reclaim input tax survives — which is exactly
+      // why exporters end up in permanent credit.
+      inputAccountId: ids['vatIn'] ?? '',
+      outputAccountId: ids['vatOut'] ?? '',
+    });
+    if (!vat0.ok) throw new Error(`tax code failed: ${vat0.error.code}`);
+
+    const TAXED: {
+      day: number;
+      supply: 'sale' | 'purchase';
+      amount: number;
+      description: string;
+    }[] = [
+      // Two months back: bought heavily, sold little. Leaves a credit.
+      { day: 74, supply: 'purchase', amount: 880_000_000, description: 'Lưỡi cắt kim cương' },
+      { day: 70, supply: 'purchase', amount: 415_000_000, description: 'Thuê gia công mài bóng' },
+      {
+        day: 66,
+        supply: 'sale',
+        amount: 620_000_000,
+        description: 'Đá ốp lát — công trình Đà Nẵng',
+      },
+      { day: 62, supply: 'purchase', amount: 168_000_000, description: 'Vật tư đóng kiện' },
+      // Last month: sold more than it bought. The credit above comes off it.
+      {
+        day: 44,
+        supply: 'sale',
+        amount: 1_450_000_000,
+        description: 'Đá bậc thang — nhà thầu Hà Nội',
+      },
+      { day: 38, supply: 'purchase', amount: 240_000_000, description: 'Điện sản xuất' },
+      { day: 33, supply: 'sale', amount: 780_000_000, description: 'Đá cubic — dự án Quảng Ninh' },
+      // This month, still open. Shows on no return yet, which is the point.
+      { day: 9, supply: 'sale', amount: 510_000_000, description: 'Đá ốp lát — khách lẻ' },
+      { day: 5, supply: 'purchase', amount: 96_000_000, description: 'Dầu diesel máy xúc' },
+    ];
+
+    for (const line of TAXED) {
+      const result = await tax.post({
+        description: line.description,
+        taxCodeId: vat10.value.id,
+        supply: line.supply,
+        amount: dong(line.amount) as bigint,
+        netAccountId: line.supply === 'sale' ? (ids['revenue'] ?? '') : (ids['admin'] ?? ''),
+        counterpartyAccountId:
+          line.supply === 'sale' ? (ids['arVnd'] ?? '') : (ids['payable'] ?? ''),
+        occurredAt: daysAgo(line.day, 11),
+      });
+      if (!result.ok) throw new Error(`taxed entry failed: ${result.error.code}`);
+      entries += 1;
+    }
+
+    // File every finished month except the most recent one, oldest first —
+    // which is the only order the ledger will accept, because each return
+    // opens with the last one's unused credit.
+    //
+    // The last finished month is deliberately left waiting, so the ledger
+    // opens on the state that has something to do in it: a period ready, its
+    // figures on screen, and a button. A demo where everything is already
+    // done shows the records but never the mechanism.
+    const now = new Date();
+    const lastFinished = `${new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1))
+      .toISOString()
+      .slice(0, 8)}01`;
+
+    for (;;) {
+      const period = await taxReturns.nextPeriod();
+      if (!period || period.periodStart >= lastFinished) break;
+      const filed = await taxReturns.file(period, { filedBy: 'seed' });
+      if (!filed.ok) throw new Error(`filing ${period.periodStart}: ${filed.error.code}`);
+      if (filed.value.entry) entries += 1;
+      console.log(
+        `filed ${period.periodStart}: ` +
+          `pay ${filed.value.return.payable.amount}, ` +
+          `carry ${filed.value.return.carriedForward.amount}`,
+      );
+    }
 
     // Assert the *schema* carries the isolation policies.
     //

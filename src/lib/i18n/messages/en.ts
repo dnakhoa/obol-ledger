@@ -42,6 +42,7 @@ export const en = {
     journal: 'Journal',
     reports: 'Reports',
     monthEnd: 'Month end',
+    tax: 'Tax',
     newEntry: 'New entry',
     webhooks: 'Webhooks',
     api: 'API',
@@ -529,6 +530,62 @@ export const en = {
     convention:
       'Nothing records which invoice a payment settled, so the oldest open one is taken first. That is a convention, not a fact — it matters when a customer pays a later invoice and disputes an earlier one.',
     credit: 'in credit',
+  },
+
+  tax: {
+    title: 'Tax returns',
+    description:
+      'What you charged, what you paid, and what that leaves owing. Filing posts the entry that clears both tax accounts, so the credit you have not used stays in the books instead of on a form.',
+    codes: 'Tax rates',
+    codesDescription:
+      'The rates you charge and reclaim. Each one names the accounts its tax lands in, so an entry never has to be told where to put it.',
+    noCodes: 'No tax rates set up yet',
+    noCodesBody: 'Add the rates you charge before posting a sale or a purchase with tax on it.',
+    addCode: 'Add a rate',
+    codeName: 'Name',
+    rate: 'Rate',
+    treatment: 'Kind',
+    vat: 'Value added tax',
+    reverseCharge: 'Reverse charge',
+    salesTax: 'Sales tax',
+    inputAccount: 'Tax paid on purchases',
+    outputAccount: 'Tax charged on sales',
+    none: 'None',
+    vatHint: 'Charged on sales, reclaimed on purchases. The ordinary case.',
+    reverseChargeHint:
+      'Buying a service from abroad: you account for the tax on both sides yourself, and the two cancel out.',
+    salesTaxHint:
+      'United States. Collected from customers and remitted; tax you pay on your own purchases is a cost, never a credit.',
+    period: 'Period to file',
+    periodReady: (month: string) => `${month} is ready to file`,
+    nothingDue: 'Nothing to file',
+    nothingDueBody:
+      'Every finished month has been filed. The month you are in now can be filed once it ends.',
+    sales: 'Tax charged on sales',
+    purchases: 'Tax paid on purchases',
+    base: 'Amount before tax',
+    taxAmount: 'Tax',
+    outputTax: 'Tax charged on sales',
+    inputTax: 'Tax paid on purchases',
+    broughtForward: 'Credit from last period',
+    payable: 'To pay',
+    carriedForward: 'Credit into next period',
+    fileReturn: 'File this return',
+    filing: 'Filing…',
+    filed: 'Filed returns',
+    filedCaption: 'Returns filed, most recent first',
+    filedOn: 'Filed',
+    periodColumn: 'Period',
+    noReturns: 'No returns filed yet',
+    noReturnsBody: 'Once a month with tax in it has finished, it can be filed here.',
+    viewEntry: 'View entry',
+    noEntry: 'Nothing to post',
+    noEntryHint:
+      'Nothing was charged on sales this period, so there was nothing to clear against. The whole of the tax you paid carries into the next return.',
+    inOrder:
+      'Returns are filed in order, oldest first. An unused credit passes from each return to the next, so skipping one would leave the next one short without anything to show it.',
+    carriedExplainer:
+      'You paid more tax than you charged, so there is nothing to pay. The difference is not refunded — it stays as credit and comes off the next return.',
   },
 
   shipments: {

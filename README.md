@@ -21,11 +21,14 @@ posting inserts and Postgres reports `40P01 deadlock detected`. Remove
 `BYPASSRLS` and the health probe says so before a request is served.
 
 **Double-entry core** · **multi-currency** balanced in the functional currency ·
-**FIFO inventory costing** · pending/posted/archived with three balances ·
-reversals · idempotency · keyset pagination · optimistic concurrency ·
-**row-level tenant isolation** · **webhooks** through a transactional outbox ·
-API key management · metadata with a GIN index · CSV export · Prometheus
-metrics · generated OpenAPI · ⌘K
+**FIFO inventory costing** · **landed cost** spread across the lots it arrived
+with · **consumption-tax returns** that carry an unused credit forward as a
+balance rather than a number on a form · aged receivables and payables ·
+pending/posted/archived with three balances · reversals · idempotency · keyset
+pagination · optimistic concurrency · **row-level tenant isolation** ·
+**webhooks** through a transactional outbox · API key management · metadata
+with a GIN index · CSV export · Prometheus metrics · generated OpenAPI ·
+English, Tiếng Việt and 日本語 · ⌘K
 
 ![The overview, in dark mode: a trial-balance banner reading "The books balance", headline figures, a 30-day posting-volume chart, and the accounting equation by account class](docs/screenshots/overview-dark.png)
 

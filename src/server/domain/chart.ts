@@ -1,4 +1,5 @@
 import type { AccountType } from './account';
+import type { AccountRole } from './period';
 
 /**
  * Chart-of-accounts templates, and the thing that makes them different.
@@ -48,7 +49,7 @@ export type TemplateAccount = {
   readonly monetary?: boolean;
   /** Managed as a set of unsettled documents, so an aged report means something. */
   readonly openItems?: boolean;
-  readonly role?: 'retained_earnings' | 'fx_gain_loss';
+  readonly role?: AccountRole;
   /** Shown in the UI for a code whose purpose is not obvious from its name. */
   readonly note?: string;
 };
@@ -79,6 +80,12 @@ const GENERIC: ChartTemplateDefinition = {
     { code: '110', name: 'Bank Account', type: 'asset' },
     { code: '120', name: 'Accounts Receivable', type: 'asset', openItems: true },
     { code: '130', name: 'Inventory', type: 'asset', monetary: false },
+    {
+      code: '140',
+      name: 'Tax Paid on Purchases',
+      type: 'asset',
+      note: 'Reclaimable against tax collected, which is why it is an asset and not a cost.',
+    },
     { code: '150', name: 'Equipment', type: 'asset', monetary: false },
     {
       code: '160',
@@ -89,6 +96,21 @@ const GENERIC: ChartTemplateDefinition = {
     },
     { code: '200', name: 'Accounts Payable', type: 'liability', overdraft: true, openItems: true },
     { code: '210', name: 'Accrued Expenses', type: 'liability', overdraft: true },
+    {
+      code: '215',
+      name: 'Tax Collected on Sales',
+      type: 'liability',
+      overdraft: true,
+      note: 'Charged to customers and owed to the state. Accrues through the period.',
+    },
+    {
+      code: '220',
+      name: 'Tax Payable',
+      type: 'liability',
+      overdraft: true,
+      role: 'tax_payable',
+      note: 'What a filed return says is owed. Separate from the accounts above, which are still accruing the period that has not been filed yet.',
+    },
     { code: '250', name: 'Loans Payable', type: 'liability', overdraft: true },
     { code: '300', name: "Owner's Capital", type: 'equity', overdraft: true },
     {
@@ -294,6 +316,14 @@ const VN_TT200: ChartTemplateDefinition = {
       note: 'Taxes payable to the State, including output VAT',
     },
     {
+      code: '3331',
+      name: 'Thuế GTGT phải nộp',
+      type: 'liability',
+      overdraft: true,
+      role: 'tax_payable',
+      note: 'What the filed 01/GTGT says is owed, separate from output VAT still accruing. A debit balance here is credit carried forward (chi tieu 43).',
+    },
+    {
       code: '334',
       name: 'Phải trả người lao động',
       type: 'liability',
@@ -429,6 +459,14 @@ const US_GAAP: ChartTemplateDefinition = {
       overdraft: true,
       note: 'Collected from customers and remitted to the state. There is no matching asset: sales tax paid on purchases is a cost, not a credit.',
     },
+    {
+      code: '2250',
+      name: 'Sales Tax Due to States',
+      type: 'liability',
+      overdraft: true,
+      role: 'tax_payable',
+      note: 'What a filed return says is owed. Sales Tax Payable above is still accruing the current period.',
+    },
     { code: '2300', name: 'Payroll Liabilities', type: 'liability', overdraft: true },
     { code: '2500', name: 'Notes Payable', type: 'liability', overdraft: true },
     { code: '3000', name: "Owner's Equity", type: 'equity', overdraft: true },
@@ -507,6 +545,14 @@ const JP: ChartTemplateDefinition = {
       type: 'liability',
       overdraft: true,
       note: 'Collected on sales and owed to the tax office, net of 仮払消費税.',
+    },
+    {
+      code: '330',
+      name: '未払消費税 — Consumption tax payable',
+      type: 'liability',
+      overdraft: true,
+      role: 'tax_payable',
+      note: 'The net of 仮受消費税 and 仮払消費税 once the return is filed. The standard settlement account, kept apart from the two that accrue.',
     },
     { code: '350', name: '前受金 — Advances from customers', type: 'liability', overdraft: true },
     { code: '400', name: '資本金 — Share capital', type: 'equity', overdraft: true },
