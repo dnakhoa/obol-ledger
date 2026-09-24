@@ -29,6 +29,22 @@ export const COSTING_METHODS = ['fifo', 'weighted_average', 'specific', 'lifo'] 
 export type CostingMethod = (typeof COSTING_METHODS)[number];
 
 /** Permitted under US GAAP, prohibited under IFRS and Vietnamese VAS. */
+/**
+ * Why stock left without being sold.
+ *
+ * Distinguished because each is a different conversation: breakage is an
+ * operating cost, an expiry is a buying problem, and a count shortfall is the
+ * ledger admitting its lots disagreed with the yard. See migration 0028.
+ */
+export const WRITE_OFF_REASONS = [
+  'damaged',
+  'expired',
+  'lost',
+  'count_shortfall',
+  'other',
+] as const;
+export type WriteOffReason = (typeof WRITE_OFF_REASONS)[number];
+
 export const US_ONLY_COSTING_METHODS: readonly CostingMethod[] = ['lifo'];
 
 export type CostLayer = {
@@ -237,4 +253,33 @@ export function onHand(layers: readonly CostLayer[]): {
     cost: layers.reduce((sum, layer) => sum + layer.remainingCost, 0n),
     baseCost: layers.reduce((sum, layer) => sum + layer.remainingBaseCost, 0n),
   };
+}
+
+/**
+ * The layers as they stand after a set of draws.
+ *
+ * A sale with two lines of the same paver draws twice from the same lots, and
+ * the second line has to see what the first one took. Doing that against the
+ * database would mean writing the first line's movement before the second is
+ * even allocated — before the sale it belongs to exists. So the lots are drawn
+ * down in memory, line by line, and written once; this is the subtraction, in
+ * the one place the costing arithmetic lives.
+ */
+export function afterDraws(
+  layers: readonly CostLayer[],
+  draws: readonly LayerDraw[],
+): readonly CostLayer[] {
+  const taken = new Map<string, LayerDraw[]>();
+  for (const d of draws) taken.set(d.layerId, [...(taken.get(d.layerId) ?? []), d]);
+
+  return layers.map((layer) => {
+    const own = taken.get(layer.id);
+    if (!own) return layer;
+    return {
+      ...layer,
+      remainingQuantity: own.reduce((left, d) => left - d.quantity, layer.remainingQuantity),
+      remainingCost: own.reduce((left, d) => left - d.cost, layer.remainingCost),
+      remainingBaseCost: own.reduce((left, d) => left - d.baseCost, layer.remainingBaseCost),
+    };
+  });
 }

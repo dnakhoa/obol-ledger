@@ -12,9 +12,16 @@ import {
   type ResolvedPosting,
 } from '@/server/domain/transaction';
 import { toSignedMinorUnits } from '@/server/http/schemas';
-import { convert, parseRate } from '@/lib/fx';
+import { convert, impliedRate, parseRate } from '@/lib/fx';
 import { organizations } from '@/server/db/schema';
-import { accounts, idempotencyKeys, postings, transactions } from '@/server/db/schema';
+import {
+  accounts,
+  idempotencyKeys,
+  inventoryMovements,
+  landedCostCharges,
+  postings,
+  transactions,
+} from '@/server/db/schema';
 import type { AccountRow } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
 import { recordOutcome, traced } from '@/server/observability/tracing';
@@ -455,7 +462,17 @@ export function createJournalService(database: Database, orgId: string) {
           accountId: posting.accountId,
           amount,
           baseAmount: posting.baseAmount,
-          fxRate: posting.fxRate ?? impliedRate(amount, posting.baseAmount),
+          // Derived rather than demanded: a caller who has decided both
+          // amounts has decided the rate, and asking them to restate it is
+          // asking for a third number that can disagree with the other two.
+          fxRate:
+            posting.fxRate ??
+            impliedRate({
+              amount,
+              from: accountCurrency,
+              baseAmount: posting.baseAmount,
+              to: functional,
+            }),
         });
         continue;
       }
@@ -552,22 +569,6 @@ export function createJournalService(database: Database, orgId: string) {
       ...draftPostings,
       { accountId: fxAccount.id, amount, baseAmount: amount, fxRate: '1' },
     ]);
-  }
-
-  /**
-   * The rate a supplied base amount implies, recorded for audit.
-   *
-   * Derived rather than demanded, because a caller who has already decided
-   * both amounts has implicitly decided the rate, and asking them to restate
-   * it is asking for a third number that can disagree with the other two.
-   */
-  function impliedRate(amount: MinorUnits, baseAmount: MinorUnits): string {
-    if (amount === 0n) return '1';
-    const scaled = (BigInt(baseAmount) * 10n ** 10n) / BigInt(amount);
-    const whole = scaled / 10n ** 10n;
-    const fraction = (scaled % 10n ** 10n).toString().padStart(10, '0').replace(/0+$/u, '');
-    const magnitude = fraction ? `${whole}.${fraction}` : String(whole);
-    return magnitude.startsWith('-') ? magnitude.slice(1) : magnitude;
   }
 
   /**
@@ -713,6 +714,19 @@ export function createJournalService(database: Database, orgId: string) {
             code: 'already_reversed',
             transactionId: original.id,
             reversedBy: existing.id,
+          });
+        }
+
+        // An entry the stock records wrote is one half of a fact written
+        // twice. Negating the postings alone leaves the lots claiming stock
+        // the account no longer carries; see migration 0026, which refuses
+        // the same thing for writers that never pass through here.
+        const owner = await stockOwnerOf(tx, original.id);
+        if (owner) {
+          throw new DomainAbort({
+            code: 'entry_owned_by_stock',
+            transactionId: original.id,
+            source: owner,
           });
         }
 
@@ -1052,4 +1066,24 @@ function isUniqueViolation(error: unknown, constraint: string): boolean {
     current = current.cause;
   }
   return false;
+}
+
+/** Which stock record wrote this entry, if one did. */
+async function stockOwnerOf(
+  tx: Transactional,
+  transactionId: string,
+): Promise<'inventory' | 'landed_cost' | null> {
+  const [movement] = await tx
+    .select({ id: inventoryMovements.id })
+    .from(inventoryMovements)
+    .where(eq(inventoryMovements.transactionId, transactionId))
+    .limit(1);
+  if (movement) return 'inventory';
+
+  const [charge] = await tx
+    .select({ id: landedCostCharges.id })
+    .from(landedCostCharges)
+    .where(eq(landedCostCharges.transactionId, transactionId))
+    .limit(1);
+  return charge ? 'landed_cost' : null;
 }

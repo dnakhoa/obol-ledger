@@ -1,3 +1,4 @@
+import type { WriteOffReason } from '@/server/domain/costing';
 import type { Locale } from './locales';
 
 /**
@@ -25,6 +26,15 @@ export type LedgerMessages = {
   readonly importedDelivery: (reference?: string | undefined) => string;
   /** Freight, duty and handling put into the cost of the goods. */
   readonly landedCost: (description: string) => string;
+  /** Stock that left without being sold, and why. */
+  readonly stockWrittenOff: (
+    item: string,
+    reason: string,
+    reference?: string | undefined,
+  ) => string;
+  readonly writeOffReason: (reason: WriteOffReason) => string;
+  /** An invoice raised against stock: revenue and its cost in one entry. */
+  readonly saleInvoiced: (reference: string, customer: string) => string;
 };
 
 const withReference = (base: string, reference?: string | undefined): string =>
@@ -39,6 +49,17 @@ const en: LedgerMessages = {
   costOfGoodsSold: (item, reference) => withReference(`Cost of goods sold: ${item}`, reference),
   importedDelivery: (reference) => withReference('Imported delivery', reference),
   landedCost: (description) => `Landed cost: ${description}`,
+  stockWrittenOff: (item, reason, reference) =>
+    withReference(`Stock written off: ${item} — ${reason}`, reference),
+  writeOffReason: (reason) =>
+    ({
+      damaged: 'damaged',
+      expired: 'past its date',
+      lost: 'lost',
+      count_shortfall: 'short at stocktake',
+      other: 'other',
+    })[reason],
+  saleInvoiced: (reference, customer) => `Sale ${reference} to ${customer}`,
 };
 
 /**
@@ -60,6 +81,20 @@ const vi: LedgerMessages = {
   costOfGoodsSold: (item, reference) => withReference(`Giá vốn hàng bán: ${item}`, reference),
   importedDelivery: (reference) => withReference('Nhập kho theo dữ liệu chuyển đổi', reference),
   landedCost: (description) => `Chi phí thu mua: ${description}`,
+  // `Xuất hủy` is the voucher a Vietnamese warehouse raises for goods leaving
+  // for any reason but a sale; the reason follows it the way it would on the
+  // biên bản that justifies it.
+  stockWrittenOff: (item, reason, reference) =>
+    withReference(`Xuất hủy hàng hóa: ${item} — ${reason}`, reference),
+  writeOffReason: (reason) =>
+    ({
+      damaged: 'hàng hỏng, vỡ',
+      expired: 'hết hạn sử dụng',
+      lost: 'mất mát',
+      count_shortfall: 'thiếu khi kiểm kê',
+      other: 'lý do khác',
+    })[reason],
+  saleInvoiced: (reference, customer) => `Bán hàng theo hóa đơn ${reference} — ${customer}`,
 };
 
 /**
@@ -81,6 +116,19 @@ const ja: LedgerMessages = {
   importedDelivery: (reference) =>
     reference ? `データ移行による入庫（${reference}）` : 'データ移行による入庫',
   landedCost: (description) => `仕入諸掛：${description}`,
+  stockWrittenOff: (item, reason, reference) =>
+    reference ? `商品廃棄：${item}（${reason}・${reference}）` : `商品廃棄：${item}（${reason}）`,
+  // 棚卸減耗 is the term for a stocktake shortfall on a Japanese voucher; the
+  // others are the plain words a warehouse uses.
+  writeOffReason: (reason) =>
+    ({
+      damaged: '破損',
+      expired: '期限切れ',
+      lost: '紛失',
+      count_shortfall: '棚卸減耗',
+      other: 'その他',
+    })[reason],
+  saleInvoiced: (reference, customer) => `売上：${reference}（${customer}）`,
 };
 
 const LEDGER: Record<Locale, LedgerMessages> = { en, vi, ja };

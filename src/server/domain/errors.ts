@@ -140,7 +140,16 @@ export type LedgerError =
       readonly code: 'earlier_return_unfiled';
       readonly periodMonth: string;
       readonly unfiled: string;
-    };
+    }
+  | {
+      readonly code: 'entry_owned_by_stock';
+      readonly transactionId: string;
+      readonly source: 'inventory' | 'landed_cost';
+    }
+  | { readonly code: 'sale_has_no_lines' }
+  | { readonly code: 'sale_reference_taken'; readonly reference: string }
+  | { readonly code: 'sale_not_found'; readonly saleId: string }
+  | { readonly code: 'due_before_invoice'; readonly dueOn: string; readonly invoicedOn: string };
 
 export type LedgerErrorCode = LedgerError['code'];
 
@@ -200,6 +209,11 @@ const TITLES: Record<LedgerErrorCode, string> = {
   tax_payable_account_missing: 'No tax payable account',
   nothing_to_file: 'No tax was charged or paid in that period',
   earlier_return_unfiled: 'An earlier period has not been filed',
+  entry_owned_by_stock: 'Entry was written by the stock records',
+  sale_has_no_lines: 'A sale needs at least one line',
+  sale_reference_taken: 'That invoice number is already in use',
+  sale_not_found: 'Sale not found',
+  due_before_invoice: 'Payment is due before the invoice was raised',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -314,6 +328,16 @@ export function describe(error: LedgerError): string {
       return `No tax was charged or paid between ${error.periodStart} and ${error.periodEnd}, so there is nothing to file.`;
     case 'earlier_return_unfiled':
       return `${error.unfiled} has not been filed yet, and filing ${error.periodMonth} first would strand its credit — an unused credit is carried into the next return, so the returns have to be filed in order.`;
+    case 'entry_owned_by_stock':
+      return `Entry ${error.transactionId} was written by the stock records, so reversing it here would move the account without moving the lots behind it — and the two would disagree from then on, with nothing left to say why. Correct stock from the stock screen instead: return the goods, write them off, or add a further charge.`;
+    case 'sale_has_no_lines':
+      return 'An invoice with no lines ships nothing and earns nothing. Add the products being sold.';
+    case 'sale_reference_taken':
+      return `Invoice ${error.reference} has already been raised. An invoice number is issued once — two with the same number is how a customer pays one and the aged receivables show the other as unpaid forever.`;
+    case 'sale_not_found':
+      return `No sale with id ${error.saleId}.`;
+    case 'due_before_invoice':
+      return `The invoice is dated ${error.invoicedOn} and payment is due ${error.dueOn}, which is earlier. That is usually a typo in the year, and it would age a brand-new invoice as months overdue.`;
   }
 }
 

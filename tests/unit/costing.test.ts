@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  afterDraws,
   allocate,
   averageUnitCost,
   onHand,
@@ -241,5 +242,47 @@ describe('quantities are scaled integers', () => {
   it('keeps trailing zeroes, because they are the precision', () => {
     expect(toQuantityString(24_600n, 3)).toBe('24.600');
     expect(toQuantityString(1500n, 0)).toBe('1500');
+  });
+});
+
+describe('afterDraws', () => {
+  it('lets a second line of the same product see what the first one took', () => {
+    // Two lines on one invoice: 600 then 900. Allocated independently they
+    // would both start from container A and together claim 1,500 of A's
+    // 1,000 — the double count a spreadsheet makes when two rows look up the
+    // same lot.
+    const first = allocate(containers, 600n, 'fifo');
+    if (!first.ok) throw new Error(first.error.code);
+    const second = allocate(afterDraws(containers, first.value.draws), 900n, 'fifo');
+    if (!second.ok) throw new Error(second.error.code);
+
+    expect(second.value.draws.map((d) => [d.layerId, d.quantity])).toEqual([
+      ['layer_a', 400n],
+      ['layer_b', 500n],
+    ]);
+    // 600 + 900 = 1,500 costed exactly as one draw of 1,500 would be.
+    const once = allocate(containers, 1500n, 'fifo');
+    if (!once.ok) throw new Error(once.error.code);
+    expect(first.value.cost + second.value.cost).toBe(once.value.cost);
+  });
+
+  it('closes a layer exactly when two draws exhaust it between them', () => {
+    const first = allocate(containers, 333n, 'fifo');
+    if (!first.ok) throw new Error(first.error.code);
+    const left = afterDraws(containers, first.value.draws);
+    const second = allocate(left, 667n, 'fifo');
+    if (!second.ok) throw new Error(second.error.code);
+    const [a] = afterDraws(left, second.value.draws);
+    expect(a).toMatchObject({ remainingQuantity: 0n, remainingCost: 0n, remainingBaseCost: 0n });
+  });
+
+  it('refuses the second line when the first has taken the stock', () => {
+    const first = allocate(containers, 2_900n, 'fifo');
+    if (!first.ok) throw new Error(first.error.code);
+    const second = allocate(afterDraws(containers, first.value.draws), 200n, 'fifo');
+    expect(second).toEqual({
+      ok: false,
+      error: { code: 'insufficient_stock', requested: '200', available: '100' },
+    });
   });
 });

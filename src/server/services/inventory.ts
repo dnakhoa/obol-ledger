@@ -4,19 +4,33 @@ import { newId } from '@/lib/id';
 import { convert, parseRate } from '@/lib/fx';
 import type { CurrencyCode, MinorUnits } from '@/lib/money';
 import { defaultPrecision, type Unit } from '@/lib/quantity';
-import { allocate, onHand, type CostLayer, type CostingMethod } from '@/server/domain/costing';
+import {
+  allocate,
+  onHand,
+  type Allocation,
+  type CostLayer,
+  type CostingMethod,
+  type CostingError,
+  type LayerDraw,
+  type WriteOffReason,
+} from '@/server/domain/costing';
 import { ledgerMessages, type Locale } from '@/lib/i18n';
 import type { LedgerError } from '@/server/domain/errors';
+import type { DraftPosting } from '@/server/domain/transaction';
 import {
   accounts,
   costLayers,
   inventoryItems,
   inventoryMovements,
+  landedCostCharges,
   layerConsumptions,
   organizations,
+  postings,
+  transactions,
 } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
 import type { Database, Transactional } from '@/server/db/types';
+import { counterpartyLeg } from './counterparty';
 import { createJournalService } from './journal';
 import { rateOn } from './rates';
 import { toMoneyDto } from './serialize';
@@ -85,6 +99,21 @@ export type IssueInput = {
   readonly metadata?: Record<string, string> | undefined;
 };
 
+export type WriteOffInput = {
+  readonly itemId: string;
+  readonly quantity: bigint;
+  readonly reason: WriteOffReason;
+  /** Where the loss is recognised: shrinkage, breakage, obsolescence. */
+  readonly expenseAccountId: string;
+  /** Required when the item is costed by specific identification. */
+  readonly layerId?: string | undefined;
+  readonly occurredAt?: Date | undefined;
+  /** The stocktake sheet, the damage report — what an auditor asks for. */
+  readonly reference?: string | undefined;
+  readonly description?: string | undefined;
+  readonly metadata?: Record<string, string> | undefined;
+};
+
 export type ItemSummary = {
   readonly id: string;
   readonly sku: string;
@@ -134,6 +163,11 @@ export type MovementSummary = {
   readonly reference: string | null;
   readonly costingMethod: CostingMethod;
   readonly transactionId: string;
+  /** Why it left, on a write-off; null otherwise. */
+  readonly reason: WriteOffReason | null;
+  /** The invoice this was a line of, and what it was sold for. Null unless sold. */
+  readonly saleId: string | null;
+  readonly revenue: MoneyDto | null;
   /** Which lots this movement drew from. Empty for a receipt. */
   readonly drawnFrom: readonly {
     readonly layerId: string;
@@ -147,6 +181,39 @@ export type MovementSummary = {
 export type MovementResult = {
   readonly movement: MovementSummary;
   readonly entry: TransactionDto;
+};
+
+export type UnexplainedEntry = {
+  readonly transactionId: string;
+  readonly occurredAt: Date;
+  readonly description: string;
+  /** Signed, debit-positive: what the entry did to the inventory account. */
+  readonly amount: MoneyDto;
+};
+
+export type AccountReconciliation = {
+  readonly accountId: string;
+  readonly accountName: string;
+  readonly accountCode: string | null;
+  /** How many products keep their stock here. */
+  readonly items: number;
+  /** What the general ledger says the account holds. */
+  readonly ledger: MoneyDto;
+  /** What the open lots behind it are worth. */
+  readonly lots: MoneyDto;
+  /** Ledger less lots. Zero is the only healthy value. */
+  readonly difference: MoneyDto;
+  /**
+   * Entries on the account that no stock record wrote — a hand-typed journal
+   * line, an import that went round the stock module. These are where a
+   * difference comes from, so they are listed rather than left to be hunted.
+   */
+  readonly unexplained: readonly UnexplainedEntry[];
+};
+
+export type StockReconciliation = {
+  readonly accounts: readonly AccountReconciliation[];
+  readonly agrees: boolean;
 };
 
 export function createInventoryService(database: Database, orgId: string) {
@@ -234,6 +301,17 @@ export function createInventoryService(database: Database, orgId: string) {
         const base = await inFunctional(tx, orgId, input.cost, input.currency, org, occurredAt);
         if (!base.ok) return base;
 
+        // The supplier's leg is in the supplier account's own currency: forty
+        // thousand dollars on a dollar payable, its dong value on a dong one.
+        const owed = await counterpartyLeg(
+          tx,
+          input.creditAccountId,
+          { amount: input.cost, currency: input.currency },
+          { ...base.value, currency: org.functionalCurrency },
+          -1n,
+        );
+        if (!owed.ok) return owed;
+
         const layerId = newId('costLayer');
         const movementId = newId('inventoryMovement');
 
@@ -255,12 +333,7 @@ export function createInventoryService(database: Database, orgId: string) {
               baseAmount: base.value.amount as MinorUnits,
               fxRate: '1',
             },
-            {
-              accountId: input.creditAccountId,
-              amount: -base.value.amount as MinorUnits,
-              baseAmount: -base.value.amount as MinorUnits,
-              fxRate: '1',
-            },
+            owed.value,
           ],
         });
         if (!entry.ok) return entry;
@@ -325,48 +398,8 @@ export function createInventoryService(database: Database, orgId: string) {
 
         const org = await organisation(tx, orgId);
         const method = methodFor(item.value, org);
-        if (method === 'specific' && !input.layerId) {
-          return err({ code: 'cost_layer_required', itemId: input.itemId });
-        }
-
-        // FOR UPDATE, because the allocation is read-then-write: two shipments
-        // of the last container, computed concurrently, would both find it
-        // available and both draw it down. Locking the open layers makes the
-        // second wait and then see the first one's result.
-        const open = await openLayers(tx, item.value.id, { lock: true });
-
-        const allocation = allocate(
-          open.map((layer): CostLayer => ({
-            id: layer.id,
-            remainingQuantity: layer.remainingQuantityMinor,
-            remainingCost: layer.remainingCostMinor,
-            remainingBaseCost: layer.remainingBaseCostMinor,
-            acquiredAt: layer.acquiredAt,
-          })),
-          input.quantity,
-          method,
-          input.layerId,
-        );
-
-        if (!allocation.ok) {
-          switch (allocation.error.code) {
-            case 'insufficient_stock':
-              return err({
-                code: 'insufficient_stock',
-                itemId: item.value.id,
-                requested: allocation.error.requested,
-                available: allocation.error.available,
-                precision: item.value.quantityPrecision,
-                unit: item.value.unit,
-              });
-            case 'layer_not_found':
-              return err({ code: 'cost_layer_not_found', layerId: allocation.error.layerId });
-            case 'layer_required':
-              return err({ code: 'cost_layer_required', itemId: item.value.id });
-            case 'non_positive_quantity':
-              return err({ code: 'zero_amount_posting', index: 0 });
-          }
-        }
+        const allocation = await drawDown(tx, item.value, input.quantity, method, input.layerId);
+        if (!allocation.ok) return allocation;
 
         const occurredAt = input.occurredAt ?? new Date();
         const movementId = newId('inventoryMovement');
@@ -414,35 +447,183 @@ export function createInventoryService(database: Database, orgId: string) {
           ...(input.metadata ? { metadata: input.metadata } : {}),
         });
 
-        for (const draw of allocation.value.draws) {
-          await tx.insert(layerConsumptions).values({
-            id: newId('layerConsumption'),
-            orgId,
-            movementId,
-            layerId: draw.layerId,
-            quantityMinor: draw.quantity,
-            costMinor: draw.cost,
-            baseCostMinor: draw.baseCost,
-          });
-
-          // The only mutation a layer permits. Expressed as a decrement rather
-          // than a computed new value so it cannot be written from a stale
-          // read — and the CHECK in 0017 refuses the result if the money
-          // outlasts the stock.
-          await tx
-            .update(costLayers)
-            .set({
-              remainingQuantityMinor: sql`${costLayers.remainingQuantityMinor} - ${draw.quantity}`,
-              remainingCostMinor: sql`${costLayers.remainingCostMinor} - ${draw.cost}`,
-              remainingBaseCostMinor: sql`${costLayers.remainingBaseCostMinor} - ${draw.baseCost}`,
-            })
-            .where(eq(costLayers.id, draw.layerId));
-        }
+        await recordDraws(tx, orgId, movementId, allocation.value.draws);
 
         const movement = await describeMovement(tx, orgId, movementId);
         return movement
           ? ok({ movement, entry: entry.value.transaction })
           : err({ code: 'item_not_found', itemId: input.itemId });
+      });
+    },
+
+    /**
+     * Stock leaves without being sold: broken, expired, lost, or simply not
+     * there when somebody counted.
+     *
+     * Costed from the lots by the item's own method, exactly as a sale would
+     * be, and posted to an expense account the caller chooses rather than to
+     * cost of sales — because a breakage and a sale are different lines on
+     * the income statement, and a distributor whose shrinkage is hiding inside
+     * its cost of goods sold cannot see that it is growing.
+     */
+    async writeOff(input: WriteOffInput): Promise<Result<MovementResult, LedgerError>> {
+      return withTenant(database, orgId, async (tx) => {
+        const item = await load(tx, input.itemId);
+        if (!item.ok) return item;
+        if (item.value.status === 'archived') {
+          return err({ code: 'item_archived', itemId: input.itemId });
+        }
+
+        const org = await organisation(tx, orgId);
+        const expense = await vetAccount(
+          tx,
+          input.expenseAccountId,
+          'expense',
+          org.functionalCurrency,
+        );
+        if (!expense.ok) return expense;
+
+        const method = methodFor(item.value, org);
+        const allocation = await drawDown(tx, item.value, input.quantity, method, input.layerId);
+        if (!allocation.ok) return allocation;
+
+        const occurredAt = input.occurredAt ?? new Date();
+        const movementId = newId('inventoryMovement');
+        const books = ledgerMessages(org.locale);
+
+        const entry = await createJournalService(tx, orgId).postEntry({
+          description:
+            input.description ??
+            books.stockWrittenOff(
+              item.value.name,
+              books.writeOffReason(input.reason),
+              input.reference,
+            ),
+          currency: org.functionalCurrency,
+          occurredAt,
+          metadata: {
+            ...(input.metadata ?? {}),
+            inventoryItem: item.value.sku,
+            inventoryMovement: movementId,
+            writeOffReason: input.reason,
+          },
+          postings: legs([
+            [input.expenseAccountId, allocation.value.baseCost],
+            [item.value.inventoryAccountId, -allocation.value.baseCost],
+          ]),
+        });
+        if (!entry.ok) return entry;
+
+        await tx.insert(inventoryMovements).values({
+          id: movementId,
+          orgId,
+          itemId: item.value.id,
+          kind: 'writeoff',
+          quantityMinor: allocation.value.quantity,
+          costMinor: allocation.value.cost,
+          baseCostMinor: allocation.value.baseCost,
+          occurredAt,
+          transactionId: entry.value.transaction.id,
+          costingMethod: method,
+          reason: input.reason,
+          reference: input.reference ?? null,
+          ...(input.metadata ? { metadata: input.metadata } : {}),
+        });
+
+        await recordDraws(tx, orgId, movementId, allocation.value.draws);
+
+        const movement = await describeMovement(tx, orgId, movementId);
+        return movement
+          ? ok({ movement, entry: entry.value.transaction })
+          : err({ code: 'item_not_found', itemId: input.itemId });
+      });
+    },
+
+    /**
+     * Whether the stock records and the inventory accounts still agree.
+     *
+     * By construction they do: every movement posts its entry in the same
+     * transaction, and the journal refuses to reverse one. What construction
+     * cannot stop is somebody posting a journal line straight to the
+     * inventory account — an accrual, a correction, a migration from the old
+     * system — which moves the account and no lot. The ledger balances; the
+     * lots and the account now disagree, and every margin computed from the
+     * lots is out by that amount.
+     *
+     * This is the month-end control a controller runs by hand with two
+     * exports and a pivot table. Here it is one query, and it names the
+     * entries responsible.
+     */
+    async reconcile(): Promise<StockReconciliation> {
+      return withTenant(database, orgId, async (tx) => {
+        const org = await organisation(tx, orgId);
+        const money = (value: bigint) => toMoneyDto(value as MinorUnits, org.functionalCurrency);
+
+        const held = await tx
+          .select({
+            accountId: inventoryItems.inventoryAccountId,
+            items: sql<number>`count(DISTINCT ${inventoryItems.id})::int`,
+            lots: sql<string>`coalesce(sum(${costLayers.remainingBaseCostMinor}), 0)::text`,
+          })
+          .from(inventoryItems)
+          .leftJoin(costLayers, eq(costLayers.itemId, inventoryItems.id))
+          .groupBy(inventoryItems.inventoryAccountId);
+
+        const out: AccountReconciliation[] = [];
+        for (const row of held) {
+          const [account] = await tx
+            .select({
+              name: accounts.name,
+              code: accounts.code,
+              balance: accounts.balanceMinor,
+            })
+            .from(accounts)
+            .where(eq(accounts.id, row.accountId))
+            .limit(1);
+          if (!account) continue;
+
+          const lots = BigInt(row.lots);
+          const unexplained = await tx
+            .select({
+              transactionId: transactions.id,
+              occurredAt: transactions.occurredAt,
+              description: transactions.description,
+              amount: postings.amountMinor,
+            })
+            .from(postings)
+            .innerJoin(transactions, eq(transactions.id, postings.transactionId))
+            .where(
+              and(
+                eq(postings.accountId, row.accountId),
+                eq(transactions.status, 'posted'),
+                sql`NOT EXISTS (SELECT 1 FROM ${inventoryMovements} WHERE ${inventoryMovements.transactionId} = ${transactions.id})`,
+                sql`NOT EXISTS (SELECT 1 FROM ${landedCostCharges} WHERE ${landedCostCharges.transactionId} = ${transactions.id})`,
+              ),
+            )
+            .orderBy(desc(transactions.occurredAt), desc(transactions.id))
+            .limit(20);
+
+          out.push({
+            accountId: row.accountId,
+            accountName: account.name,
+            accountCode: account.code,
+            items: row.items,
+            ledger: money(account.balance),
+            lots: money(lots),
+            difference: money(account.balance - lots),
+            unexplained: unexplained.map((entry) => ({
+              transactionId: entry.transactionId,
+              occurredAt: entry.occurredAt,
+              description: entry.description,
+              amount: money(entry.amount),
+            })),
+          });
+        }
+
+        out.sort((a, b) =>
+          (a.accountCode ?? a.accountName).localeCompare(b.accountCode ?? b.accountName),
+        );
+        return { accounts: out, agrees: out.every((a) => a.difference.minorUnits === '0') };
       });
     },
 
@@ -513,8 +694,8 @@ export function createInventoryService(database: Database, orgId: string) {
 
 export type InventoryService = ReturnType<typeof createInventoryService>;
 
-type ItemRow = typeof inventoryItems.$inferSelect;
-type OrgRow = {
+export type ItemRow = typeof inventoryItems.$inferSelect;
+export type OrgRow = {
   chartTemplate: string;
   costingMethod: CostingMethod;
   functionalCurrency: CurrencyCode;
@@ -522,7 +703,7 @@ type OrgRow = {
   locale: Locale;
 };
 
-async function organisation(tx: Transactional, orgId: string): Promise<OrgRow> {
+export async function organisation(tx: Transactional, orgId: string): Promise<OrgRow> {
   const [row] = await tx
     .select({
       chartTemplate: organizations.chartTemplate,
@@ -543,11 +724,14 @@ async function organisation(tx: Transactional, orgId: string): Promise<OrgRow> {
 }
 
 /** The item's own method, or the organisation's when it has none. */
-function methodFor(item: ItemRow, org: OrgRow): CostingMethod {
+export function methodFor(item: ItemRow, org: OrgRow): CostingMethod {
   return item.costingMethod ?? org.costingMethod;
 }
 
-async function load(tx: Transactional, itemId: string): Promise<Result<ItemRow, LedgerError>> {
+export async function load(
+  tx: Transactional,
+  itemId: string,
+): Promise<Result<ItemRow, LedgerError>> {
   const [row] = await tx
     .select()
     .from(inventoryItems)
@@ -567,10 +751,10 @@ async function load(tx: Transactional, itemId: string): Promise<Result<ItemRow, 
  * The foreign cost is recorded on the layer instead, where it belongs — as a
  * fact about a purchase rather than a property of an account.
  */
-async function vetAccount(
+export async function vetAccount(
   tx: Transactional,
   accountId: string,
-  expected: 'asset' | 'expense',
+  expected: 'asset' | 'expense' | 'revenue',
   functional: CurrencyCode,
 ): Promise<Result<true, LedgerError>> {
   const [row] = await tx
@@ -596,7 +780,7 @@ async function vetAccount(
 }
 
 /** What a foreign purchase cost in the books' own currency, on its own day. */
-async function inFunctional(
+export async function inFunctional(
   tx: Transactional,
   orgId: string,
   amount: bigint,
@@ -633,9 +817,124 @@ async function inFunctional(
   });
 }
 
-type LayerRow = typeof costLayers.$inferSelect;
+export type LayerRow = typeof costLayers.$inferSelect;
 
-async function openLayers(
+export function toCostLayer(layer: LayerRow): CostLayer {
+  return {
+    id: layer.id,
+    remainingQuantity: layer.remainingQuantityMinor,
+    remainingCost: layer.remainingCostMinor,
+    remainingBaseCost: layer.remainingBaseCostMinor,
+    acquiredAt: layer.acquiredAt,
+  };
+}
+
+/** A costing refusal, restated with what the caller needs to act on it. */
+export function costingRefusal(error: CostingError, item: ItemRow): LedgerError {
+  switch (error.code) {
+    case 'insufficient_stock':
+      return {
+        code: 'insufficient_stock',
+        itemId: item.id,
+        requested: error.requested,
+        available: error.available,
+        precision: item.quantityPrecision,
+        unit: item.unit,
+      };
+    case 'layer_not_found':
+      return { code: 'cost_layer_not_found', layerId: error.layerId };
+    case 'layer_required':
+      return { code: 'cost_layer_required', itemId: item.id };
+    case 'non_positive_quantity':
+      return { code: 'zero_amount_posting', index: 0 };
+  }
+}
+
+/**
+ * Locks an item's open lots and decides which of them a movement draws on.
+ *
+ * FOR UPDATE, because the allocation is read-then-write: two shipments of the
+ * last container, computed concurrently, would both find it available and
+ * both draw it down. Locking the open layers makes the second wait and then
+ * see the first one's result.
+ */
+async function drawDown(
+  tx: Transactional,
+  item: ItemRow,
+  quantity: bigint,
+  method: CostingMethod,
+  layerId: string | undefined,
+): Promise<Result<Allocation, LedgerError>> {
+  if (method === 'specific' && !layerId) {
+    return err({ code: 'cost_layer_required', itemId: item.id });
+  }
+  const open = await openLayers(tx, item.id, { lock: true });
+  const allocation = allocate(open.map(toCostLayer), quantity, method, layerId);
+  return allocation.ok ? allocation : err(costingRefusal(allocation.error, item));
+}
+
+/**
+ * Writes down which lots a movement ate, and eats them.
+ *
+ * The consumption rows are the answer to "which container did this shipment
+ * come from" — the question the spreadsheet existed to answer.
+ */
+export async function recordDraws(
+  tx: Transactional,
+  orgId: string,
+  movementId: string,
+  draws: readonly LayerDraw[],
+): Promise<void> {
+  for (const draw of draws) {
+    await tx.insert(layerConsumptions).values({
+      id: newId('layerConsumption'),
+      orgId,
+      movementId,
+      layerId: draw.layerId,
+      quantityMinor: draw.quantity,
+      costMinor: draw.cost,
+      baseCostMinor: draw.baseCost,
+    });
+
+    // The only mutation a layer permits. Expressed as a decrement rather
+    // than a computed new value so it cannot be written from a stale
+    // read — and the CHECK in 0017 refuses the result if the money
+    // outlasts the stock.
+    await tx
+      .update(costLayers)
+      .set({
+        remainingQuantityMinor: sql`${costLayers.remainingQuantityMinor} - ${draw.quantity}`,
+        remainingCostMinor: sql`${costLayers.remainingCostMinor} - ${draw.cost}`,
+        remainingBaseCostMinor: sql`${costLayers.remainingBaseCostMinor} - ${draw.baseCost}`,
+      })
+      .where(eq(costLayers.id, draw.layerId));
+  }
+}
+
+/**
+ * Functional-currency legs, one per account, zeroes dropped.
+ *
+ * One entry may not post twice to one account, and a sale of two products
+ * that share a stock account would otherwise try to. A zero leg records
+ * nothing and the journal rightly refuses it — a line of free samples costs
+ * nothing to ship, and has no business turning the whole invoice away.
+ */
+export function legs(pairs: readonly (readonly [string, bigint])[]): DraftPosting[] {
+  const byAccount = new Map<string, bigint>();
+  for (const [accountId, amount] of pairs) {
+    byAccount.set(accountId, (byAccount.get(accountId) ?? 0n) + amount);
+  }
+  return [...byAccount]
+    .filter(([, amount]) => amount !== 0n)
+    .map(([accountId, amount]) => ({
+      accountId,
+      amount: amount as MinorUnits,
+      baseAmount: amount as MinorUnits,
+      fxRate: '1',
+    }));
+}
+
+export async function openLayers(
   tx: Transactional,
   itemId: string,
   options: { lock: boolean },
@@ -731,6 +1030,12 @@ async function describeMovement(
     reference: row.reference,
     costingMethod: row.costingMethod,
     transactionId: row.transactionId,
+    reason: row.reason,
+    saleId: row.saleId,
+    revenue:
+      row.revenueBaseMinor === null
+        ? null
+        : toMoneyDto(row.revenueBaseMinor as MinorUnits, org.functionalCurrency),
     drawnFrom: draws.map((draw) => ({
       layerId: draw.layerId,
       layerReference: draw.layerReference,

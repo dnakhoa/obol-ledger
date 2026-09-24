@@ -21,7 +21,7 @@ import { ACCOUNT_STATUSES, ACCOUNT_TYPES } from '@/server/domain/account';
 import { TRANSACTION_STATUSES } from '@/server/domain/transaction-status';
 import { DELIVERY_STATUSES } from '@/server/domain/webhook';
 import { ACCOUNT_ROLES, PERIOD_STATUSES } from '@/server/domain/period';
-import type { CostingMethod } from '@/server/domain/costing';
+import type { CostingMethod, WriteOffReason } from '@/server/domain/costing';
 import type { AllocationBasis } from '@/server/domain/landed-cost';
 import type { Supply, TaxTreatment } from '@/server/domain/tax';
 import type { Unit } from '@/lib/quantity';
@@ -938,6 +938,7 @@ export const landedCostCharges = pgTable(
   (table) => [
     unique('landed_cost_charges_id_org_key').on(table.id, table.orgId),
     index('landed_cost_charges_shipment_idx').on(table.orgId, table.shipmentId, table.createdAt),
+    index('landed_cost_charges_transaction_idx').on(table.orgId, table.transactionId),
     foreignKey({
       name: 'landed_cost_charges_shipment_fk',
       columns: [table.shipmentId, table.orgId],
@@ -990,6 +991,70 @@ export const landedCostAllocations = pgTable(
   ],
 );
 
+/**
+ * A sale: the invoice and the stock that left, as one record.
+ *
+ * Its lines are its stock movements — each an issue that also carries what it
+ * was sold for — so the margin on a line is a subtraction on one row. See
+ * `drizzle/0027_sales.sql` and `docs/adr/0018-sales-and-margin.md`.
+ */
+export const sales = pgTable(
+  'sales',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    /** The invoice number. Unique per tenant. */
+    reference: text('reference').notNull(),
+    customerAccountId: text('customer_account_id').notNull(),
+    revenueAccountId: text('revenue_account_id').notNull(),
+    taxCodeId: text('tax_code_id'),
+    currency: char('currency', { length: 3 }).notNull(),
+    fxRate: numeric('fx_rate', { precision: 20, scale: 10 }).notNull().default('1'),
+    netMinor: bigint('net_minor', { mode: 'bigint' }).notNull(),
+    taxMinor: bigint('tax_minor', { mode: 'bigint' }).notNull(),
+    grossMinor: bigint('gross_minor', { mode: 'bigint' }).notNull(),
+    baseNetMinor: bigint('base_net_minor', { mode: 'bigint' }).notNull(),
+    baseTaxMinor: bigint('base_tax_minor', { mode: 'bigint' }).notNull(),
+    baseCostMinor: bigint('base_cost_minor', { mode: 'bigint' }).notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    /** When the customer agreed to pay; absent means on receipt. */
+    dueOn: date('due_on', { mode: 'string' }),
+    transactionId: text('transaction_id').notNull(),
+    metadata: jsonb('metadata')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('sales_id_org_key').on(table.id, table.orgId),
+    uniqueIndex('sales_org_reference_key').on(table.orgId, table.reference),
+    index('sales_org_occurred_idx').on(table.orgId, table.occurredAt, table.id),
+    index('sales_org_customer_idx').on(table.orgId, table.customerAccountId, table.occurredAt),
+    index('sales_transaction_idx').on(table.orgId, table.transactionId),
+    foreignKey({
+      name: 'sales_customer_account_fk',
+      columns: [table.customerAccountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'sales_revenue_account_fk',
+      columns: [table.revenueAccountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'sales_tax_code_fk',
+      columns: [table.taxCodeId, table.orgId],
+      foreignColumns: [taxCodes.id, taxCodes.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'sales_transaction_fk',
+      columns: [table.transactionId, table.orgId],
+      foreignColumns: [transactions.id, transactions.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
 /** Something happened to the stock. Append-only, like postings. */
 export const inventoryMovements = pgTable(
   'inventory_movements',
@@ -1019,6 +1084,14 @@ export const inventoryMovements = pgTable(
      */
     costingMethod: text('costing_method').$type<CostingMethod>().notNull(),
     reference: text('reference'),
+    /** The sale this issue was a line of, when it was one. */
+    saleId: text('sale_id'),
+    /** What the line was sold for, net, in the books' own currency. */
+    revenueBaseMinor: bigint('revenue_base_minor', { mode: 'bigint' }),
+    /** Where the line sits on the invoice, from 1. */
+    saleLine: integer('sale_line'),
+    /** Why stock left without being sold. Set on a write-off and nothing else. */
+    reason: text('reason').$type<WriteOffReason>(),
     metadata: jsonb('metadata')
       .$type<Record<string, string>>()
       .notNull()
@@ -1028,6 +1101,15 @@ export const inventoryMovements = pgTable(
   (table) => [
     unique('inventory_movements_id_org_key').on(table.id, table.orgId),
     index('inventory_movements_item_idx').on(table.orgId, table.itemId, table.occurredAt, table.id),
+    index('inventory_movements_transaction_idx').on(table.orgId, table.transactionId),
+    uniqueIndex('inventory_movements_sale_line_key')
+      .on(table.orgId, table.saleId, table.saleLine)
+      .where(sql`${table.saleId} IS NOT NULL`),
+    foreignKey({
+      name: 'inventory_movements_sale_fk',
+      columns: [table.saleId, table.orgId],
+      foreignColumns: [sales.id, sales.orgId],
+    }).onDelete('restrict'),
     foreignKey({
       name: 'inventory_movements_item_fk',
       columns: [table.itemId, table.orgId],

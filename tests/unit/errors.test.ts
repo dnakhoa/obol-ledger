@@ -129,6 +129,15 @@ const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
     periodMonth: '2026-03-01',
     unfiled: '2026-02-01',
   },
+  entry_owned_by_stock: {
+    code: 'entry_owned_by_stock',
+    transactionId: 'txn_1',
+    source: 'inventory',
+  },
+  sale_has_no_lines: { code: 'sale_has_no_lines' },
+  sale_reference_taken: { code: 'sale_reference_taken', reference: 'INV-2607' },
+  sale_not_found: { code: 'sale_not_found', saleId: 'sale_1' },
+  due_before_invoice: { code: 'due_before_invoice', dueOn: '2025-03-01', invoicedOn: '2026-03-01' },
 };
 
 const variants = Object.values(EVERY_VARIANT);

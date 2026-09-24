@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createTestDatabase, expectDatabaseError, type TestDatabase } from '../helpers/database';
 import { openAccount, servicesFor } from '../helpers/fixtures';
-import { taxCodes } from '@/server/db/schema';
+import { eq } from 'drizzle-orm';
+import { taxCodes, taxEntries } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
 
 /**
@@ -127,6 +128,43 @@ describe('consumption tax', () => {
       expect(result.value.tax).toBe('10000');
       expect(result.value.gross).toBe('110000');
     });
+
+    it('posts a zero-rated export, and still puts it on the return', async () => {
+      // Vietnam's GTGT is 0% on exported goods, and so is every VAT system's
+      // treatment of an export. There is no tax to post — a nil leg records
+      // nothing and the journal rightly refuses it — but the supply belongs
+      // on the return, so the tax entry row is written anyway.
+      const zero = await services.tax.create({
+        name: 'GTGT 0% (xuất khẩu)',
+        rateBasisPoints: 0,
+        treatment: 'vat',
+        inputAccountId: inputTax.id,
+        outputAccountId: outputTax.id,
+      });
+      if (!zero.ok) throw new Error(zero.error.code);
+
+      const result = await services.tax.post({
+        description: 'Export invoice INV-2607',
+        taxCodeId: zero.value.id,
+        supply: 'sale',
+        amount: 58_400_00n,
+        netAccountId: revenue.id,
+        counterpartyAccountId: receivable.id,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.entry.postings).toHaveLength(2);
+      expect(result.value.tax).toBe('0');
+      expect(await balanceOf(receivable.id)).toBe('5840000');
+      expect(await balanceOf(outputTax.id)).toBe('0');
+
+      const rows = await withTenant(db, db.$orgId, (tx) =>
+        tx.select().from(taxEntries).where(eq(taxEntries.transactionId, result.value.entry.id)),
+      );
+      expect(rows.map((row) => [row.supply, row.baseMinor, row.taxMinor])).toEqual([
+        ['sale', 5_840_000n, 0n],
+      ]);
+    });
   });
 
   describe('EU reverse charge', () => {
@@ -156,6 +194,39 @@ describe('consumption tax', () => {
       expect(await balanceOf(inputTax.id)).toBe('20000');
       expect(await balanceOf(outputTax.id)).toBe('20000');
       expect(await balanceOf(payable.id)).toBe('100000');
+    });
+
+    it('reports a reverse-charge sale once, without inventing an acquisition', async () => {
+      const created = await services.tax.create({
+        name: 'EU reverse charge 20%',
+        rateBasisPoints: 2000,
+        treatment: 'reverse_charge',
+        inputAccountId: inputTax.id,
+        outputAccountId: outputTax.id,
+      });
+      if (!created.ok) throw new Error(created.error.code);
+
+      // The seller charges nothing and the buyer self-accounts. The supply
+      // goes on the seller's return; a purchase row beside it would claim an
+      // acquisition the seller never made.
+      const result = await services.tax.post({
+        description: 'Supply to a German distributor',
+        taxCodeId: created.value.id,
+        supply: 'sale',
+        amount: 1_000_00n,
+        netAccountId: revenue.id,
+        counterpartyAccountId: receivable.id,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(await balanceOf(receivable.id)).toBe('100000');
+
+      const rows = await withTenant(db, db.$orgId, (tx) =>
+        tx.select().from(taxEntries).where(eq(taxEntries.transactionId, result.value.entry.id)),
+      );
+      expect(rows.map((row) => [row.supply, row.baseMinor, row.taxMinor])).toEqual([
+        ['sale', 100_000n, 0n],
+      ]);
     });
   });
 
