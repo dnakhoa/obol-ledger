@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { db } from './db/client';
+import type { Database } from './db/types';
 import { createAccountService } from './services/accounts';
 import { createApiKeyService } from './services/api-keys';
 import { createAuthenticationService } from './services/authentication';
@@ -31,9 +32,13 @@ import { currentViewer, type Viewer } from './auth/viewer';
  *
  * Lazy matters: building this at module scope would open a connection during
  * `next build`, when no database exists.
+ *
+ * `database` is a transaction when a caller needs several services' writes to
+ * commit or roll back as one — an idempotent API write claims its key and does
+ * its work in the same transaction. Each service's own `withTenant` then opens
+ * a savepoint inside it rather than a transaction of its own.
  */
-export function servicesFor(orgId: string) {
-  const database = db();
+export function servicesFor(orgId: string, database: Database = db()) {
   return {
     accounts: createAccountService(database, orgId),
     apiKeys: createApiKeyService(database, orgId),
