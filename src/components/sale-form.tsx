@@ -6,6 +6,10 @@ import { Button } from './ui/button';
 import { Field, Input, Select } from './ui/field';
 import { AlertIcon, CheckIcon, PlusIcon } from './icons';
 import { cn } from '@/lib/cn';
+import { formatAmount } from '@/lib/format';
+import { invoiceTotals } from '@/lib/invoice';
+import { toDecimalString, type CurrencyCode, type MinorUnits } from '@/lib/money';
+import type { Locale } from '@/lib/i18n/locales';
 import { sellAction, type SaleState } from '@/app/(app)/sales/actions';
 
 const INITIAL: SaleState = { status: 'idle' };
@@ -50,12 +54,16 @@ export type SaleLabels = {
   readonly submit: string;
   readonly working: string;
   readonly openInvoice: string;
+  readonly remove: string;
+  readonly net: string;
+  readonly tax: string;
+  readonly gross: string;
 };
 
 /** How many lines a single invoice form offers. A container rarely carries more. */
 export const MAX_LINES = 12;
 
-type Line = { key: number; itemId: string };
+type Line = { key: number; itemId: string; amount: string };
 
 /**
  * An invoice, with lines added and removed in place.
@@ -74,6 +82,8 @@ export function SaleForm({
   currencies,
   today,
   labels,
+  taxRates,
+  locale,
 }: {
   customers: readonly SaleOption[];
   revenueAccounts: readonly SaleOption[];
@@ -82,9 +92,22 @@ export function SaleForm({
   currencies: readonly string[];
   today: string;
   labels: SaleLabels;
+  /** What each code charges on a sale, in basis points — 0 for a reverse charge. */
+  taxRates: Readonly<Record<string, number>>;
+  /** For grouping the running total the way the rest of the page does. */
+  locale: Locale;
 }) {
   const [state, action, pending] = useActionState(sellAction, INITIAL);
-  const [lines, setLines] = useState<Line[]>([{ key: 0, itemId: items[0]?.id ?? '' }]);
+  const [lines, setLines] = useState<Line[]>([{ key: 0, itemId: items[0]?.id ?? '', amount: '' }]);
+  const [currency, setCurrency] = useState(currencies[0] ?? 'USD');
+  const [taxCodeId, setTaxCodeId] = useState('');
+  const totals = invoiceTotals(
+    lines.map((line) => line.amount),
+    currency as CurrencyCode,
+    taxRates[taxCodeId] ?? 0,
+  );
+  const show = (value: MinorUnits) =>
+    formatAmount({ amount: toDecimalString(value, currency as CurrencyCode) }, locale);
   const [nextKey, setNextKey] = useState(1);
   const id = useId();
 
@@ -92,7 +115,7 @@ export function SaleForm({
 
   const addLine = () => {
     if (lines.length >= MAX_LINES) return;
-    setLines([...lines, { key: nextKey, itemId: items[0]?.id ?? '' }]);
+    setLines([...lines, { key: nextKey, itemId: items[0]?.id ?? '', amount: '' }]);
     setNextKey(nextKey + 1);
   };
 
@@ -131,7 +154,12 @@ export function SaleForm({
           </Select>
         </Field>
         <Field label={labels.currency} htmlFor={`${id}-ccy`} hint={labels.currencyHint}>
-          <Select id={`${id}-ccy`} name="currency" defaultValue={currencies[0]}>
+          <Select
+            id={`${id}-ccy`}
+            name="currency"
+            value={currency}
+            onChange={(event) => setCurrency(event.target.value)}
+          >
             {currencies.map((currency) => (
               <option key={currency} value={currency}>
                 {currency}
@@ -140,7 +168,12 @@ export function SaleForm({
           </Select>
         </Field>
         <Field label={labels.taxCode} htmlFor={`${id}-tax`}>
-          <Select id={`${id}-tax`} name="taxCodeId" defaultValue="">
+          <Select
+            id={`${id}-tax`}
+            name="taxCodeId"
+            value={taxCodeId}
+            onChange={(event) => setTaxCodeId(event.target.value)}
+          >
             <option value="">{labels.noTax}</option>
             {taxCodes.map((option) => (
               <option key={option.id} value={option.id}>
@@ -215,6 +248,14 @@ export function SaleForm({
                   inputMode="decimal"
                   placeholder="12000.00"
                   required
+                  value={line.amount}
+                  onChange={(event) =>
+                    setLines(
+                      lines.map((other) =>
+                        other.key === line.key ? { ...other, amount: event.target.value } : other,
+                      ),
+                    )
+                  }
                 />
               </Field>
               <Field label={labels.lot} htmlFor={`${row}-lot`}>
@@ -234,8 +275,12 @@ export function SaleForm({
                 disabled={lines.length === 1}
                 aria-label={labels.removeLine[index]}
                 onClick={() => setLines(lines.filter((other) => other.key !== line.key))}
+                className="justify-self-start sm:justify-self-auto"
               >
-                ×
+                {/* A bare × is a target nobody can name on a phone, where the
+                    row stacks and the button sits alone under the lot. */}
+                <span aria-hidden="true">×</span>
+                <span className="sm:hidden">{labels.remove}</span>
               </Button>
             </div>
           );
@@ -251,6 +296,27 @@ export function SaleForm({
           {labels.addLine}
         </Button>
       </fieldset>
+
+      {/*
+        The running total, laid out as the foot of the paper invoice it will be
+        checked against. Announced politely so a screen reader hears the new
+        total once the person stops typing, not on every keystroke's worth of
+        interruption.
+      */}
+      <dl
+        aria-live="polite"
+        className="border-line bg-surface-sunken ml-auto grid w-full max-w-sm grid-cols-[1fr_auto] gap-x-6 gap-y-1 rounded-lg border px-4 py-3 text-sm"
+      >
+        <dt className="text-ink-muted">{labels.net}</dt>
+        <dd className="numeric text-right">{totals ? show(totals.net) : '—'}</dd>
+        <dt className="text-ink-muted">{labels.tax}</dt>
+        <dd className="numeric text-right">{totals ? show(totals.tax) : '—'}</dd>
+        <dt className="border-line mt-1 border-t pt-1.5 font-medium">{labels.gross}</dt>
+        <dd className="numeric border-line mt-1 border-t pt-1.5 text-right font-semibold">
+          {totals ? show(totals.gross) : '—'}
+          <span className="text-ink-muted ml-1 text-[11px] font-normal">{currency}</span>
+        </dd>
+      </dl>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" variant="primary" disabled={pending}>

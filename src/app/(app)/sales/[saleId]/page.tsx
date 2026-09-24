@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Card, CardBody, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Table, TableScroll, Td, Th, Tr } from '@/components/ui/table';
 import { ArrowLeftIcon } from '@/components/icons';
 import { PageHeader } from '@/components/page-header';
 import { Money } from '@/components/money';
+import { StatTile } from '@/components/stat-tile';
 import { MarginPercent } from '@/components/margin';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
@@ -59,8 +60,6 @@ export default async function SalePage({ params }: { params: Promise<{ saleId: s
   }
   if (!sale) notFound();
 
-  const foreign = sale.currency !== sale.revenue.currency;
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -77,47 +76,41 @@ export default async function SalePage({ params }: { params: Promise<{ saleId: s
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">{t.sales.gross}</p>
-            <p className="numeric text-2xl font-semibold">
-              <Money value={sale.gross} showCurrency />
-            </p>
-            <p className="text-ink-muted text-[11px]">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatTile
+          label={t.sales.gross}
+          value={<Money value={sale.gross} />}
+          unit={sale.gross.currency}
+          detail={
+            <>
               {t.sales.net} <Money value={sale.net} /> · {t.sales.tax} <Money value={sale.tax} />
-            </p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">{t.sales.revenue}</p>
-            <p className="numeric text-2xl font-semibold">
-              <Money value={sale.revenue} showCurrency={foreign} />
-            </p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">{t.sales.cost}</p>
-            <p className="numeric text-2xl font-semibold">
-              <Money value={sale.cost} showCurrency={foreign} />
-            </p>
-          </CardBody>
-        </Card>
-        <Card className={sale.margin.amount.startsWith('-') ? 'border-negative' : ''}>
-          <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">{t.sales.margin}</p>
-            <p className="numeric flex flex-wrap items-baseline text-2xl font-semibold">
-              <Money value={sale.margin} signed showCurrency={foreign} />
-              <MarginPercent basisPoints={sale.marginBasisPoints} className="text-sm" />
-            </p>
-            <p className="text-ink-muted text-[11px]">
+            </>
+          }
+        />
+        <StatTile
+          label={t.sales.revenue}
+          value={<Money value={sale.revenue} />}
+          unit={sale.revenue.currency}
+        />
+        <StatTile
+          label={t.sales.cost}
+          value={<Money value={sale.cost} />}
+          unit={sale.cost.currency}
+        />
+        <StatTile
+          label={t.sales.margin}
+          value={<Money value={sale.margin} signed />}
+          unit={sale.margin.currency}
+          tone={sale.margin.amount.startsWith('-') ? 'caution' : 'neutral'}
+          detail={
+            <>
+              <MarginPercent basisPoints={sale.marginBasisPoints} className="ml-0" />
+              {' · '}
               {t.sales.due}:{' '}
               {sale.dueOn ? DATE.day(new Date(`${sale.dueOn}T12:00:00Z`)) : t.sales.onReceipt}
-            </p>
-          </CardBody>
-        </Card>
+            </>
+          }
+        />
       </div>
 
       <Card>
@@ -131,9 +124,13 @@ export default async function SalePage({ params }: { params: Promise<{ saleId: s
               <tr>
                 <Th>{t.sales.product}</Th>
                 <Th align="right">{t.product.quantity}</Th>
-                <Th>{t.sales.shippedFrom}</Th>
-                <Th align="right">{t.sales.revenue}</Th>
-                <Th align="right">{t.sales.cost}</Th>
+                <Th hideBelow="md">{t.sales.shippedFrom}</Th>
+                <Th hideBelow="md" align="right">
+                  {t.sales.revenue}
+                </Th>
+                <Th hideBelow="md" align="right">
+                  {t.sales.cost}
+                </Th>
                 <Th align="right">{t.sales.margin}</Th>
               </tr>
             </thead>
@@ -158,7 +155,7 @@ export default async function SalePage({ params }: { params: Promise<{ saleId: s
                         {unitLabel(line.unit)}
                       </span>
                     </Td>
-                    <Td>
+                    <Td hideBelow="md">
                       <span className="flex flex-wrap gap-1">
                         {line.drawnFrom.map((draw, index) => (
                           <Badge key={`${line.movementId}-${index}`}>
@@ -168,10 +165,10 @@ export default async function SalePage({ params }: { params: Promise<{ saleId: s
                         ))}
                       </span>
                     </Td>
-                    <Td align="right" numeric>
+                    <Td hideBelow="md" align="right" numeric>
                       <Money value={line.revenue} />
                     </Td>
-                    <Td align="right" numeric>
+                    <Td hideBelow="md" align="right" numeric>
                       <Money value={line.cost} />
                     </Td>
                     <Td align="right" numeric>
@@ -184,13 +181,15 @@ export default async function SalePage({ params }: { params: Promise<{ saleId: s
             </tbody>
             <tfoot>
               <Tr>
-                <Td colSpan={3} className="font-medium">
-                  {t.margins.total}
-                </Td>
-                <Td align="right" numeric className="font-semibold">
+                {/* Cells rather than a colSpan: a span over a column hidden on
+                    a phone would shift every total one to the right. */}
+                <Td className="font-medium">{t.margins.total}</Td>
+                <Td />
+                <Td hideBelow="md" />
+                <Td hideBelow="md" align="right" numeric className="font-semibold">
                   <Money value={sale.revenue} />
                 </Td>
-                <Td align="right" numeric className="font-semibold">
+                <Td hideBelow="md" align="right" numeric className="font-semibold">
                   <Money value={sale.cost} />
                 </Td>
                 <Td align="right" numeric className="font-semibold">

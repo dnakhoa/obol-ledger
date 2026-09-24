@@ -43,7 +43,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     viewer.kind === 'guest' ? {} : { name: viewer.name, email: viewer.email, image: viewer.image };
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr]">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
+      {/*
+        `minmax(0, 1fr)`, not `1fr`: a bare `1fr` track's minimum is its
+        content's, so one wide table widened the whole page and the sidebar
+        scrolled off with it, instead of the table scrolling in its card.
+      */}
       {/*
         A skip link is the difference between one Tab keystroke and twenty for
         anyone navigating by keyboard. Visually hidden until focused.
@@ -81,7 +86,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex min-h-dvh flex-col">
+      <div className="flex min-h-dvh min-w-0 flex-col">
         <header className="border-line bg-surface/90 sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b px-4 backdrop-blur-sm lg:hidden">
           <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
             <span className="bg-action text-action-ink flex size-7 items-center justify-center rounded-md">

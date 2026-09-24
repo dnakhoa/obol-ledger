@@ -106,6 +106,22 @@ export const en = {
     entryDescription: 'Description',
     accounts: 'Accounts',
     amount: 'Amount',
+    theBooks: 'The books',
+    trading: 'The business at a glance',
+    stockOnHand: 'Stock on hand',
+    stockAgrees: (products: number) => `${products} products · agrees with the accounts`,
+    stockDisagrees: 'Out of step with the accounts — check',
+    owedToYou: 'Owed to you',
+    invoicesLate: (count: number, days: number) =>
+      `${count} invoice${count === 1 ? '' : 's'} late · oldest ${days} days`,
+    nothingLate: 'Nothing late',
+    owedToSuppliers: 'Owed to suppliers',
+    billsLate: (count: number) => `${count} bill${count === 1 ? '' : 's'} past due`,
+    nothingPastDue: 'Nothing past due',
+    marginThisMonth: 'Gross margin this month',
+    marginDetail: (invoices: number, percent: string) =>
+      `${percent} on ${invoices} invoice${invoices === 1 ? '' : 's'}`,
+    noInvoicesYet: 'No invoices raised this month',
   },
 
   accounts: {
@@ -902,6 +918,7 @@ export const en = {
     lineTotal: 'Line total before tax',
     lot: 'Lot',
     byMethod: 'By costing method',
+    remove: 'Remove',
     addLine: 'Add a line',
     removeLine: (line: number) => `Remove line ${line}`,
     lineLabel: (line: number) => `Line ${line}`,

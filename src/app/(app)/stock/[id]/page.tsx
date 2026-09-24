@@ -8,6 +8,7 @@ import { Table, TableScroll, Td, Th, Tr } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/page-header';
 import { Money } from '@/components/money';
+import { StatTile } from '@/components/stat-tile';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
 import { ArrowLeftIcon } from '@/components/icons';
@@ -190,32 +191,18 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">{t.product.onHand}</p>
-            <p className="numeric text-2xl font-semibold">
-              {quantity(item.onHandMinor)}
-              <span className="text-ink-muted ml-1.5 text-sm font-normal">
-                {unitLabel(item.unit)}
-              </span>
-            </p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">{t.product.whatItCost}</p>
-            <p className="numeric text-2xl font-semibold">
-              <Money value={item.value} showCurrency />
-            </p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">{t.product.deliveriesStillOpen}</p>
-            <p className="numeric text-2xl font-semibold">{item.openLayers}</p>
-          </CardBody>
-        </Card>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+        <StatTile
+          label={t.product.onHand}
+          value={<span className="numeric">{quantity(item.onHandMinor)}</span>}
+          unit={unitLabel(item.unit)}
+        />
+        <StatTile
+          label={t.product.whatItCost}
+          value={<Money value={item.value} />}
+          unit={item.value.currency}
+        />
+        <StatTile label={t.product.deliveriesStillOpen} value={item.openLayers} />
       </div>
 
       <Card>
@@ -231,9 +218,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               <thead>
                 <tr>
                   <Th>{t.product.reference}</Th>
-                  <Th>{t.product.arrived}</Th>
+                  <Th hideBelow="sm">{t.product.arrived}</Th>
                   <Th align="right">{t.product.left}</Th>
-                  <Th align="right">{t.product.paidForLot}</Th>
+                  <Th hideBelow="md" align="right">
+                    {t.product.paidForLot}
+                  </Th>
                   <Th align="right">{t.product.valueOfRemainder}</Th>
                 </tr>
               </thead>
@@ -252,14 +241,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                         (lot.reference ?? t.product.openingBalance)
                       )}
                     </Td>
-                    <Td>{DATE.day(lot.acquiredAt)}</Td>
+                    <Td hideBelow="sm">{DATE.day(lot.acquiredAt)}</Td>
                     <Td align="right" numeric>
                       {quantity(lot.remainingQuantityMinor)}
                       <span className="text-ink-muted ml-1 text-[11px]">
                         {t.product.ofTotal(quantity(lot.quantityMinor))}
                       </span>
                     </Td>
-                    <Td align="right" numeric>
+                    <Td hideBelow="md" align="right" numeric>
                       <Money value={lot.cost} showCurrency={lot.currency !== functional} />
                     </Td>
                     <Td align="right" numeric>
@@ -368,18 +357,20 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <Table caption={t.product.movementsCaption}>
               <thead>
                 <tr>
-                  <Th>{t.product.date}</Th>
+                  <Th hideBelow="sm">{t.product.date}</Th>
                   <Th>{t.product.whatHappened}</Th>
                   <Th align="right">{t.product.quantity}</Th>
-                  <Th>{t.product.costedFrom}</Th>
+                  <Th hideBelow="md">{t.product.costedFrom}</Th>
                   <Th align="right">{t.product.cost}</Th>
-                  <Th align="right">{t.product.soldFor}</Th>
+                  <Th hideBelow="md" align="right">
+                    {t.product.soldFor}
+                  </Th>
                 </tr>
               </thead>
               <tbody>
                 {movements.map((movement) => (
                   <Tr key={movement.id}>
-                    <Td>{DATE.day(movement.occurredAt)}</Td>
+                    <Td hideBelow="sm">{DATE.day(movement.occurredAt)}</Td>
                     <Td>
                       <Link
                         href={
@@ -391,6 +382,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                       >
                         {movementLabel(movement, t)}
                       </Link>
+                      <span className="text-ink-muted block text-xs sm:hidden">
+                        {DATE.day(movement.occurredAt)}
+                      </span>
                       {movement.reference ? (
                         <span className="text-ink-muted ml-2 text-xs">{movement.reference}</span>
                       ) : null}
@@ -399,7 +393,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                       {movement.kind === 'receipt' ? '+' : '−'}
                       {quantity(movement.quantityMinor)}
                     </Td>
-                    <Td>
+                    <Td hideBelow="md">
                       {movement.drawnFrom.length === 0 ? (
                         <span className="text-ink-muted text-xs">—</span>
                       ) : (
@@ -416,7 +410,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     <Td align="right" numeric>
                       <Money value={movement.cost} />
                     </Td>
-                    <Td align="right" numeric>
+                    <Td hideBelow="md" align="right" numeric>
                       {movement.revenue ? (
                         <Money value={movement.revenue} />
                       ) : (

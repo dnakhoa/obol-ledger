@@ -48,9 +48,15 @@ export async function StockReconciliationCard({
           <thead>
             <tr>
               <Th>{t.reconcile.account}</Th>
-              <Th align="right">{t.reconcile.products}</Th>
-              <Th align="right">{t.reconcile.ledger}</Th>
-              <Th align="right">{t.reconcile.lots}</Th>
+              <Th hideBelow="sm" align="right">
+                {t.reconcile.products}
+              </Th>
+              <Th hideBelow="md" align="right">
+                {t.reconcile.ledger}
+              </Th>
+              <Th hideBelow="md" align="right">
+                {t.reconcile.lots}
+              </Th>
               <Th align="right">{t.reconcile.difference}</Th>
             </tr>
           </thead>
@@ -67,13 +73,13 @@ export async function StockReconciliationCard({
                       : account.accountName}
                   </Link>
                 </Td>
-                <Td align="right" numeric>
+                <Td hideBelow="sm" align="right" numeric>
                   {account.items}
                 </Td>
-                <Td align="right" numeric>
+                <Td hideBelow="md" align="right" numeric>
                   <Money value={account.ledger} />
                 </Td>
-                <Td align="right" numeric>
+                <Td hideBelow="md" align="right" numeric>
                   <Money value={account.lots} />
                 </Td>
                 <Td align="right" numeric>
@@ -89,7 +95,7 @@ export async function StockReconciliationCard({
                 ? null
                 : account.unexplained.map((entry) => (
                     <Tr key={entry.transactionId}>
-                      <Td colSpan={4} className="pl-8 text-xs">
+                      <Td className="pl-8 text-xs">
                         <span className="text-ink-muted mr-2">{t.reconcile.unexplained}</span>
                         <Link
                           href={`/journal/${entry.transactionId}`}
@@ -98,6 +104,9 @@ export async function StockReconciliationCard({
                           {DATE.day(entry.occurredAt)} · {entry.description}
                         </Link>
                       </Td>
+                      <Td hideBelow="sm" />
+                      <Td hideBelow="md" />
+                      <Td hideBelow="md" />
                       <Td align="right" numeric className="text-xs">
                         <Money value={entry.amount} />
                       </Td>

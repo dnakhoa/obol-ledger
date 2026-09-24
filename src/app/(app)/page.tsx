@@ -7,6 +7,7 @@ import { Table, TableScroll, Td, Th, Tr } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatTile } from '@/components/stat-tile';
 import { Money } from '@/components/money';
+import { marginText } from '@/components/margin';
 import { VolumeChart } from '@/components/volume-chart';
 import { SetupNotice } from '@/components/setup-notice';
 import { CheckIcon, AlertIcon, ArrowRightIcon } from '@/components/icons';
@@ -35,7 +36,7 @@ export default async function OverviewPage() {
     throw error;
   }
 
-  const { accounts, trialBalance, recent, summary, chart } = model;
+  const { accounts, trialBalance, recent, summary, chart, trading } = model;
   // One row: the trial balance is stated in the functional currency and
   // nothing else, because that is the only unit it means anything in.
   const books = trialBalance[0];
@@ -117,35 +118,112 @@ export default async function OverviewPage() {
         </CardBody>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile
-          label={t.overview.cashAndAssets}
-          value={<Money value={position.totalFor('asset')} />}
-          unit={position.currency}
-          detail={t.overview.debitNormalBalances}
-          emphasis
-        />
-        <StatTile
-          label={t.overview.revenue}
-          value={<Money value={position.totalFor('revenue')} />}
-          unit={position.currency}
-          detail={t.overview.revenueDetail}
-        />
-        <StatTile
-          label={t.overview.expenses}
-          value={<Money value={position.totalFor('expense')} />}
-          unit={position.currency}
-          detail={t.overview.debitNormalBalances}
-        />
-        <StatTile
-          label={t.overview.entriesPosted}
-          value={format.number(summary.entryCount)}
-          detail={t.overview.entriesDetail(
-            format.number(summary.postingCount),
-            summary.accountCount,
-          )}
-        />
-      </div>
+      {/*
+        The business before the books. The ledger tiles below prove the
+        figures are consistent; these say how the trading is going, and each
+        opens the page that answers the next question. Shown only to a ledger
+        that holds stock — a services business has no yard to report on.
+      */}
+      {trading ? (
+        <section aria-label={t.overview.trading} className="space-y-2">
+          <h2 className="text-ink-muted text-xs font-medium">{t.overview.trading}</h2>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+            <StatTile
+              href="/stock"
+              label={t.overview.stockOnHand}
+              value={<Money value={trading.stock} />}
+              unit={trading.stock.currency}
+              tone={trading.stockAgrees ? 'neutral' : 'caution'}
+              detail={
+                trading.stockAgrees ? (
+                  t.overview.stockAgrees(trading.products)
+                ) : (
+                  <span className="text-caution font-medium">{t.overview.stockDisagrees}</span>
+                )
+              }
+            />
+            <StatTile
+              href="/reports/aging"
+              label={t.overview.owedToYou}
+              value={<Money value={trading.receivable} />}
+              unit={trading.receivable.currency}
+              tone={trading.oldestDaysLate > 60 ? 'caution' : 'neutral'}
+              detail={
+                trading.overdueInvoices > 0 ? (
+                  <span className={trading.oldestDaysLate > 60 ? 'text-caution font-medium' : ''}>
+                    {t.overview.invoicesLate(trading.overdueInvoices, trading.oldestDaysLate)}
+                  </span>
+                ) : (
+                  t.overview.nothingLate
+                )
+              }
+            />
+            <StatTile
+              href="/reports/aging"
+              label={t.overview.owedToSuppliers}
+              value={<Money value={trading.payable} />}
+              unit={trading.payable.currency}
+              detail={
+                trading.overdueBills > 0
+                  ? t.overview.billsLate(trading.overdueBills)
+                  : t.overview.nothingPastDue
+              }
+            />
+            <StatTile
+              href="/reports/margins"
+              label={t.overview.marginThisMonth}
+              value={<Money value={trading.margin} signed />}
+              unit={trading.margin.currency}
+              detail={
+                trading.invoicesThisMonth === 0
+                  ? t.overview.noInvoicesYet
+                  : trading.marginBasisPoints === null
+                    ? null
+                    : t.overview.marginDetail(
+                        trading.invoicesThisMonth,
+                        marginText(trading.marginBasisPoints, locale),
+                      )
+              }
+            />
+          </div>
+        </section>
+      ) : null}
+
+      <section aria-label={t.overview.theBooks} className="space-y-2">
+        {/* Named only beside the trading row, where there are two to tell apart. */}
+        {trading ? (
+          <h2 className="text-ink-muted text-xs font-medium">{t.overview.theBooks}</h2>
+        ) : null}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <StatTile
+            label={t.overview.cashAndAssets}
+            value={<Money value={position.totalFor('asset')} />}
+            unit={position.currency}
+            detail={t.overview.debitNormalBalances}
+            emphasis
+          />
+          <StatTile
+            label={t.overview.revenue}
+            value={<Money value={position.totalFor('revenue')} />}
+            unit={position.currency}
+            detail={t.overview.revenueDetail}
+          />
+          <StatTile
+            label={t.overview.expenses}
+            value={<Money value={position.totalFor('expense')} />}
+            unit={position.currency}
+            detail={t.overview.debitNormalBalances}
+          />
+          <StatTile
+            label={t.overview.entriesPosted}
+            value={format.number(summary.entryCount)}
+            detail={t.overview.entriesDetail(
+              format.number(summary.postingCount),
+              summary.accountCount,
+            )}
+          />
+        </div>
+      </section>
 
       <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
         <Card>
@@ -274,9 +352,9 @@ export default async function OverviewPage() {
             <Table caption={t.overview.recentCaption}>
               <thead>
                 <tr>
-                  <Th>{t.overview.date}</Th>
+                  <Th hideBelow="sm">{t.overview.date}</Th>
                   <Th>{t.overview.entryDescription}</Th>
-                  <Th>{t.overview.accounts}</Th>
+                  <Th hideBelow="md">{t.overview.accounts}</Th>
                   <Th align="right">{t.overview.amount}</Th>
                 </tr>
               </thead>
@@ -285,15 +363,19 @@ export default async function OverviewPage() {
                   const debit = entry.postings.find((posting) => posting.direction === 'debit');
                   return (
                     <Tr key={entry.id}>
-                      <Td className="text-ink-muted whitespace-nowrap">
+                      <Td hideBelow="sm" className="text-ink-muted whitespace-nowrap">
                         {format.day(new Date(entry.occurredAt))}
                       </Td>
                       <Td className="font-medium">
                         <Link href={`/journal?highlight=${entry.id}`} className="hover:underline">
                           {entry.description}
                         </Link>
+                        {/* The date column is gone on a phone; it rides here instead. */}
+                        <span className="text-ink-muted block text-xs font-normal sm:hidden">
+                          {format.day(new Date(entry.occurredAt))}
+                        </span>
                       </Td>
-                      <Td className="text-ink-muted text-xs">
+                      <Td hideBelow="md" className="text-ink-muted text-xs">
                         {entry.postings.map((posting) => posting.accountName).join(' · ')}
                       </Td>
                       <Td align="right" numeric>

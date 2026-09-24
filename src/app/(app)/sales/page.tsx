@@ -41,6 +41,7 @@ export default async function SalesPage() {
   let customers: SaleOption[];
   let revenueAccounts: SaleOption[];
   let taxCodes: SaleOption[];
+  let taxRates: Record<string, number>;
   let items: SaleItemOption[];
   let functional: CurrencyCode;
   try {
@@ -69,6 +70,14 @@ export default async function SalesPage() {
     revenueAccounts = open
       .filter((a) => a.type === 'revenue' && a.balance.currency === functional)
       .map((account) => ({ id: account.id, label: label(account) }));
+    // What each code charges *on a sale*: the seller under a reverse charge
+    // charges nothing, and the running total has to say so.
+    taxRates = Object.fromEntries(
+      codes.map((code) => [
+        code.id,
+        code.treatment === 'reverse_charge' ? 0 : code.rateBasisPoints,
+      ]),
+    );
     taxCodes = codes.map((code) => ({
       id: code.id,
       label: `${code.name} (${formatRate(code.rateBasisPoints)})`,
@@ -131,6 +140,10 @@ export default async function SalesPage() {
     submit: t.sales.submit,
     working: t.common.working,
     openInvoice: t.entry.openSale,
+    remove: t.sales.remove,
+    net: t.sales.net,
+    tax: t.sales.tax,
+    gross: t.sales.gross,
   };
   const ready = items.length > 0 && customers.length > 0 && revenueAccounts.length > 0;
   const today = new Date().toISOString().slice(0, 10);
@@ -161,12 +174,18 @@ export default async function SalesPage() {
               <thead>
                 <tr>
                   <Th>{t.sales.invoice}</Th>
-                  <Th>{t.sales.customer}</Th>
-                  <Th>{t.sales.date}</Th>
-                  <Th>{t.sales.due}</Th>
-                  <Th align="right">{t.sales.invoiced}</Th>
-                  <Th align="right">{t.sales.revenue}</Th>
-                  <Th align="right">{t.sales.cost}</Th>
+                  <Th hideBelow="md">{t.sales.customer}</Th>
+                  <Th hideBelow="md">{t.sales.date}</Th>
+                  <Th hideBelow="lg">{t.sales.due}</Th>
+                  <Th hideBelow="sm" align="right">
+                    {t.sales.invoiced}
+                  </Th>
+                  <Th hideBelow="lg" align="right">
+                    {t.sales.revenue}
+                  </Th>
+                  <Th hideBelow="lg" align="right">
+                    {t.sales.cost}
+                  </Th>
                   <Th align="right">{t.sales.margin}</Th>
                 </tr>
               </thead>
@@ -180,26 +199,34 @@ export default async function SalesPage() {
                       >
                         {sale.reference}
                       </Link>
+                      {/* Who and when, for the screens that drop those columns. */}
+                      <span className="text-ink-muted block text-xs whitespace-normal md:hidden">
+                        {sale.customerName} · {DATE.day(sale.occurredAt)}
+                      </span>
                     </Td>
-                    <Td className="min-w-40">{sale.customerName}</Td>
-                    <Td className="whitespace-nowrap">{DATE.day(sale.occurredAt)}</Td>
-                    <Td className="whitespace-nowrap">
+                    <Td hideBelow="md" className="min-w-40">
+                      {sale.customerName}
+                    </Td>
+                    <Td hideBelow="md" className="whitespace-nowrap">
+                      {DATE.day(sale.occurredAt)}
+                    </Td>
+                    <Td hideBelow="lg" className="whitespace-nowrap">
                       {sale.dueOn ? (
                         DATE.day(new Date(`${sale.dueOn}T12:00:00Z`))
                       ) : (
                         <span className="text-ink-muted text-xs">{t.sales.onReceipt}</span>
                       )}
                     </Td>
-                    <Td align="right" numeric>
+                    <Td hideBelow="sm" align="right" numeric>
                       <Money value={sale.gross} showCurrency={sale.currency !== functional} />
                     </Td>
-                    <Td align="right" numeric>
+                    <Td hideBelow="lg" align="right" numeric>
                       <Money value={sale.revenue} />
                     </Td>
-                    <Td align="right" numeric>
+                    <Td hideBelow="lg" align="right" numeric>
                       <Money value={sale.cost} />
                     </Td>
-                    <Td align="right" numeric>
+                    <Td align="right" numeric className="whitespace-nowrap">
                       <Money value={sale.margin} />
                       <MarginPercent basisPoints={sale.marginBasisPoints} />
                     </Td>
@@ -226,6 +253,8 @@ export default async function SalesPage() {
               currencies={currencies}
               today={today}
               labels={labels}
+              taxRates={taxRates}
+              locale={locale}
             />
           ) : (
             <p className="text-ink-secondary text-sm">

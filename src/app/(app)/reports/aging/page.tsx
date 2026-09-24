@@ -144,8 +144,8 @@ function Section({
               <thead>
                 <tr>
                   <Th>{t.aging.invoice}</Th>
-                  <Th>{t.aging.dated}</Th>
-                  <Th>{t.aging.due}</Th>
+                  <Th hideBelow="sm">{t.aging.dated}</Th>
+                  <Th hideBelow="md">{t.aging.due}</Th>
                   <Th align="right">{t.aging.late}</Th>
                   <Th align="right">{t.aging.outstanding}</Th>
                 </tr>
@@ -161,8 +161,12 @@ function Section({
                         </Badge>
                       ) : null}
                     </Td>
-                    <Td numeric>{format.day(item.occurredAt)}</Td>
-                    <Td numeric>{format.day(item.dueOn)}</Td>
+                    <Td hideBelow="sm" numeric>
+                      {format.day(item.occurredAt)}
+                    </Td>
+                    <Td hideBelow="md" numeric>
+                      {format.day(item.dueOn)}
+                    </Td>
                     <Td align="right" numeric>
                       {item.daysOverdue > 0 ? (
                         <span className={item.daysOverdue > 60 ? 'text-negative font-medium' : ''}>

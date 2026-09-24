@@ -117,8 +117,10 @@ export default async function StockPage() {
                 <tr>
                   <Th>{t.stock.product}</Th>
                   <Th align="right">{t.stock.onHand}</Th>
-                  <Th align="right">{t.stock.deliveriesOpen}</Th>
-                  <Th>{t.stock.costedBy}</Th>
+                  <Th hideBelow="md" align="right">
+                    {t.stock.deliveriesOpen}
+                  </Th>
+                  <Th hideBelow="md">{t.stock.costedBy}</Th>
                   <Th align="right">{t.stock.value}</Th>
                 </tr>
               </thead>
@@ -140,10 +142,10 @@ export default async function StockPage() {
                         {unitLabel(item.unit)}
                       </span>
                     </Td>
-                    <Td align="right" numeric>
+                    <Td hideBelow="md" align="right" numeric>
                       {item.openLayers}
                     </Td>
-                    <Td>
+                    <Td hideBelow="md">
                       <span className="text-ink-secondary text-xs">
                         {methodLabel(item.costingMethod, t)}
                       </span>
@@ -159,9 +161,12 @@ export default async function StockPage() {
               </tbody>
               <tfoot>
                 <Tr>
-                  <Td colSpan={4} className="font-medium">
-                    {t.stock.totalValue}
-                  </Td>
+                  {/* Cells rather than a colSpan, so the total stays under the
+                      value column when a phone drops the middle ones. */}
+                  <Td className="font-medium">{t.stock.totalValue}</Td>
+                  <Td />
+                  <Td hideBelow="md" />
+                  <Td hideBelow="md" />
                   <Td align="right" numeric className="font-semibold">
                     <Money
                       value={{

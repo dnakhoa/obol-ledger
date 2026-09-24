@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ArrowLeftIcon, ArrowRightIcon } from '@/components/icons';
 import { PageHeader } from '@/components/page-header';
 import { Money } from '@/components/money';
+import { StatTile } from '@/components/stat-tile';
 import { MarginPercent } from '@/components/margin';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
@@ -83,26 +84,25 @@ export default async function MarginsPage({ searchParams }: PageProps) {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        {[
-          [t.margins.month, <span key="m">{DATE.month(from)}</span>],
-          [t.margins.revenue, <Money key="r" value={report.total.revenue} showCurrency />],
-          [t.margins.cost, <Money key="c" value={report.total.cost} showCurrency />],
-          [
-            t.margins.margin,
-            <span key="g">
-              <Money value={report.total.margin} signed showCurrency />
-              <MarginPercent basisPoints={report.total.marginBasisPoints} />
-            </span>,
-          ],
-        ].map(([label, value]) => (
-          <Card key={String(label)}>
-            <div className="space-y-1 p-4">
-              <p className="text-ink-muted text-xs">{label}</p>
-              <p className="numeric text-xl font-semibold">{value}</p>
-            </div>
-          </Card>
-        ))}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatTile label={t.margins.month} value={DATE.month(from)} />
+        <StatTile
+          label={t.margins.revenue}
+          value={<Money value={report.total.revenue} />}
+          unit={report.total.revenue.currency}
+        />
+        <StatTile
+          label={t.margins.cost}
+          value={<Money value={report.total.cost} />}
+          unit={report.total.cost.currency}
+        />
+        <StatTile
+          label={t.margins.margin}
+          value={<Money value={report.total.margin} signed />}
+          unit={report.total.margin.currency}
+          tone={report.total.margin.amount.startsWith('-') ? 'caution' : 'neutral'}
+          detail={<MarginPercent basisPoints={report.total.marginBasisPoints} className="ml-0" />}
+        />
       </div>
 
       {empty ? (
@@ -121,10 +121,18 @@ export default async function MarginsPage({ searchParams }: PageProps) {
                 <thead>
                   <tr>
                     <Th>{t.margins.product}</Th>
-                    <Th align="right">{t.margins.sold}</Th>
-                    <Th align="right">{t.margins.revenue}</Th>
-                    <Th align="right">{t.margins.lateCharges}</Th>
-                    <Th align="right">{t.margins.cost}</Th>
+                    <Th hideBelow="sm" align="right">
+                      {t.margins.sold}
+                    </Th>
+                    <Th hideBelow="md" align="right">
+                      {t.margins.revenue}
+                    </Th>
+                    <Th hideBelow="lg" align="right">
+                      {t.margins.lateCharges}
+                    </Th>
+                    <Th hideBelow="md" align="right">
+                      {t.margins.cost}
+                    </Th>
                     <Th align="right">{t.margins.margin}</Th>
                   </tr>
                 </thead>
@@ -140,23 +148,23 @@ export default async function MarginsPage({ searchParams }: PageProps) {
                         </Link>
                         <span className="text-ink-muted ml-2 text-xs">{row.sku}</span>
                       </Td>
-                      <Td align="right" numeric>
+                      <Td hideBelow="sm" align="right" numeric>
                         {toQuantityString(BigInt(row.quantitySoldMinor), row.quantityPrecision)}
                         <span className="text-ink-muted ml-1 text-[11px]">
                           {unitLabel(row.unit)}
                         </span>
                       </Td>
-                      <Td align="right" numeric>
+                      <Td hideBelow="md" align="right" numeric>
                         <Money value={row.revenue} />
                       </Td>
-                      <Td align="right" numeric>
+                      <Td hideBelow="lg" align="right" numeric>
                         {row.lateCharges.minorUnits === '0' ? (
                           <span className="text-ink-muted text-xs">—</span>
                         ) : (
                           <Money value={row.lateCharges} />
                         )}
                       </Td>
-                      <Td align="right" numeric>
+                      <Td hideBelow="md" align="right" numeric>
                         <Money value={row.cost} />
                       </Td>
                       <Td align="right" numeric>
@@ -168,16 +176,17 @@ export default async function MarginsPage({ searchParams }: PageProps) {
                 </tbody>
                 <tfoot>
                   <Tr>
-                    <Td colSpan={2} className="font-medium">
-                      {t.margins.total}
-                    </Td>
-                    <Td align="right" numeric className="font-semibold">
+                    {/* Two cells rather than a colSpan: a span over a column
+                        hidden on a phone would shift every total one to the right. */}
+                    <Td className="font-medium">{t.margins.total}</Td>
+                    <Td hideBelow="sm" />
+                    <Td hideBelow="md" align="right" numeric className="font-semibold">
                       <Money value={report.total.revenue} />
                     </Td>
-                    <Td align="right" numeric className="font-semibold">
+                    <Td hideBelow="lg" align="right" numeric className="font-semibold">
                       <Money value={report.total.lateCharges} />
                     </Td>
-                    <Td align="right" numeric className="font-semibold">
+                    <Td hideBelow="md" align="right" numeric className="font-semibold">
                       <Money value={report.total.cost} />
                     </Td>
                     <Td align="right" numeric className="font-semibold">
@@ -200,9 +209,15 @@ export default async function MarginsPage({ searchParams }: PageProps) {
                 <thead>
                   <tr>
                     <Th>{t.margins.customer}</Th>
-                    <Th align="right">{t.margins.invoices}</Th>
-                    <Th align="right">{t.margins.revenue}</Th>
-                    <Th align="right">{t.margins.cost}</Th>
+                    <Th hideBelow="sm" align="right">
+                      {t.margins.invoices}
+                    </Th>
+                    <Th hideBelow="md" align="right">
+                      {t.margins.revenue}
+                    </Th>
+                    <Th hideBelow="md" align="right">
+                      {t.margins.cost}
+                    </Th>
                     <Th align="right">{t.margins.margin}</Th>
                   </tr>
                 </thead>
@@ -217,13 +232,13 @@ export default async function MarginsPage({ searchParams }: PageProps) {
                           {row.code ? `${row.code} — ${row.name}` : row.name}
                         </Link>
                       </Td>
-                      <Td align="right" numeric>
+                      <Td hideBelow="sm" align="right" numeric>
                         {row.invoices}
                       </Td>
-                      <Td align="right" numeric>
+                      <Td hideBelow="md" align="right" numeric>
                         <Money value={row.revenue} />
                       </Td>
-                      <Td align="right" numeric>
+                      <Td hideBelow="md" align="right" numeric>
                         <Money value={row.cost} />
                       </Td>
                       <Td align="right" numeric>
