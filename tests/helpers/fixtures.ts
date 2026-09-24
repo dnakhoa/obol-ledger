@@ -15,6 +15,7 @@ import { createLandedCostService } from '@/server/services/landed-cost';
 import { createAgingService } from '@/server/services/aging';
 import { createTaxService } from '@/server/services/tax';
 import { createSalesService } from '@/server/services/sales';
+import { createCreditNoteService } from '@/server/services/credit-notes';
 import { createTaxReturnService } from '@/server/services/tax-return';
 import type { AccountRole } from '@/server/domain/period';
 import { createWebhookService } from '@/server/services/webhooks';
@@ -39,6 +40,7 @@ export function servicesFor(database: Database, orgId: string) {
     aging: createAgingService(database, orgId),
     tax: createTaxService(database, orgId),
     sales: createSalesService(database, orgId),
+    creditNotes: createCreditNoteService(database, orgId),
     taxReturns: createTaxReturnService(database, orgId),
   };
 }

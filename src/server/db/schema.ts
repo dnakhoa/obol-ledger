@@ -1030,6 +1030,7 @@ export const sales = pgTable(
   },
   (table) => [
     unique('sales_id_org_key').on(table.id, table.orgId),
+    unique('sales_id_org_currency_key').on(table.id, table.orgId, table.currency),
     uniqueIndex('sales_org_reference_key').on(table.orgId, table.reference),
     index('sales_org_occurred_idx').on(table.orgId, table.occurredAt, table.id),
     index('sales_org_customer_idx').on(table.orgId, table.customerAccountId, table.occurredAt),
@@ -1064,7 +1065,7 @@ export const inventoryMovements = pgTable(
     id: text('id').primaryKey(),
     orgId: text('org_id').notNull(),
     itemId: text('item_id').notNull(),
-    kind: text('kind').$type<'receipt' | 'issue' | 'writeoff'>().notNull(),
+    kind: text('kind').$type<'receipt' | 'issue' | 'writeoff' | 'return'>().notNull(),
     quantityMinor: bigint('quantity_minor', { mode: 'bigint' }).notNull(),
     costMinor: bigint('cost_minor', { mode: 'bigint' }).notNull(),
     baseCostMinor: bigint('base_cost_minor', { mode: 'bigint' }).notNull(),
@@ -1092,6 +1093,11 @@ export const inventoryMovements = pgTable(
     revenueBaseMinor: bigint('revenue_base_minor', { mode: 'bigint' }),
     /** Where the line sits on the invoice, from 1. */
     saleLine: integer('sale_line'),
+    /**
+     * The line's net total in the invoice currency, as the customer saw it.
+     * Null on lines raised before credit notes existed; see migration 0030.
+     */
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }),
     /** Why stock left without being sold. Set on a write-off and nothing else. */
     reason: text('reason').$type<WriteOffReason>(),
     metadata: jsonb('metadata')
@@ -1102,6 +1108,7 @@ export const inventoryMovements = pgTable(
   },
   (table) => [
     unique('inventory_movements_id_org_key').on(table.id, table.orgId),
+    unique('inventory_movements_id_org_sale_key').on(table.id, table.orgId, table.saleId),
     index('inventory_movements_item_idx').on(table.orgId, table.itemId, table.occurredAt, table.id),
     index('inventory_movements_transaction_idx').on(table.orgId, table.transactionId),
     uniqueIndex('inventory_movements_sale_line_key')
@@ -1153,6 +1160,7 @@ export const layerConsumptions = pgTable(
     // A movement that drew from the same lot twice is a movement whose
     // arithmetic ran twice, which is how a double count gets in.
     uniqueIndex('layer_consumptions_movement_layer_key').on(table.movementId, table.layerId),
+    unique('layer_consumptions_id_org_key').on(table.id, table.orgId),
     index('layer_consumptions_layer_idx').on(table.orgId, table.layerId),
     foreignKey({
       name: 'layer_consumptions_movement_fk',
@@ -1161,6 +1169,145 @@ export const layerConsumptions = pgTable(
     }).onDelete('restrict'),
     foreignKey({
       name: 'layer_consumptions_layer_fk',
+      columns: [table.layerId, table.orgId],
+      foreignColumns: [costLayers.id, costLayers.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/**
+ * A correction to a sale, as a further record. See migration 0030 and ADR 21.
+ *
+ * Always in the invoice's own currency and at its rate: a credit note undoes
+ * part of a sale, and undoing it at today's rate would book an exchange
+ * difference that no money moved to create.
+ */
+export const creditNotes = pgTable(
+  'credit_notes',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    reference: text('reference').notNull(),
+    saleId: text('sale_id').notNull(),
+    currency: char('currency', { length: 3 }).notNull(),
+    fxRate: numeric('fx_rate', { precision: 20, scale: 10 }).notNull(),
+    /** The account the revenue comes back out of — the sale's, or a contra such as 521. */
+    revenueAccountId: text('revenue_account_id').notNull(),
+    reason: text('reason'),
+    netMinor: bigint('net_minor', { mode: 'bigint' }).notNull(),
+    taxMinor: bigint('tax_minor', { mode: 'bigint' }).notNull(),
+    grossMinor: bigint('gross_minor', { mode: 'bigint' }).notNull(),
+    baseNetMinor: bigint('base_net_minor', { mode: 'bigint' }).notNull(),
+    baseTaxMinor: bigint('base_tax_minor', { mode: 'bigint' }).notNull(),
+    /** What the returned goods cost, put back into stock. */
+    baseCostMinor: bigint('base_cost_minor', { mode: 'bigint' }).notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    transactionId: text('transaction_id').notNull(),
+    metadata: jsonb('metadata')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('credit_notes_id_org_key').on(table.id, table.orgId),
+    unique('credit_notes_id_org_sale_key').on(table.id, table.orgId, table.saleId),
+    uniqueIndex('credit_notes_org_reference_key').on(table.orgId, table.reference),
+    index('credit_notes_org_sale_idx').on(table.orgId, table.saleId, table.occurredAt),
+    index('credit_notes_org_occurred_idx').on(table.orgId, table.occurredAt, table.id),
+    index('credit_notes_transaction_idx').on(table.orgId, table.transactionId),
+    foreignKey({
+      name: 'credit_notes_sale_fk',
+      columns: [table.saleId, table.orgId, table.currency],
+      foreignColumns: [sales.id, sales.orgId, sales.currency],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'credit_notes_revenue_account_fk',
+      columns: [table.revenueAccountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'credit_notes_transaction_fk',
+      columns: [table.transactionId, table.orgId],
+      foreignColumns: [transactions.id, transactions.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/** What one credit note does to one invoice line. */
+export const creditNoteLines = pgTable(
+  'credit_note_lines',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    creditNoteId: text('credit_note_id').notNull(),
+    saleId: text('sale_id').notNull(),
+    line: integer('line').notNull(),
+    saleMovementId: text('sale_movement_id').notNull(),
+    /** How much came back. Zero for a price allowance. */
+    quantityMinor: bigint('quantity_minor', { mode: 'bigint' }).notNull(),
+    /** Credited, net, in the invoice currency. */
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+    revenueBaseMinor: bigint('revenue_base_minor', { mode: 'bigint' }).notNull(),
+    baseCostMinor: bigint('base_cost_minor', { mode: 'bigint' }).notNull(),
+    /** The movement that put the goods back, when any came back. */
+    returnMovementId: text('return_movement_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('credit_note_lines_line_key').on(table.creditNoteId, table.line),
+    uniqueIndex('credit_note_lines_sale_line_key').on(table.creditNoteId, table.saleMovementId),
+    index('credit_note_lines_sale_movement_idx').on(table.orgId, table.saleMovementId),
+    foreignKey({
+      name: 'credit_note_lines_note_fk',
+      columns: [table.creditNoteId, table.orgId, table.saleId],
+      foreignColumns: [creditNotes.id, creditNotes.orgId, creditNotes.saleId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'credit_note_lines_sale_line_fk',
+      columns: [table.saleMovementId, table.orgId, table.saleId],
+      foreignColumns: [inventoryMovements.id, inventoryMovements.orgId, inventoryMovements.saleId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'credit_note_lines_return_fk',
+      columns: [table.returnMovementId, table.orgId],
+      foreignColumns: [inventoryMovements.id, inventoryMovements.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/** Which draws a return undid. The mirror of `layer_consumptions`. */
+export const layerRestorations = pgTable(
+  'layer_restorations',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    movementId: text('movement_id').notNull(),
+    consumptionId: text('consumption_id').notNull(),
+    layerId: text('layer_id').notNull(),
+    quantityMinor: bigint('quantity_minor', { mode: 'bigint' }).notNull(),
+    costMinor: bigint('cost_minor', { mode: 'bigint' }).notNull(),
+    baseCostMinor: bigint('base_cost_minor', { mode: 'bigint' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('layer_restorations_movement_consumption_key').on(
+      table.movementId,
+      table.consumptionId,
+    ),
+    index('layer_restorations_consumption_idx').on(table.orgId, table.consumptionId),
+    foreignKey({
+      name: 'layer_restorations_movement_fk',
+      columns: [table.movementId, table.orgId],
+      foreignColumns: [inventoryMovements.id, inventoryMovements.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'layer_restorations_consumption_fk',
+      columns: [table.consumptionId, table.orgId],
+      foreignColumns: [layerConsumptions.id, layerConsumptions.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'layer_restorations_layer_fk',
       columns: [table.layerId, table.orgId],
       foreignColumns: [costLayers.id, costLayers.orgId],
     }).onDelete('restrict'),

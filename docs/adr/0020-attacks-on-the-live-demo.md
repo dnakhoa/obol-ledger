@@ -79,6 +79,13 @@ instead of failing.
 cards on the page are the most-read description of what the database enforces.
 A guard added without one is true and invisible.
 
+**It is not part of the product's navigation.** It was, briefly, in the
+sidebar and on the overview, and that was a mistake about audience: an owner
+reading "write into another company's books" in their accounting package hears
+"this has a security hole", not "this refuses one". The page is for someone
+evaluating how the ledger is built, and it is linked from the README, where
+that reader is.
+
 ## Considered and rejected
 
 - **A recorded video of the attacks.** Proves only that they failed once, on

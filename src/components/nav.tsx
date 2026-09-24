@@ -12,7 +12,6 @@ import {
   CalendarIcon,
   ReceiptIcon,
   SettingsIcon,
-  ShieldIcon,
   StockIcon,
   TagIcon,
   TransferIcon,
@@ -47,7 +46,6 @@ export type NavLabels = {
   readonly webhooks: string;
   readonly api: string;
   readonly settings: string;
-  readonly breakIt: string;
   readonly morePages: string;
 };
 
@@ -62,7 +60,6 @@ const LINKS = [
   { href: '/tax', key: 'tax', Icon: ReceiptIcon, exact: false },
   { href: '/transfer', key: 'newEntry', Icon: TransferIcon, exact: false },
   { href: '/webhooks', key: 'webhooks', Icon: WebhookIcon, exact: false },
-  { href: '/break', key: 'breakIt', Icon: ShieldIcon, exact: false },
   { href: '/api-reference', key: 'api', Icon: ApiIcon, exact: false },
   { href: '/settings', key: 'settings', Icon: SettingsIcon, exact: false },
 ] as const satisfies readonly {
@@ -86,9 +83,6 @@ const LINKS = [
  */
 const DESKTOP_ONLY = new Set([
   '/accounts',
-  // Not a desk job, but not a daily one either: it is listed at the foot of
-  // every page on a phone, and the overview links to it for a first visit.
-  '/break',
   '/api-reference',
   '/tax',
   '/webhooks',

@@ -59,6 +59,13 @@ export type AgingEntry = {
   readonly reference: string | null;
   /** When the invoice itself says it is due. Wins over the account's terms. */
   readonly dueOn?: Date | null | undefined;
+  /**
+   * The invoice a settlement belongs to, when it says so — a credit note
+   * names the invoice it corrects. Applied to that invoice first and only the
+   * remainder to the oldest, so crediting March's invoice does not make
+   * January's look paid.
+   */
+  readonly appliesTo?: string | null | undefined;
 };
 
 export type OpenItem = {
@@ -134,6 +141,15 @@ export function ageAccount(
     // item rather than dropped, because a credit balance on a customer is
     // something somebody needs to see, not something to hide.
     let remaining = -signed;
+    if (entry.appliesTo) {
+      const target = open.find((item) => item.entry.reference === entry.appliesTo);
+      if (target) {
+        const applied = target.outstanding < remaining ? target.outstanding : remaining;
+        target.outstanding -= applied;
+        remaining -= applied;
+        if (target.outstanding === 0n) open.splice(open.indexOf(target), 1);
+      }
+    }
     while (remaining > 0n && open.length > 0) {
       const oldest = open[0];
       if (!oldest) break;

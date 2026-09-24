@@ -65,7 +65,6 @@ export const vi: Messages = {
     webhooks: 'Webhook',
     api: 'API',
     settings: 'Cài đặt',
-    breakIt: 'Thử phá sổ cái',
     morePages: 'Các trang khác',
   },
 
@@ -73,9 +72,6 @@ export const vi: Messages = {
     title: 'Tổng quan',
     description: 'Mọi con số dưới đây đều được tính từ các bút toán vốn đã cân bằng sẵn.',
     postEntry: 'Ghi bút toán',
-    breakItPrompt:
-      'Số 0 này do cơ sở dữ liệu giữ, không phải trang này: nó từ chối mọi bút toán làm lệch số dư.',
-    breakItCta: 'Thử phá sổ cái',
 
     balanced: 'Sổ sách cân đối',
     notBalanced: 'Sổ sách chưa cân đối',
@@ -230,6 +226,7 @@ export const vi: Messages = {
   },
 
   product: {
+    returnedByCustomer: 'Khách trả lại',
     allStock: 'Tất cả mặt hàng',
     measuredInSuffix: (unit) => `đơn vị tính: ${unit}`,
     onHand: 'Tồn kho',
@@ -1133,5 +1130,41 @@ export const vi: Messages = {
         why: 'Truy vấn mọi tài khoản không thuộc tenant này. Câu trả lời đúng không phải là lỗi, mà là không có gì cả.',
       },
     },
+  },
+  creditNotes: {
+    title: 'Phiếu giảm trừ',
+    description: 'Các điều chỉnh cho hóa đơn này. Bản thân hóa đơn không bao giờ bị sửa.',
+    open: 'Lập phiếu giảm trừ',
+    intro:
+      'Dùng khi khách trả lại hàng hoặc được giảm giá trên hóa đơn. Hàng trả lại được nhập lại kho theo đúng giá vốn lúc xuất.',
+    reference: 'Số phiếu',
+    date: 'Ngày',
+    account: 'Tài khoản doanh thu',
+    accountHint: 'Thường là 521 — các khoản giảm trừ doanh thu.',
+    reason: 'Lý do',
+    reasonPlaceholder: 'Ví dụ: Vỡ khi vận chuyển',
+    product: 'Mặt hàng',
+    canReturn: 'Còn trên hóa đơn',
+    quantityBack: 'Số lượng trả lại',
+    credit: 'Giảm trừ chưa thuế',
+    total: 'Giảm trừ chưa thuế',
+    taxNote: 'Thuế được tính theo thuế suất của hóa đơn.',
+    submit: 'Lập phiếu',
+    working: 'Đang lập…',
+    cancel: 'Hủy',
+    number: 'Số phiếu',
+    reasonColumn: 'Lý do',
+    creditedColumn: 'Đã giảm',
+    stockBack: 'Nhập lại kho',
+    credited: 'Đã giảm trừ',
+    afterCredits: 'Sau giảm trừ',
+    returned: (quantity) => `Đã trả lại ${quantity}`,
+    checkForm: 'Hãy kiểm tra số phiếu, ngày và tài khoản.',
+    checkLine: (sku) => `Hãy kiểm tra số lượng và số tiền của ${sku}. Nhập số thường, ví dụ 12.5.`,
+    tooManyDecimals: (sku, places) => `${sku} được tính đến ${places} chữ số thập phân.`,
+    amountNotRepresentable: (sku, currency) =>
+      `Số tiền của ${sku} có nhiều chữ số thập phân hơn mức ${currency} cho phép.`,
+    nothingEntered: 'Hãy nhập số lượng hoặc số tiền cho ít nhất một dòng.',
+    issued: (reference, amount) => `Đã lập phiếu giảm trừ ${reference}, giá trị ${amount}.`,
   },
 };

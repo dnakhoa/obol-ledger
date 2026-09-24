@@ -55,7 +55,6 @@ export const en = {
     webhooks: 'Webhooks',
     api: 'API',
     settings: 'Settings',
-    breakIt: 'Try to break it',
     morePages: 'More pages',
   },
 
@@ -63,9 +62,6 @@ export const en = {
     title: 'Overview',
     description: 'Every figure below is derived from postings that are balanced by construction.',
     postEntry: 'Post an entry',
-    breakItPrompt:
-      'Zero is held by the database, not by this page: it refuses any entry that would move it.',
-    breakItCta: 'Try to break it',
 
     balanced: 'The books balance',
     notBalanced: 'The books do not balance',
@@ -223,6 +219,7 @@ export const en = {
   },
 
   product: {
+    returnedByCustomer: 'Returned by customer',
     allStock: 'All stock',
     measuredInSuffix: (unit: string) => `measured in ${unit}`,
     onHand: 'On hand',
@@ -1127,6 +1124,44 @@ export const en = {
         why: 'Asks for every account that is not this tenant’s. The right answer is not an error but nothing at all.',
       },
     },
+  },
+  creditNotes: {
+    title: 'Credit notes',
+    description: 'Corrections to this invoice. The invoice itself never changes.',
+    open: 'Issue a credit note',
+    intro:
+      'For goods sent back, or money taken off the invoice. Returned goods go back into stock at the cost they left at.',
+    reference: 'Credit note number',
+    date: 'Date',
+    account: 'Revenue account',
+    accountHint: 'Often a sales returns or discounts account.',
+    reason: 'Reason',
+    reasonPlaceholder: 'e.g. Cracked in transit',
+    product: 'Product',
+    canReturn: 'Still on the invoice',
+    quantityBack: 'Quantity back',
+    credit: 'Credit before tax',
+    total: 'Credit before tax',
+    taxNote: 'Tax is added at the invoice’s rate.',
+    submit: 'Issue credit note',
+    working: 'Issuing…',
+    cancel: 'Cancel',
+    number: 'Number',
+    reasonColumn: 'Reason',
+    creditedColumn: 'Credited',
+    stockBack: 'Stock back',
+    credited: 'Credited',
+    afterCredits: 'After credit notes',
+    returned: (quantity: string) => `${quantity} returned`,
+    checkForm: 'Check the credit note number, date and account.',
+    checkLine: (sku: string) =>
+      `Check the quantity and amount for ${sku}. Use plain numbers, like 12.5.`,
+    tooManyDecimals: (sku: string, places: number) =>
+      `${sku} is counted to ${places} decimal place${places === 1 ? '' : 's'}.`,
+    amountNotRepresentable: (sku: string, currency: string) =>
+      `The amount for ${sku} has more decimals than ${currency} allows.`,
+    nothingEntered: 'Enter a quantity or an amount on at least one line.',
+    issued: (reference: string, amount: string) => `Credit note ${reference} issued for ${amount}.`,
   },
 } as const;
 

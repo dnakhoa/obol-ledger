@@ -62,7 +62,6 @@ export const ja: Messages = {
     webhooks: 'Webhook',
     api: 'API',
     settings: '設定',
-    breakIt: '壊してみる',
     morePages: 'その他のページ',
   },
 
@@ -70,9 +69,6 @@ export const ja: Messages = {
     title: '概要',
     description: '以下の数値はすべて、貸借が一致した仕訳から計算されています。',
     postEntry: '仕訳を入力',
-    breakItPrompt:
-      'このゼロを守っているのはページではなくデータベースです。ずれを生む仕訳はすべて拒否されます。',
-    breakItCta: '壊してみる',
 
     balanced: '帳簿は一致しています',
     notBalanced: '帳簿が一致していません',
@@ -225,6 +221,7 @@ export const ja: Messages = {
   },
 
   product: {
+    returnedByCustomer: '得意先から返品',
     allStock: '在庫一覧',
     measuredInSuffix: (unit) => `単位：${unit}`,
     onHand: '在庫数量',
@@ -1109,5 +1106,41 @@ export const ja: Messages = {
         why: 'このテナント以外の勘定科目をすべて要求します。正しい答えはエラーではなく、何もないことです。',
       },
     },
+  },
+  creditNotes: {
+    title: '返品・値引',
+    description: 'この請求書への訂正です。請求書そのものは変更されません。',
+    open: '返品・値引伝票を作成',
+    intro:
+      '返品された商品や、請求額からの値引に使います。返品された商品は出庫時の原価のまま在庫に戻ります。',
+    reference: '伝票番号',
+    date: '日付',
+    account: '売上勘定',
+    accountHint: '売上戻り・値引の勘定を使うことが多いです。',
+    reason: '理由',
+    reasonPlaceholder: '例：輸送中の破損',
+    product: '品目',
+    canReturn: '請求書の残り',
+    quantityBack: '返品数量',
+    credit: '値引額（税抜）',
+    total: '税抜合計',
+    taxNote: '消費税は請求書の税率で計算されます。',
+    submit: '伝票を作成',
+    working: '作成中…',
+    cancel: 'キャンセル',
+    number: '番号',
+    reasonColumn: '理由',
+    creditedColumn: '返品・値引額',
+    stockBack: '在庫戻り',
+    credited: '返品・値引済み',
+    afterCredits: '返品・値引後',
+    returned: (quantity) => `${quantity} 返品済み`,
+    checkForm: '伝票番号、日付、勘定を確認してください。',
+    checkLine: (sku) => `${sku} の数量と金額を確認してください。12.5 のような数字で入力します。`,
+    tooManyDecimals: (sku, places) => `${sku} は小数点以下 ${places} 桁までです。`,
+    amountNotRepresentable: (sku, currency) =>
+      `${sku} の金額の小数桁数が ${currency} の許容範囲を超えています。`,
+    nothingEntered: '少なくとも一行に数量か金額を入力してください。',
+    issued: (reference, amount) => `伝票 ${reference}（${amount}）を作成しました。`,
   },
 };

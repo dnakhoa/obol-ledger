@@ -41,7 +41,7 @@ posting inserts and Postgres reports `40P01 deadlock detected`. Remove
 **Double-entry core** · **multi-currency** balanced in the functional currency ·
 **FIFO inventory costing** · **landed cost** spread across the lots it arrived
 with · **sales that know their margin** — invoice and cost of goods sold in one
-entry, by product and by customer · **write-offs** with a reason · stock
+entry, by product and by customer · **credit notes** that put returned goods back into the lot they left from · **write-offs** with a reason · stock
 **reconciled** to the inventory accounts · **consumption-tax returns** that carry an unused credit forward as a
 balance rather than a number on a form · receivables and payables aged by **due date and payment terms** ·
 pending/posted/archived with three balances · reversals · idempotency · keyset
@@ -578,6 +578,7 @@ including the metadata filter and every problem type, are in the
 - [ADR 18](docs/adr/0018-sales-and-margin.md) — a sale is the invoice and the stock that left, in one entry
 - [ADR 19](docs/adr/0019-ageing-by-due-date.md) — what is owed ages from when it falls due
 - [ADR 20](docs/adr/0020-attacks-on-the-live-demo.md) — let a stranger attack the live demo
+- [ADR 21](docs/adr/0021-credit-notes.md) — a sale is corrected by a credit note, never by an edit
 
 ## Licence
 

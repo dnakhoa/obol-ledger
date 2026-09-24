@@ -150,7 +150,7 @@ export type LedgerError =
   | {
       readonly code: 'entry_owned_by_stock';
       readonly transactionId: string;
-      readonly source: 'inventory' | 'landed_cost';
+      readonly source: 'inventory' | 'landed_cost' | 'credit_note';
     }
   | { readonly code: 'sale_has_no_lines' }
   | { readonly code: 'sale_reference_taken'; readonly reference: string }
@@ -160,7 +160,44 @@ export type LedgerError =
   | { readonly code: 'account_code_disagrees'; readonly accountCode: string; readonly type: string }
   | { readonly code: 'account_code_taken'; readonly accountCode: string }
   | { readonly code: 'open_items_not_permitted'; readonly type: string }
-  | { readonly code: 'payment_terms_need_open_items' };
+  | { readonly code: 'payment_terms_need_open_items' }
+  | { readonly code: 'credit_note_reference_taken'; readonly reference: string }
+  | { readonly code: 'credit_note_not_found'; readonly creditNoteId: string }
+  | { readonly code: 'credit_note_has_no_lines' }
+  | {
+      readonly code: 'credit_line_not_on_sale';
+      readonly saleId: string;
+      readonly movementId: string;
+    }
+  | { readonly code: 'credit_line_repeated'; readonly movementId: string }
+  | {
+      /** More than is still returnable on the invoice line. */
+      readonly code: 'credit_exceeds_sale';
+      readonly limit: 'quantity';
+      readonly movementId: string;
+      readonly sku: string;
+      /** Scaled by the item's precision, like every other quantity. */
+      readonly remaining: string;
+      readonly requested: string;
+      readonly precision: number;
+      readonly unit: string;
+    }
+  | {
+      /** More than is still creditable on the invoice line. */
+      readonly code: 'credit_exceeds_sale';
+      readonly limit: 'amount';
+      readonly movementId: string;
+      readonly sku: string;
+      /** Decimal strings in the invoice currency. */
+      readonly remaining: string;
+      readonly requested: string;
+      readonly currency: CurrencyCode;
+    }
+  | {
+      readonly code: 'credit_before_sale';
+      readonly creditedOn: string;
+      readonly invoicedOn: string;
+    };
 
 export type LedgerErrorCode = LedgerError['code'];
 
@@ -231,6 +268,13 @@ const TITLES: Record<LedgerErrorCode, string> = {
   account_code_taken: 'That account code is already in use',
   open_items_not_permitted: 'Only an asset or a liability can be managed as open items',
   payment_terms_need_open_items: 'Payment terms need an open-item account',
+  credit_note_reference_taken: 'That credit note number is already in use',
+  credit_note_not_found: 'Credit note not found',
+  credit_note_has_no_lines: 'A credit note needs at least one line',
+  credit_line_not_on_sale: 'That line is not on this invoice',
+  credit_line_repeated: 'An invoice line appears twice on the credit note',
+  credit_exceeds_sale: 'More than the invoice line has left to credit',
+  credit_before_sale: 'The credit note is dated before the invoice',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -369,6 +413,22 @@ export function describe(error: LedgerError): string {
       return `Only a claim on somebody can be outstanding — a receivable or a payable. A ${error.type} account does not age.`;
     case 'payment_terms_need_open_items':
       return 'Payment terms say when a customer or supplier has to pay, so they only mean something on an account managed as open items. Tick that, or leave the terms blank.';
+    case 'credit_note_reference_taken':
+      return `Credit note number ${error.reference} is already used. Choose another number.`;
+    case 'credit_note_not_found':
+      return `Credit note ${error.creditNoteId} was not found.`;
+    case 'credit_note_has_no_lines':
+      return 'Enter a quantity to return or an amount to credit on at least one line.';
+    case 'credit_line_not_on_sale':
+      return `That line is not on invoice ${error.saleId}.`;
+    case 'credit_line_repeated':
+      return 'The same invoice line appears twice. Combine them into one line.';
+    case 'credit_exceeds_sale':
+      return error.limit === 'quantity'
+        ? `Only ${quantityText(error.remaining, error.precision)} ${error.unit} of ${error.sku} can still be returned; ${quantityText(error.requested, error.precision)} was entered.`
+        : `Only ${error.remaining} ${error.currency} of ${error.sku} can still be credited; ${error.requested} was entered.`;
+    case 'credit_before_sale':
+      return `A credit note cannot be dated before its invoice, which is dated ${error.invoicedOn}.`;
   }
 }
 

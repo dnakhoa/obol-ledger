@@ -35,6 +35,7 @@ export type LedgerMessages = {
   readonly writeOffReason: (reason: WriteOffReason) => string;
   /** An invoice raised against stock: revenue and its cost in one entry. */
   readonly saleInvoiced: (reference: string, customer: string) => string;
+  readonly creditNoteIssued: (reference: string, invoice: string, customer: string) => string;
 };
 
 const withReference = (base: string, reference?: string | undefined): string =>
@@ -60,6 +61,8 @@ const en: LedgerMessages = {
       other: 'other',
     })[reason],
   saleInvoiced: (reference, customer) => `Sale ${reference} to ${customer}`,
+  creditNoteIssued: (reference, invoice, customer) =>
+    `Credit note ${reference} against ${invoice} — ${customer}`,
 };
 
 /**
@@ -95,6 +98,8 @@ const vi: LedgerMessages = {
       other: 'lý do khác',
     })[reason],
   saleInvoiced: (reference, customer) => `Bán hàng theo hóa đơn ${reference} — ${customer}`,
+  creditNoteIssued: (reference, invoice, customer) =>
+    `Giảm trừ doanh thu ${reference} cho hóa đơn ${invoice} — ${customer}`,
 };
 
 /**
@@ -129,6 +134,8 @@ const ja: LedgerMessages = {
       other: 'その他',
     })[reason],
   saleInvoiced: (reference, customer) => `売上：${reference}（${customer}）`,
+  creditNoteIssued: (reference, invoice, customer) =>
+    `返品・値引：${reference}（${invoice}・${customer}）`,
 };
 
 const LEDGER: Record<Locale, LedgerMessages> = { en, vi, ja };

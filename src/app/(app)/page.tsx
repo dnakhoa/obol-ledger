@@ -10,7 +10,7 @@ import { Money } from '@/components/money';
 import { marginText } from '@/components/margin';
 import { VolumeChart } from '@/components/volume-chart';
 import { SetupNotice } from '@/components/setup-notice';
-import { CheckIcon, AlertIcon, ArrowRightIcon, ShieldIcon } from '@/components/icons';
+import { CheckIcon, AlertIcon, ArrowRightIcon } from '@/components/icons';
 import { buildPosition, loadDashboard } from '@/server/queries';
 import { translations } from '@/server/i18n';
 import { classLabel, dateFormats } from '@/lib/i18n';
@@ -116,31 +116,6 @@ export default async function OverviewPage() {
             ) : null}
           </dl>
         </CardBody>
-        {/*
-          The claim above is the easiest one on the page to wave away — every
-          screenshot of a ledger says it balances. So the banner carries the
-          invitation to test it, against this same database. Only while it
-          is true: a banner reporting a residual has no business daring anyone.
-        */}
-        {allBalanced ? (
-          <Link
-            href="/break"
-            className="group border-line text-ink-secondary hover:bg-surface-hover hover:text-ink flex items-center justify-between gap-3 rounded-b-[var(--radius)] border-t px-4 py-2.5 text-xs transition-colors duration-150 sm:px-5"
-          >
-            <span className="flex items-center gap-2">
-              <ShieldIcon className="text-positive shrink-0" width={14} height={14} />
-              {t.overview.breakItPrompt}
-            </span>
-            <span className="text-ink flex shrink-0 items-center gap-1 font-medium">
-              {t.overview.breakItCta}
-              <ArrowRightIcon
-                width={13}
-                height={13}
-                className="transition-transform duration-150 group-hover:translate-x-0.5"
-              />
-            </span>
-          </Link>
-        ) : null}
       </Card>
 
       {/*

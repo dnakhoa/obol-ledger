@@ -245,6 +245,18 @@ const vi: ErrorMessages = {
     'Chỉ khoản phải thu hoặc phải trả mới có công nợ để theo dõi theo tuổi nợ. Tài khoản loại này không có tuổi nợ.',
   payment_terms_need_open_items: () =>
     'Thời hạn thanh toán cho biết khi nào khách hàng hoặc nhà cung cấp phải trả, nên chỉ có nghĩa với tài khoản theo dõi công nợ. Hãy đánh dấu ô đó, hoặc để trống thời hạn.',
+  credit_note_reference_taken: (e) => `Số phiếu ${e.reference} đã được dùng. Hãy chọn số khác.`,
+  credit_note_not_found: (e) => `Không tìm thấy phiếu giảm trừ ${e.creditNoteId}.`,
+  credit_note_has_no_lines: () =>
+    'Hãy nhập số lượng trả lại hoặc số tiền giảm cho ít nhất một dòng.',
+  credit_line_not_on_sale: (e) => `Dòng này không thuộc hóa đơn ${e.saleId}.`,
+  credit_line_repeated: () => 'Một dòng hóa đơn bị nhập hai lần. Hãy gộp thành một dòng.',
+  credit_exceeds_sale: (e) =>
+    e.limit === 'quantity'
+      ? `${e.sku} chỉ còn ${vn.quantity(e.remaining, e.precision)} ${vn.unit(e.unit)} có thể trả lại; bạn đã nhập ${vn.quantity(e.requested, e.precision)}.`
+      : `${e.sku} chỉ còn ${vn.money(e.remaining)} ${e.currency} có thể giảm; bạn đã nhập ${vn.money(e.requested)}.`,
+  credit_before_sale: (e) =>
+    `Ngày phiếu giảm trừ không được trước ngày hóa đơn (${vn.day(e.invoicedOn)}).`,
 };
 
 const jp = writing('ja');
@@ -413,6 +425,18 @@ const ja: ErrorMessages = {
     '未決済残高として管理できるのは債権か債務の勘定だけです。この区分の勘定には年齢がありません。',
   payment_terms_need_open_items: () =>
     '支払条件は得意先や仕入先がいつ支払うかを表すものなので、未決済残高として管理する勘定でのみ意味を持ちます。そちらにチェックを入れるか、条件を空欄にしてください。',
+  credit_note_reference_taken: (e) =>
+    `伝票番号 ${e.reference} は既に使われています。別の番号を指定してください。`,
+  credit_note_not_found: (e) => `返品・値引伝票 ${e.creditNoteId} が見つかりません。`,
+  credit_note_has_no_lines: () => '少なくとも一行に、返品数量または値引額を入力してください。',
+  credit_line_not_on_sale: (e) => `この明細は請求書 ${e.saleId} のものではありません。`,
+  credit_line_repeated: () => '同じ請求明細が二回入力されています。一行にまとめてください。',
+  credit_exceeds_sale: (e) =>
+    e.limit === 'quantity'
+      ? `${e.sku} で返品できる残りは ${jp.quantity(e.remaining, e.precision)} ${jp.unit(e.unit)} です（入力：${jp.quantity(e.requested, e.precision)}）。`
+      : `${e.sku} で値引できる残りは ${jp.money(e.remaining)} ${e.currency} です（入力：${jp.money(e.requested)}）。`,
+  credit_before_sale: (e) =>
+    `返品・値引伝票の日付は請求書の日付（${jp.day(e.invoicedOn)}）より前にできません。`,
 };
 
 const TRANSLATIONS: Record<TranslatedLocale, ErrorMessages> = { vi, ja };

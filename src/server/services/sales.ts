@@ -7,11 +7,14 @@ import type { Unit } from '@/lib/quantity';
 import { ledgerMessages } from '@/lib/i18n';
 import { afterDraws, allocate, type Allocation, type CostLayer } from '@/server/domain/costing';
 import { marginOf, priceSale } from '@/server/domain/sale';
+import { lineAmounts } from '@/server/domain/credit-note';
 import type { TaxCalculation } from '@/server/domain/tax';
 import type { LedgerError } from '@/server/domain/errors';
 import {
   accounts,
   costLayers,
+  creditNoteLines,
+  creditNotes,
   inventoryItems,
   inventoryMovements,
   landedCostAllocations,
@@ -105,6 +108,13 @@ export type SaleLine = {
   readonly cost: MoneyDto;
   readonly margin: MoneyDto;
   readonly marginBasisPoints: number | null;
+  /** The line's net total as invoiced, in the invoice currency. */
+  readonly amount: MoneyDto;
+  /** What credit notes have taken back from this line so far. */
+  readonly creditedQuantityMinor: string;
+  readonly creditedAmount: MoneyDto;
+  readonly creditedRevenue: MoneyDto;
+  readonly returnedCost: MoneyDto;
   /** The lots it shipped from, oldest first. */
   readonly drawnFrom: readonly {
     readonly layerReference: string | null;
@@ -131,6 +141,31 @@ export type SaleSummary = {
   readonly marginBasisPoints: number | null;
   readonly transactionId: string;
   readonly lines: readonly SaleLine[];
+  /**
+   * What credit notes have taken back, in total. The invoice figures above
+   * stay as invoiced — that is what the customer was sent — and the `net*`
+   * figures below are what the sale is worth after the corrections.
+   */
+  readonly credited: {
+    readonly net: MoneyDto;
+    readonly tax: MoneyDto;
+    readonly gross: MoneyDto;
+    readonly revenue: MoneyDto;
+    readonly cost: MoneyDto;
+  };
+  readonly creditNotes: readonly {
+    readonly id: string;
+    readonly reference: string;
+    readonly occurredAt: Date;
+    readonly reason: string | null;
+    readonly gross: MoneyDto;
+    readonly revenue: MoneyDto;
+    readonly cost: MoneyDto;
+  }[];
+  readonly netRevenue: MoneyDto;
+  readonly netCost: MoneyDto;
+  readonly netMargin: MoneyDto;
+  readonly netMarginBasisPoints: number | null;
 };
 
 export type SaleResult = {
@@ -387,6 +422,9 @@ export function createSalesService(database: Database, orgId: string) {
             saleId,
             saleLine: index + 1,
             revenueBaseMinor: priced.lineBases[index] ?? 0n,
+            // What the customer saw, so a credit note can be checked against
+            // it rather than against the dong figure divided back by a rate.
+            amountMinor: line.amount,
           });
           await recordDraws(tx, orgId, movementId, allocation.draws);
         }
@@ -474,6 +512,23 @@ export function createSalesService(database: Database, orgId: string) {
           )
           .groupBy(inventoryMovements.itemId);
 
+        // Credit notes, dated when they were issued: a return in September
+        // reduces September's margin, not July's, because July's figures were
+        // true when they were reported and a report that rewrote them would
+        // not reproduce.
+        const credits = await tx
+          .select({
+            itemId: inventoryMovements.itemId,
+            quantity: sql<string>`sum(${creditNoteLines.quantityMinor})::text`,
+            revenue: sql<string>`sum(${creditNoteLines.revenueBaseMinor})::text`,
+            cost: sql<string>`sum(${creditNoteLines.baseCostMinor})::text`,
+          })
+          .from(creditNoteLines)
+          .innerJoin(creditNotes, eq(creditNotes.id, creditNoteLines.creditNoteId))
+          .innerJoin(inventoryMovements, eq(inventoryMovements.id, creditNoteLines.saleMovementId))
+          .where(and(gte(creditNotes.occurredAt, from), lt(creditNotes.occurredAt, to)))
+          .groupBy(inventoryMovements.itemId);
+
         // Freight and duty that reached cost of sales because the goods had
         // already gone. Dated by the charge's own entry: it is a cost of the
         // period it became known in, which is where ADR 15 posts it.
@@ -495,22 +550,25 @@ export function createSalesService(database: Database, orgId: string) {
           )
           .groupBy(costLayers.itemId);
 
-        const itemIds = [...new Set([...lines, ...late].map((r) => r.itemId))];
+        const itemIds = [...new Set([...lines, ...late, ...credits].map((r) => r.itemId))];
         const itemRows = itemIds.length
           ? await tx.select().from(inventoryItems).where(inArray(inventoryItems.id, itemIds))
           : [];
         const byId = new Map(itemRows.map((item) => [item.id, item]));
         const lateBy = new Map(late.map((r) => [r.itemId, BigInt(r.amount)]));
         const soldBy = new Map(lines.map((r) => [r.itemId, r]));
+        const creditedBy = new Map(credits.map((r) => [r.itemId, r]));
 
         const byItem: ItemMargin[] = itemIds
           .flatMap((itemId) => {
             const item = byId.get(itemId);
             if (!item) return [];
             const sold = soldBy.get(itemId);
-            const revenue = BigInt(sold?.revenue ?? '0');
+            const credited = creditedBy.get(itemId);
+            const revenue = BigInt(sold?.revenue ?? '0') - BigInt(credited?.revenue ?? '0');
             const lateCharges = lateBy.get(itemId) ?? 0n;
-            const cost = BigInt(sold?.cost ?? '0') + lateCharges;
+            const cost = BigInt(sold?.cost ?? '0') - BigInt(credited?.cost ?? '0') + lateCharges;
+            const quantity = BigInt(sold?.quantity ?? '0') - BigInt(credited?.quantity ?? '0');
             return [
               {
                 itemId,
@@ -518,7 +576,7 @@ export function createSalesService(database: Database, orgId: string) {
                 name: item.name,
                 unit: item.unit,
                 quantityPrecision: item.quantityPrecision,
-                quantitySoldMinor: sold?.quantity ?? '0',
+                quantitySoldMinor: String(quantity),
                 lateCharges: money(lateCharges),
                 ...row(revenue, cost),
               },
@@ -541,14 +599,43 @@ export function createSalesService(database: Database, orgId: string) {
           .where(and(gte(sales.occurredAt, from), lt(sales.occurredAt, to)))
           .groupBy(sales.customerAccountId, accounts.name, accounts.code);
 
-        const byCustomer: CustomerMargin[] = customers
-          .map((c) => ({
-            accountId: c.accountId,
-            name: c.name,
-            code: c.code,
-            invoices: c.invoices,
-            ...row(BigInt(c.revenue), BigInt(c.cost)),
-          }))
+        const customerCredits = await tx
+          .select({
+            accountId: sales.customerAccountId,
+            name: accounts.name,
+            code: accounts.code,
+            revenue: sql<string>`sum(${creditNotes.baseNetMinor})::text`,
+            cost: sql<string>`sum(${creditNotes.baseCostMinor})::text`,
+          })
+          .from(creditNotes)
+          .innerJoin(sales, eq(sales.id, creditNotes.saleId))
+          .innerJoin(accounts, eq(accounts.id, sales.customerAccountId))
+          .where(and(gte(creditNotes.occurredAt, from), lt(creditNotes.occurredAt, to)))
+          .groupBy(sales.customerAccountId, accounts.name, accounts.code);
+        const customerCreditBy = new Map(customerCredits.map((c) => [c.accountId, c]));
+        // A customer credited this month for an invoice raised last month
+        // still belongs on this month's table, with a negative contribution.
+        const customerRows = [
+          ...customers,
+          ...customerCredits
+            .filter((c) => !customers.some((sold) => sold.accountId === c.accountId))
+            .map((c) => ({ ...c, invoices: 0, revenue: '0', cost: '0' })),
+        ];
+
+        const byCustomer: CustomerMargin[] = customerRows
+          .map((c) => {
+            const credited = customerCreditBy.get(c.accountId);
+            return {
+              accountId: c.accountId,
+              name: c.name,
+              code: c.code,
+              invoices: c.invoices,
+              ...row(
+                BigInt(c.revenue) - BigInt(credited?.revenue ?? '0'),
+                BigInt(c.cost) - BigInt(credited?.cost ?? '0'),
+              ),
+            };
+          })
           .sort((a, b) => compareMinor(b.margin.minorUnits, a.margin.minorUnits));
 
         const totalRevenue = byItem.reduce((sum, i) => sum + BigInt(i.revenue.minorUnits), 0n);
@@ -617,7 +704,7 @@ function addDays(date: string, days: number): string {
  * the only one under which later rate movements land in FX gain and loss
  * rather than quietly rewriting what was sold.
  */
-async function revenueAccount(
+export async function revenueAccount(
   tx: Transactional,
   accountId: string,
   functional: CurrencyCode,
@@ -705,6 +792,43 @@ async function describeSale(
 
   const total = marginOf(sale.baseNetMinor, sale.baseCostMinor);
 
+  const notes = await tx
+    .select()
+    .from(creditNotes)
+    .where(eq(creditNotes.saleId, saleId))
+    .orderBy(asc(creditNotes.occurredAt), asc(creditNotes.id));
+  const creditedLines = movements.length
+    ? await tx
+        .select({
+          movementId: creditNoteLines.saleMovementId,
+          quantity: sql<string>`sum(${creditNoteLines.quantityMinor})::text`,
+          amount: sql<string>`sum(${creditNoteLines.amountMinor})::text`,
+          revenue: sql<string>`sum(${creditNoteLines.revenueBaseMinor})::text`,
+          cost: sql<string>`sum(${creditNoteLines.baseCostMinor})::text`,
+        })
+        .from(creditNoteLines)
+        .where(
+          inArray(
+            creditNoteLines.saleMovementId,
+            movements.map((m) => m.movement.id),
+          ),
+        )
+        .groupBy(creditNoteLines.saleMovementId)
+    : [];
+  const creditedBy = new Map(creditedLines.map((row) => [row.movementId, row]));
+  const amounts = lineAmounts(
+    sale.netMinor,
+    movements.map(({ movement }) => ({
+      amount: movement.amountMinor,
+      revenueBase: movement.revenueBaseMinor ?? 0n,
+    })),
+  );
+  const sum = (pick: (note: (typeof notes)[number]) => bigint) =>
+    notes.reduce((total, note) => total + pick(note), 0n);
+  const creditedRevenue = sum((note) => note.baseNetMinor);
+  const creditedCost = sum((note) => note.baseCostMinor);
+  const net = marginOf(sale.baseNetMinor - creditedRevenue, sale.baseCostMinor - creditedCost);
+
   return {
     id: sale.id,
     reference: sale.reference,
@@ -721,9 +845,30 @@ async function describeSale(
     margin: base(total.margin),
     marginBasisPoints: total.basisPoints,
     transactionId: sale.transactionId,
-    lines: movements.map(({ movement, item }): SaleLine => {
+    credited: {
+      net: invoiced(sum((note) => note.netMinor)),
+      tax: invoiced(sum((note) => note.taxMinor)),
+      gross: invoiced(sum((note) => note.grossMinor)),
+      revenue: base(creditedRevenue),
+      cost: base(creditedCost),
+    },
+    creditNotes: notes.map((note) => ({
+      id: note.id,
+      reference: note.reference,
+      occurredAt: note.occurredAt,
+      reason: note.reason,
+      gross: invoiced(note.grossMinor),
+      revenue: base(note.baseNetMinor),
+      cost: base(note.baseCostMinor),
+    })),
+    netRevenue: base(net.revenue),
+    netCost: base(net.cost),
+    netMargin: base(net.margin),
+    netMarginBasisPoints: net.basisPoints,
+    lines: movements.map(({ movement, item }, index): SaleLine => {
       const revenue = movement.revenueBaseMinor ?? 0n;
       const margin = marginOf(revenue, movement.baseCostMinor);
+      const credited = creditedBy.get(movement.id);
       return {
         movementId: movement.id,
         itemId: item.id,
@@ -736,6 +881,11 @@ async function describeSale(
         cost: base(movement.baseCostMinor),
         margin: base(margin.margin),
         marginBasisPoints: margin.basisPoints,
+        amount: invoiced(amounts[index] ?? 0n),
+        creditedQuantityMinor: credited?.quantity ?? '0',
+        creditedAmount: invoiced(BigInt(credited?.amount ?? '0')),
+        creditedRevenue: base(BigInt(credited?.revenue ?? '0')),
+        returnedCost: base(BigInt(credited?.cost ?? '0')),
         drawnFrom: draws
           .filter((d) => d.movementId === movement.id)
           .map((d) => ({ layerReference: d.reference, quantityMinor: String(d.quantity) })),

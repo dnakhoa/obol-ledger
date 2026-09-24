@@ -17,6 +17,7 @@ import type { AccountRole } from '../src/server/domain/period';
 import { createTaxService } from '../src/server/services/tax';
 import { createTaxReturnService } from '../src/server/services/tax-return';
 import { createSalesService } from '../src/server/services/sales';
+import { createCreditNoteService } from '../src/server/services/credit-notes';
 import { describeTarget, schemaConnectionString, sslFor } from './connection';
 
 /**
@@ -260,6 +261,16 @@ const ACCOUNTS: {
     key: 'revenue',
     code: '511',
     name: 'Doanh thu bán hàng và cung cấp dịch vụ',
+    type: 'revenue',
+    currency: 'VND',
+    overdraft: true,
+  },
+  // Returns and allowances, kept apart from 511 so a statement can show them
+  // as the deduction from revenue Thông tư 200 says they are.
+  {
+    key: 'salesReturns',
+    code: '5212',
+    name: 'Hàng bán bị trả lại',
     type: 'revenue',
     currency: 'VND',
     overdraft: true,
@@ -967,6 +978,10 @@ async function main(): Promise<void> {
       },
     ];
 
+    const soldByInvoice = new Map<
+      string,
+      { id: string; line: string; shipped: bigint; amount: bigint }
+    >();
     for (const container of CONTAINERS) {
       const invoicedAt = daysAgo(container.day, 10);
 
@@ -1015,6 +1030,12 @@ async function main(): Promise<void> {
       });
       if (!sold.ok) throw new Error(`sale failed for ${container.invoice}: ${sold.error.code}`);
       entries += 1;
+      soldByInvoice.set(container.invoice, {
+        id: sold.value.sale.id,
+        line: sold.value.sale.lines[0]?.movementId ?? '',
+        shipped,
+        amount: BigInt(foreign(container.amount)),
+      });
 
       // Freight and customs, paid in dong to a local forwarder.
       const freight = between(48_000_000, 96_000_000);
@@ -1022,6 +1043,34 @@ async function main(): Promise<void> {
         { account: 'selling', amount: dong(freight) },
         { account: 'bankVnd', amount: dong(-freight) },
       ]);
+    }
+
+    // ---- A container that arrived with cracked slabs ------------------------
+    //
+    // Brisbane's surveyor found 3% of the last shipment cracked. The buyer
+    // keeps the rest and is credited for the broken slabs, which come back
+    // into the lot they left from — the ordinary way an exporter's invoice
+    // gets corrected, and the reason a sale is append-only rather than
+    // editable.
+    const cracked = soldByInvoice.get('INV-2612');
+    if (cracked) {
+      const returned = ((cracked.shipped * 3n) / 100n / 100n) * 100n;
+      const credited = await createCreditNoteService(database, orgId).issue({
+        saleId: cracked.id,
+        reference: 'CN-2612-01',
+        revenueAccountId: ids['salesReturns'] ?? '',
+        reason: 'Nứt vỡ khi vận chuyển — biên bản giám định tại Brisbane',
+        occurredAt: daysAgo(3, 11),
+        lines: [
+          {
+            saleMovementId: cracked.line,
+            quantity: returned,
+            amount: (cracked.amount * returned) / cracked.shipped,
+          },
+        ],
+      });
+      if (!credited.ok) throw new Error(`credit note failed: ${credited.error.code}`);
+      entries += 1;
     }
 
     // ---- The quarterly stocktake --------------------------------------------
