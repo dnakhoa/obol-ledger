@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableScroll, Td, Th } from '@/components/ui/table';
+import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
+import { ApiIcon, WebhookIcon } from '@/components/icons';
 import { ApiKeyForm } from '@/components/api-key-form';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
@@ -38,8 +40,40 @@ export default async function SettingsPage() {
     <>
       <PageHeader
         title="Settings"
-        description="Credentials for the published demo tenant. Tokens are stored as SHA-256 digests, so a leaked database backup yields nothing usable."
+        description="API keys and integrations for developers connecting other systems to this ledger."
       />
+
+      {/*
+        The developer pages live here rather than in the sidebar: they are for
+        whoever connects a warehouse system or a storefront, not whoever runs
+        the business day to day.
+      */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Link
+          href="/api-reference"
+          className="border-line bg-surface hover:bg-surface-hover rounded-card block border px-4 py-3.5 transition-colors duration-150"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <ApiIcon className="text-ink-muted" />
+            API reference
+          </span>
+          <span className="text-ink-muted mt-1 block text-xs">
+            Every endpoint, with its request and response, generated from the live schemas.
+          </span>
+        </Link>
+        <Link
+          href="/webhooks"
+          className="border-line bg-surface hover:bg-surface-hover rounded-card block border px-4 py-3.5 transition-colors duration-150"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <WebhookIcon className="text-ink-muted" />
+            Webhooks
+          </span>
+          <span className="text-ink-muted mt-1 block text-xs">
+            Tell another system the moment an entry is posted, with every delivery attempt logged.
+          </span>
+        </Link>
+      </div>
 
       <Card>
         <CardHeader>

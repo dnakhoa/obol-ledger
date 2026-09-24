@@ -154,3 +154,14 @@ built yet.
   would hand a freight forwarder a construction-in-progress account and a
   science-and-technology development fund. The full list is law and available;
   what is opened is what a trading company uses.
+
+## Addendum: Thông tư 133
+
+Most Vietnamese importers, exporters and distributors are small and medium
+enterprises, and keep their books under Thông tư 133/2016/TT-BTC rather than 200. It is offered as its own template (migration 0031) and enforced the same
+way: the statutory-code CHECK covers both circulars, so a rule fixed for one
+cannot drift from the other. The template differs where posting differs — no
+521, so returns and discounts come straight off 511; no 641, with selling and
+administrative expense as 6421 and 6422. The account list was drawn from the
+circular's structure and should be checked by a Vietnamese accountant before a
+customer relies on it; the setup screen offers it first to a Vietnamese reader.

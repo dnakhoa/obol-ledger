@@ -8,6 +8,7 @@ import { memberships, organizations } from '@/server/db/schema';
 import { db } from '@/server/db/client';
 import type { Transactional } from '@/server/db/types';
 import { createAccountService } from './accounts';
+import { populateSampleLedger } from './sample-ledger';
 import {
   CHART_TEMPLATE_DEFINITIONS,
   CHART_TEMPLATES,
@@ -40,6 +41,12 @@ export type CreateLedgerInput = {
    * guess is free to be wrong.
    */
   readonly locale?: Locale;
+  /**
+   * Open the template's starter accounts. False when the caller brings its own
+   * chart, as the sample ledger does — two sets of the same codes would be
+   * refused by the unique index, rightly.
+   */
+  readonly openChart?: boolean;
 };
 
 export async function createLedger(input: CreateLedgerInput): Promise<{ orgId: string }> {
@@ -77,6 +84,7 @@ export async function createLedger(input: CreateLedgerInput): Promise<{ orgId: s
   // role indexes, and on a statutory chart the constraint that the leading
   // digit agrees with the type. A template that got a code wrong would be
   // rejected here rather than shipped.
+  if (input.openChart === false) return { orgId };
   const accounts = createAccountService(database, orgId);
   for (const account of template.accounts) {
     await accounts.create({
@@ -90,6 +98,30 @@ export async function createLedger(input: CreateLedgerInput): Promise<{ orgId: s
     });
   }
 
+  return { orgId };
+}
+
+/**
+ * A ledger of the visitor's own, filled with the sample company's quarter.
+ *
+ * The same books the read-only demo shows, but theirs: they can raise an
+ * invoice, credit it, close a month, and see what the ledger refuses. Kept in
+ * dong on Thông tư 200 because that is what the sample company is, whatever
+ * language the visitor reads — only the name says it is a sample.
+ */
+export async function createSampleLedger(input: {
+  readonly userId: string;
+  readonly name: string;
+}): Promise<{ orgId: string }> {
+  const { orgId } = await createLedger({
+    userId: input.userId,
+    name: input.name,
+    functionalCurrency: 'VND',
+    chartTemplate: 'vn_tt200',
+    locale: 'vi',
+    openChart: false,
+  });
+  await populateSampleLedger(db(), orgId);
   return { orgId };
 }
 

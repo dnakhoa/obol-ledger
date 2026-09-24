@@ -25,12 +25,19 @@ import type { AccountRole } from './period';
  * nowhere to put a rule that actually is a rule.
  */
 
-export const CHART_TEMPLATES = ['generic', 'au_nz', 'us_gaap', 'jp', 'vn_tt200'] as const;
+export const CHART_TEMPLATES = [
+  'generic',
+  'au_nz',
+  'us_gaap',
+  'jp',
+  'vn_tt200',
+  'vn_tt133',
+] as const;
 export type ChartTemplate = (typeof CHART_TEMPLATES)[number];
 
 /** Whether the template's codes are prescribed by law rather than by habit. */
 export function isStatutory(template: ChartTemplate): boolean {
-  return template === 'vn_tt200';
+  return template === 'vn_tt200' || template === 'vn_tt133';
 }
 
 export type TemplateAccount = {
@@ -408,6 +415,50 @@ const VN_TT200: ChartTemplateDefinition = {
 };
 
 /**
+ * Vietnam, Thông tư 133/2016/TT-BTC — the small and medium enterprise chart.
+ *
+ * Most importers, exporters and distributors keep their books under this
+ * circular rather than Thông tư 200. It is shorter, and three of its
+ * differences change where a ledger posts:
+ *
+ *  - **No 521.** Returns and discounts come straight off 511, so a credit note
+ *    on this chart debits revenue directly rather than a contra account.
+ *  - **One 642 for both selling and administration**, as 6421 (bán hàng) and
+ *    6422 (quản lý doanh nghiệp). There is no 641.
+ *  - Statutory in the same way as 200: prescribed codes, and the leading digit
+ *    is the class. The database enforces both for either circular.
+ */
+const VN_TT133: ChartTemplateDefinition = {
+  id: 'vn_tt133',
+  label: 'Việt Nam — Thông tư 133/2016/TT-BTC',
+  summary:
+    'Statutory, for small and medium enterprises. Codes are prescribed by the circular and the leading digit must agree with the account class; the database enforces both.',
+  statutory: true,
+  accounts: VN_TT200.accounts
+    // 133 has no revenue deductions account and no separate selling expense.
+    .filter((account) => !['521', '641', '642'].includes(account.code))
+    .flatMap((account): TemplateAccount[] =>
+      account.code === '635'
+        ? [
+            account,
+            {
+              code: '6421',
+              name: 'Chi phí bán hàng',
+              type: 'expense',
+              note: 'Selling expenses — one half of 642 under this circular',
+            },
+            {
+              code: '6422',
+              name: 'Chi phí quản lý doanh nghiệp',
+              type: 'expense',
+              note: 'General and administrative expenses — the other half of 642',
+            },
+          ]
+        : [account],
+    ),
+};
+
+/**
  * United States.
  *
  * Four digits, which is the convention most American small businesses and
@@ -590,6 +641,7 @@ export const CHART_TEMPLATE_DEFINITIONS: Record<ChartTemplate, ChartTemplateDefi
   us_gaap: US_GAAP,
   jp: JP,
   vn_tt200: VN_TT200,
+  vn_tt133: VN_TT133,
 };
 
 /**

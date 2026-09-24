@@ -18,6 +18,7 @@ export function ViewerMenu({
   email,
   image,
   orgName,
+  sample = false,
   canSignIn,
   labels,
 }: {
@@ -27,12 +28,16 @@ export function ViewerMenu({
     signIn: string;
     signOut: string;
     signingOut: string;
-    readOnlyDemo: string;
+    trySample: string;
+    sampleBadge: string;
+    keepIt: string;
   };
   name?: string;
   email?: string;
   image?: string | null;
   orgName: string;
+  /** Trying the sample ledger with no identity yet: said so, with the way to keep it. */
+  sample?: boolean;
   /**
    * Whether any sign-in provider is configured. Without one the button would
    * lead to a page that can only say no, so the visitor is told up front that
@@ -50,18 +55,13 @@ export function ViewerMenu({
         <p className="text-ink-muted px-1 text-[11px]">
           {labels.reading} <span className="text-ink-secondary font-medium">{orgName}</span>
         </p>
-        {canSignIn ? (
-          <Link
-            href="/sign-in"
-            className="bg-action text-action-ink hover:bg-action-hover flex h-9 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors duration-150"
-          >
-            {labels.signIn}
-          </Link>
-        ) : (
-          <p className="border-line text-ink-secondary flex h-9 w-full items-center justify-center rounded-lg border text-xs">
-            {labels.readOnlyDemo}
-          </p>
-        )}
+        {/* Trying needs no provider, so the way in is always offered. */}
+        <Link
+          href="/sign-in"
+          className="bg-action text-action-ink hover:bg-action-hover flex h-9 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors duration-150"
+        >
+          {canSignIn ? labels.signIn : labels.trySample}
+        </Link>
       </div>
     );
   }
@@ -84,7 +84,13 @@ export function ViewerMenu({
         )}
         <span className="min-w-0 flex-1">
           <span className="text-ink block truncate text-xs font-medium">{orgName}</span>
-          <span className="text-ink-muted block truncate text-[11px]">{email}</span>
+          {sample ? (
+            <span className="text-caution block truncate text-[11px] font-medium">
+              {labels.sampleBadge}
+            </span>
+          ) : (
+            <span className="text-ink-muted block truncate text-[11px]">{email}</span>
+          )}
         </span>
       </button>
 
@@ -95,6 +101,14 @@ export function ViewerMenu({
             'shadow-[var(--shadow-card)]',
           )}
         >
+          {sample && canSignIn ? (
+            <Link
+              href="/sign-in"
+              className="text-ink hover:bg-surface-hover block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors duration-150"
+            >
+              {labels.keepIt}
+            </Link>
+          ) : null}
           <button
             type="button"
             disabled={signingOut}

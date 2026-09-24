@@ -6,6 +6,7 @@ import { currentViewer } from '@/server/auth/viewer';
 import { createLedger } from '@/server/services/onboarding';
 import { SUPPORTED_CURRENCIES } from '@/lib/money';
 import { CHART_TEMPLATES } from '@/server/domain/chart';
+import { viewerLocale } from '@/server/i18n';
 
 const schema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -49,6 +50,9 @@ export async function createLedgerAction(
     name: parsed.data.name,
     functionalCurrency: parsed.data.functionalCurrency,
     chartTemplate: parsed.data.chartTemplate,
+    // The books are kept in the language the person set them up in; see the
+    // note on `CreateLedgerInput.locale`.
+    locale: await viewerLocale(),
   });
 
   redirect('/');

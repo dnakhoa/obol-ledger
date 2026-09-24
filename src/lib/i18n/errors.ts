@@ -107,6 +107,7 @@ const VI_CHART: Record<ChartTemplate, string> = {
   us_gaap: 'hệ thống tài khoản theo US GAAP',
   jp: 'hệ thống tài khoản của Nhật Bản',
   vn_tt200: 'hệ thống tài khoản theo Thông tư 200',
+  vn_tt133: 'hệ thống tài khoản theo Thông tư 133',
 };
 
 const VI_TREATMENT: Record<TaxTreatment, string> = {
@@ -288,6 +289,7 @@ const JA_CHART: Record<ChartTemplate, string> = {
   us_gaap: '米国会計基準',
   jp: '日本基準',
   vn_tt200: 'ベトナム（通達200号）',
+  vn_tt133: 'ベトナム（通達133号）',
 };
 
 const JA_TREATMENT: Record<TaxTreatment, string> = {

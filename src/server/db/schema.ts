@@ -125,6 +125,8 @@ export const users = pgTable('user', {
   image: text('image'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+  /** A visitor trying the sample ledger, with no identity yet. See migration 0032. */
+  isAnonymous: boolean('isAnonymous').default(false),
 });
 
 export const sessions = pgTable('session', {

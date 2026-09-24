@@ -39,6 +39,8 @@ export type Viewer =
       readonly email: string;
       readonly image: string | null;
       readonly role: string;
+      /** Trying the sample ledger, signed in with no identity yet. */
+      readonly sample: boolean;
     }
   | {
       readonly kind: 'unenrolled';
@@ -46,6 +48,8 @@ export type Viewer =
       readonly name: string;
       readonly email: string;
       readonly image: string | null;
+      /** An anonymous session whose sample ledger is still being created. */
+      readonly sample: boolean;
     };
 
 /** Roles that may write. A viewer reads; the other two do not. */
@@ -79,6 +83,7 @@ export type AuthenticatedUser = {
   readonly name: string;
   readonly email: string;
   readonly image?: string | null | undefined;
+  readonly isAnonymous?: boolean | null | undefined;
 };
 
 export async function resolveViewer(user?: AuthenticatedUser): Promise<Viewer> {
@@ -102,6 +107,7 @@ export async function resolveViewer(user?: AuthenticatedUser): Promise<Viewer> {
       name: user.name,
       email: user.email,
       image: user.image ?? null,
+      sample: user.isAnonymous === true,
     };
   }
 
@@ -114,6 +120,7 @@ export async function resolveViewer(user?: AuthenticatedUser): Promise<Viewer> {
     email: user.email,
     image: user.image ?? null,
     role: membership.role,
+    sample: user.isAnonymous === true,
   };
 }
 

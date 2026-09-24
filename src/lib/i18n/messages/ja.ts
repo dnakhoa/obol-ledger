@@ -43,7 +43,7 @@ export const ja: Messages = {
     keepYourOwnBooks: '自分の帳簿をつける',
     working: '処理中…',
     refusalSignIn:
-      'ご自身の帳簿をつけるにはサインインしてください。これは公開デモで、誰でも閲覧できますが変更はできません。',
+      'このデモは閲覧専用です。変更するには、自分のサンプル帳簿を開いてください（サインイン → サンプルデータで試す）。',
     refusalNoLedger: 'このアカウントにはまだ帳簿がありません。作成すると記帳を始められます。',
     refusalReadOnly: 'この帳簿でのあなたの権限は閲覧のみです。',
   },
@@ -63,11 +63,13 @@ export const ja: Messages = {
     api: 'API',
     settings: '設定',
     morePages: 'その他のページ',
+    sectionTrading: '販売・在庫',
+    sectionAccounting: '会計',
   },
 
   overview: {
     title: '概要',
-    description: '以下の数値はすべて、貸借が一致した仕訳から計算されています。',
+    description: '本日時点の事業の状況です。',
     postEntry: '仕訳を入力',
 
     balanced: '帳簿は一致しています',
@@ -79,15 +81,15 @@ export const ja: Messages = {
     residual: '差額',
 
     cashAndAssets: '現預金・資産',
-    debitNormalBalances: '借方残高となる勘定',
+    debitNormalBalances: 'この区分の勘定の合計',
     revenue: '収益',
-    revenueDetail: '貸方残高、正の数で表示',
+    revenueDetail: '売上勘定の合計',
     expenses: '費用',
     entriesPosted: '登録済み仕訳',
     entriesDetail: (postings, accounts) => `${accounts} 勘定にわたり ${postings} 行`,
 
-    volumeTitle: '日次の仕訳金額',
-    volumeHint: '直近 30 日、借方のみ — 各仕訳には同額の貸方があります。',
+    volumeTitle: '取引の推移',
+    volumeHint: '直近30日間の日ごとの記帳額。',
 
     positionTitle: '勘定区分別の残高',
     positionHint: '資産 + 費用 = 負債 + 純資産 + 収益',
@@ -129,8 +131,7 @@ export const ja: Messages = {
 
   accounts: {
     title: '勘定科目',
-    description:
-      '勘定区分ごとにまとめています。残高は経理担当者が読む形 — その勘定が本来どちら側に立つかにかかわらず、正の数が正常です。',
+    description: '勘定科目を区分ごとに、現在の残高とともに表示します。',
     postEntry: '仕訳を入力',
 
     emptyTitle: '勘定科目がまだありません',
@@ -169,8 +170,7 @@ export const ja: Messages = {
 
   stock: {
     title: '在庫',
-    description:
-      '入荷のたびに、その単価のまま別ロットとして記録します。出庫すると、実際に引き当てたロットから売上原価を計算し、どのロットから引き当てたかも表示します。',
+    description: '在庫の数量と原価、どの入荷分かを表示します。',
     importButton: '表計算から取り込む',
     sellButton: '請求書を発行',
 
@@ -308,8 +308,7 @@ export const ja: Messages = {
 
   journal: {
     title: '仕訳帳',
-    description:
-      'すべての仕訳を新しい順に、明細行とあわせて表示します。仕訳は追記のみ — 誤りは反対仕訳で訂正し、履歴を書き換えることはありません。',
+    description: 'すべての仕訳を新しい順に表示します。誤りは反対仕訳で訂正し、履歴は変更しません。',
     entries: '仕訳',
     noMatches: '条件に一致する仕訳はありません',
     noMatchesBody:
@@ -338,8 +337,7 @@ export const ja: Messages = {
 
   transfer: {
     title: '仕訳を入力',
-    description:
-      '仕訳を記帳します。貸借の一致は入力中に検証され、ドメイン層でもう一度、そして COMMIT 時に Postgres が三度目の検証を行います。',
+    description: '仕訳を記帳します。貸借が一致しないと記帳できません。',
     tooMany: (seconds) =>
       `短時間に多くの仕訳が記帳されました。${seconds} 秒後にもう一度お試しください。`,
     checkFields: '仕訳を記帳できませんでした。強調表示された項目を確認してください。',
@@ -351,8 +349,7 @@ export const ja: Messages = {
 
   reports: {
     title: '帳票',
-    description:
-      '会計帳簿が作成するために存在する 2 つの計算書です。どちらも他と同じ仕訳から計算しており、食い違う余地のある別の集計テーブルはありません。',
+    description: '貸借対照表と損益計算書。',
     sheetBalances: '貸借対照表は一致しています',
     sheetDoesNot: '貸借対照表が一致していません',
     assets: '資産',
@@ -378,8 +375,7 @@ export const ja: Messages = {
 
   monthEnd: {
     title: '月次決算',
-    description:
-      '月に一度、順番に 3 つの作業を行います。早めに押しても構いません — まだその時期でなければ、誤った処理をする代わりに理由を表示します。',
+    description: '3つの手順で月を締めます。準備ができていない手順は理由を表示します。',
     open: '未締め',
     closed: '締め済み',
     entriesInMonth: (count) => `仕訳 ${count} 件。締めは古い月から行うため、この月が対象です。`,
@@ -506,7 +502,6 @@ export const ja: Messages = {
       '有効にするには GITHUB_CLIENT_ID と GITHUB_CLIENT_SECRET、または Google の組を設定してください。',
     justLooking: '見るだけですか？',
     noAccountNeeded: 'アカウントは不要です。',
-    readOnlyDemo: '閲覧専用デモ',
   },
 
   entry: {
@@ -646,8 +641,7 @@ export const ja: Messages = {
 
   aging: {
     title: '債権債務の年齢表',
-    description:
-      '未回収・未払がどれだけ滞留しているかを示します。他と同じ仕訳から作成しており、食い違う余地のある別の補助元帳はありません。',
+    description: '未回収・未払の請求書を、延滞の程度ごとに表示します。',
     receivables: '売掛金',
     payables: '買掛金',
     caption: (account) => `${account}、古い順`,
@@ -678,8 +672,7 @@ export const ja: Messages = {
 
   tax: {
     title: '消費税申告',
-    description:
-      '預かった消費税、支払った消費税、そして差引の納付額です。申告すると両方の仮勘定を精算する仕訳が起票されるため、控除しきれなかった分は申告書の上ではなく帳簿に残ります。',
+    description: '期間ごとの売上税額・仕入税額と納付額。',
     codes: '税率',
     codesDescription:
       '売上に課す税率と仕入で控除する税率です。それぞれに計上先の勘定科目を紐づけてあるので、伝票ごとに指定する必要はありません。',
@@ -739,8 +732,7 @@ export const ja: Messages = {
 
   shipments: {
     title: '輸入船積',
-    description:
-      'コンテナ 1 本を荷揚げするまでに実際にかかった額です。海上運賃・関税・荷役費は仕入諸掛として棚卸資産の価額に含めるべきもので、当月の費用ではありません。その差は通常、小さくありません。',
+    description: 'コンテナごとの取得原価です。運賃・関税・諸掛は在庫の価額に含めます。',
     caption: '船積、新しい順',
     reference: '伝票番号',
     arrived: '入荷日',
@@ -806,8 +798,7 @@ export const ja: Messages = {
 
   stockImport: {
     title: '表計算から取り込む',
-    description:
-      '普段お使いの仕入履歴をそのまま貼り付けてください。1 行が 1 ロットになり、仕入仕訳も同時に計上されます。',
+    description: 'スプレッドシートから仕入履歴を貼り付けます。各行が入荷として登録されます。',
 
     requirementsTitle: '必要な列',
     requirementsHint:
@@ -877,8 +868,7 @@ export const ja: Messages = {
   },
   sales: {
     title: '販売',
-    description:
-      '請求書ごとに出庫と売上原価の計上を同じ仕訳で行うため、どの請求書もその利益がわかります。',
+    description: '請求書ごとの原価と利益。',
     marginsButton: '売上総利益',
 
     recentTitle: '最近の請求書',
@@ -954,8 +944,7 @@ export const ja: Messages = {
 
   margins: {
     title: '売上総利益',
-    description:
-      '販売したものの利益を品目別・得意先別に。売上は各請求日のレート、原価は各ロットの入庫日のレートによります。通貨をまたいで合計できるのはこの二つだけです。',
+    description: '品目別・得意先別の粗利。',
     month: '月',
     previous: '前月',
     next: '翌月',
@@ -1142,5 +1131,32 @@ export const ja: Messages = {
       `${sku} の金額の小数桁数が ${currency} の許容範囲を超えています。`,
     nothingEntered: '少なくとも一行に数量か金額を入力してください。',
     issued: (reference, amount) => `伝票 ${reference}（${amount}）を作成しました。`,
+  },
+  sample: {
+    title: 'サンプルデータで試す',
+    pitch:
+      '石材輸出会社の帳簿を、あなた専用のコピーとして用意します。四半期分の販売・在庫・3通貨の輸出・付加価値税を含み、自由に変更できます。登録は不要です。',
+    start: '自分のサンプル帳簿を開く',
+    working: 'サンプル会社を準備しています…',
+    failed: 'サンプル帳簿を作成できませんでした。少し時間をおいて再度お試しください。',
+    tooMany: (seconds) =>
+      `このネットワークからのサンプル作成が多すぎます。${seconds} 秒後にもう一度お試しください。`,
+    companyName: 'Bình Minh 石材（サンプル）',
+    badge: 'サンプル帳簿',
+    keepIt: 'サインインして保存',
+    haveAccount: 'アカウントをお持ちの方',
+    orReadOnly: '閲覧専用のデモを見るだけならこちら',
+  },
+  onboarding: {
+    statutory: '法定',
+    charts: {
+      generic: 'シンプルな番号付きの勘定科目体系です。自由に名称変更・追加できます。',
+      au_nz: 'GST・PAYG・年金の勘定を含みます（豪州・NZ）。法定ではないため自由に変更できます。',
+      vn_tt200: '大企業向け（ベトナム）。科目コードは通達で定められています。',
+      vn_tt133:
+        '中小企業向け（ベトナム）。輸出入・卸売業の多くが採用しています。科目コードは通達で定められています。',
+      us_gaap: '米国の4桁体系。売上税は預かって納付します。',
+      jp: '日本の勘定科目。仮払消費税と仮受消費税を含みます。',
+    },
   },
 };

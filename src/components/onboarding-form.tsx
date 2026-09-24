@@ -14,6 +14,7 @@ export function OnboardingForm({
   currencies,
   templates,
   suggestedName,
+  defaultCurrency,
 }: {
   /** Resolved on the server; a client component holds no dictionary. */
   labels: {
@@ -28,11 +29,13 @@ export function OnboardingForm({
     submit: string;
     failed: string;
     chartIsAStart: string;
+    statutory: string;
   };
   action: (state: OnboardingState, formData: FormData) => Promise<OnboardingState>;
   currencies: readonly string[];
   templates: readonly { id: string; label: string; summary: string; statutory: boolean }[];
   suggestedName: string;
+  defaultCurrency: string;
 }) {
   const [state, submit, pending] = useActionState(action, INITIAL);
 
@@ -78,7 +81,7 @@ export function OnboardingForm({
                       {template.label}
                       {template.statutory ? (
                         <span className="border-line text-ink-muted rounded-full border px-1.5 py-0.5 text-[10px] font-normal">
-                          statutory
+                          {labels.statutory}
                         </span>
                       ) : null}
                     </span>
@@ -96,7 +99,11 @@ export function OnboardingForm({
             // cannot be changed should say so before it is chosen, not after.
             hint={labels.currencyHint}
           >
-            <Select id="functionalCurrency" name="functionalCurrency" defaultValue="USD">
+            <Select
+              id="functionalCurrency"
+              name="functionalCurrency"
+              defaultValue={defaultCurrency}
+            >
               {currencies.map((currency) => (
                 <option key={currency} value={currency}>
                   {currency}

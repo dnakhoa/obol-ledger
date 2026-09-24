@@ -218,6 +218,20 @@
       "when": 1789966000000,
       "tag": "0030_credit_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1789967000000,
+      "tag": "0031_vn_tt133",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1789968000000,
+      "tag": "0032_anonymous_users",
+      "breakpoints": true
     }
   ]
 }

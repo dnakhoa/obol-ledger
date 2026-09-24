@@ -46,7 +46,7 @@ export const vi: Messages = {
     keepYourOwnBooks: 'Ghi sổ của riêng bạn',
     working: 'Đang xử lý…',
     refusalSignIn:
-      'Hãy đăng nhập để lập sổ sách của riêng bạn. Đây là bản trình diễn công khai: ai cũng xem được, không ai sửa được.',
+      'Bản demo này chỉ để xem. Hãy mở sổ mẫu của riêng bạn (Đăng nhập → Dùng thử với dữ liệu mẫu) để thay đổi.',
     refusalNoLedger: 'Tài khoản này chưa có sổ sách nào. Hãy tạo một bộ sổ để bắt đầu ghi sổ.',
     refusalReadOnly: 'Bạn chỉ có quyền xem trên bộ sổ này.',
   },
@@ -66,11 +66,13 @@ export const vi: Messages = {
     api: 'API',
     settings: 'Cài đặt',
     morePages: 'Các trang khác',
+    sectionTrading: 'Bán hàng & kho',
+    sectionAccounting: 'Kế toán',
   },
 
   overview: {
     title: 'Tổng quan',
-    description: 'Mọi con số dưới đây đều được tính từ các bút toán vốn đã cân bằng sẵn.',
+    description: 'Tình hình kinh doanh hôm nay.',
     postEntry: 'Ghi bút toán',
 
     balanced: 'Sổ sách cân đối',
@@ -83,15 +85,15 @@ export const vi: Messages = {
     residual: 'Chênh lệch',
 
     cashAndAssets: 'Tiền và tài sản',
-    debitNormalBalances: 'Các tài khoản thường dư Nợ',
+    debitNormalBalances: 'Tổng các tài khoản loại này',
     revenue: 'Doanh thu',
-    revenueDetail: 'Thường dư Có, hiển thị số dương',
+    revenueDetail: 'Tổng các tài khoản doanh thu',
     expenses: 'Chi phí',
     entriesPosted: 'Bút toán đã ghi',
     entriesDetail: (postings, accounts) => `${postings} dòng, trên ${accounts} tài khoản`,
 
-    volumeTitle: 'Phát sinh theo ngày',
-    volumeHint: 'Chỉ tính bên Nợ, 30 ngày gần nhất — mỗi bút toán đều có bên Có bằng đúng như vậy.',
+    volumeTitle: 'Hoạt động',
+    volumeHint: 'Giá trị ghi sổ mỗi ngày, 30 ngày gần nhất.',
 
     positionTitle: 'Số dư theo loại tài khoản',
     positionHint: 'Tài sản + Chi phí = Nợ phải trả + Vốn chủ sở hữu + Doanh thu',
@@ -133,8 +135,7 @@ export const vi: Messages = {
 
   accounts: {
     title: 'Hệ thống tài khoản',
-    description:
-      'Nhóm theo loại tài khoản. Số dư hiển thị theo cách kế toán vẫn đọc — số dương là bình thường, bất kể tài khoản đó thường dư bên nào.',
+    description: 'Các tài khoản, nhóm theo loại, kèm số dư hiện tại.',
     postEntry: 'Ghi bút toán',
 
     emptyTitle: 'Chưa có tài khoản nào',
@@ -173,8 +174,7 @@ export const vi: Messages = {
 
   stock: {
     title: 'Kho hàng',
-    description:
-      'Mỗi lần nhập hàng được giữ thành một lô riêng với giá riêng. Khi xuất hàng, hệ thống tự tính giá vốn từ chính những lô đã xuất — và cho bạn biết đó là những lô nào.',
+    description: 'Hàng đang có, giá vốn, và mỗi mặt hàng thuộc lô nhập nào.',
     importButton: 'Nhập từ bảng tính',
     sellButton: 'Lập hóa đơn bán hàng',
 
@@ -315,7 +315,7 @@ export const vi: Messages = {
   journal: {
     title: 'Sổ nhật ký',
     description:
-      'Toàn bộ bút toán, mới nhất trước, kèm các dòng hạch toán. Bút toán chỉ ghi thêm: sai thì ghi bút toán điều chỉnh, không bao giờ sửa lại lịch sử.',
+      'Mọi bút toán, mới nhất trước. Để sửa sai, hãy đảo bút toán — lịch sử không bao giờ bị sửa.',
     entries: 'Bút toán',
     noMatches: 'Không có bút toán nào khớp với bộ lọc',
     noMatchesBody:
@@ -344,8 +344,7 @@ export const vi: Messages = {
 
   transfer: {
     title: 'Ghi bút toán',
-    description:
-      'Ghi một bút toán vào sổ. Tính cân đối được kiểm tra ngay khi bạn gõ, kiểm tra lại ở tầng nghiệp vụ, và lần thứ ba do Postgres kiểm tra tại thời điểm COMMIT.',
+    description: 'Ghi một bút toán. Bút toán phải cân đối mới ghi sổ được.',
     tooMany: (seconds) =>
       `Bạn ghi quá nhiều bút toán trong thời gian ngắn. Hãy thử lại sau ${seconds} giây.`,
     checkFields: 'Chưa ghi được bút toán. Hãy kiểm tra các ô được đánh dấu.',
@@ -357,8 +356,7 @@ export const vi: Messages = {
 
   reports: {
     title: 'Báo cáo',
-    description:
-      'Hai báo cáo mà mọi sổ kế toán sinh ra để lập. Cả hai đều tính từ chính các bút toán đã ghi — không có kho dữ liệu báo cáo riêng để lệch nhau.',
+    description: 'Bảng cân đối kế toán và báo cáo kết quả kinh doanh.',
     sheetBalances: 'Bảng cân đối kế toán cân',
     sheetDoesNot: 'Bảng cân đối kế toán chưa cân',
     assets: 'Tài sản',
@@ -384,8 +382,7 @@ export const vi: Messages = {
 
   monthEnd: {
     title: 'Khóa sổ cuối tháng',
-    description:
-      'Ba việc, làm theo thứ tự, mỗi tháng một lần. Bạn cứ bấm sớm cũng được — nếu chưa tới lúc, hệ thống sẽ nói rõ lý do chứ không làm sai.',
+    description: 'Khóa sổ tháng qua ba bước. Nếu một bước chưa sẵn sàng, bạn sẽ thấy lý do.',
     open: 'Đang mở',
     closed: 'Đã khóa',
     entriesInMonth: (count) =>
@@ -515,7 +512,6 @@ export const vi: Messages = {
       'Để bật, hãy đặt GITHUB_CLIENT_ID và GITHUB_CLIENT_SECRET, hoặc cặp khóa của Google.',
     justLooking: 'Chỉ xem thôi?',
     noAccountNeeded: 'Không cần tài khoản.',
-    readOnlyDemo: 'Sổ mẫu chỉ xem',
   },
 
   entry: {
@@ -660,8 +656,7 @@ export const vi: Messages = {
 
   aging: {
     title: 'Công nợ theo tuổi nợ',
-    description:
-      'Khoản phải thu, phải trả đã tồn bao lâu. Tính từ chính các bút toán đã ghi — không có sổ công nợ riêng để lệch với sổ cái.',
+    description: 'Hóa đơn chưa thu, chưa trả, theo mức độ quá hạn.',
     receivables: 'Phải thu khách hàng',
     payables: 'Phải trả người bán',
     caption: (account) => `${account}, nợ cũ nhất trước`,
@@ -692,8 +687,7 @@ export const vi: Messages = {
 
   tax: {
     title: 'Tờ khai thuế GTGT',
-    description:
-      'Thuế đầu ra, thuế đầu vào và số còn phải nộp. Khi kết chuyển, hệ thống ghi bút toán khấu trừ hai tài khoản thuế, nên số thuế chưa khấu trừ hết nằm luôn trên sổ chứ không chỉ trên tờ khai.',
+    description: 'Thuế đầu ra, thuế đầu vào và số phải nộp theo từng kỳ.',
     codes: 'Thuế suất',
     codesDescription:
       'Các mức thuế suất doanh nghiệp xuất và được khấu trừ. Mỗi mức đã gắn sẵn tài khoản hạch toán, nên khi ghi hóa đơn không phải chọn lại.',
@@ -755,7 +749,7 @@ export const vi: Messages = {
   shipments: {
     title: 'Lô hàng nhập khẩu',
     description:
-      'Giá thực tế để đưa mỗi container về đến kho. Cước tàu, thuế nhập khẩu và phí giao nhận là chi phí thu mua, phải tính vào giá trị hàng tồn chứ không phải chi phí trong kỳ — và khoản chênh lệch thường không nhỏ.',
+      'Chi phí thực tế của mỗi container. Cước vận chuyển, thuế nhập khẩu và phí bốc xếp được tính vào giá trị hàng.',
     caption: 'Các lô hàng, mới nhất trước',
     reference: 'Số chứng từ',
     arrived: 'Ngày về',
@@ -823,8 +817,7 @@ export const vi: Messages = {
 
   stockImport: {
     title: 'Nhập dữ liệu từ bảng tính',
-    description:
-      'Dán vào đây lịch sử mua hàng bạn vẫn đang giữ. Mỗi dòng sẽ thành một lô hàng với giá riêng, đồng thời bút toán mua hàng cũng được ghi vào sổ.',
+    description: 'Dán lịch sử mua hàng từ bảng tính. Mỗi dòng thành một lô nhập.',
 
     requirementsTitle: 'File cần có gì',
     requirementsHint:
@@ -897,8 +890,7 @@ export const vi: Messages = {
   },
   sales: {
     title: 'Bán hàng',
-    description:
-      'Mỗi hóa đơn vừa xuất kho vừa ghi giá vốn trong cùng một bút toán, nên hóa đơn nào cũng biết mình lãi bao nhiêu.',
+    description: 'Các hóa đơn, kèm giá vốn và lãi của từng hóa đơn.',
     marginsButton: 'Lãi gộp',
 
     recentTitle: 'Hóa đơn gần đây',
@@ -977,8 +969,7 @@ export const vi: Messages = {
 
   margins: {
     title: 'Lãi gộp',
-    description:
-      'Lãi từ hàng đã bán, theo mặt hàng và theo khách hàng. Doanh thu theo tỷ giá ngày lập từng hóa đơn, giá vốn theo tỷ giá ngày nhập từng lô — hai con số duy nhất cộng được với nhau qua nhiều loại tiền.',
+    description: 'Lãi gộp theo mặt hàng và theo khách hàng.',
     month: 'Tháng',
     previous: 'Tháng trước',
     next: 'Tháng sau',
@@ -1166,5 +1157,32 @@ export const vi: Messages = {
       `Số tiền của ${sku} có nhiều chữ số thập phân hơn mức ${currency} cho phép.`,
     nothingEntered: 'Hãy nhập số lượng hoặc số tiền cho ít nhất một dòng.',
     issued: (reference, amount) => `Đã lập phiếu giảm trừ ${reference}, giá trị ${amount}.`,
+  },
+  sample: {
+    title: 'Dùng thử với dữ liệu mẫu',
+    pitch:
+      'Một bản sổ sách riêng của công ty xuất khẩu đá mẫu: một quý bán hàng, tồn kho, xuất khẩu bằng ba loại ngoại tệ và thuế GTGT. Bạn có thể sửa mọi thứ. Không cần đăng ký.',
+    start: 'Mở sổ mẫu của tôi',
+    working: 'Đang tạo công ty mẫu…',
+    failed: 'Chưa tạo được sổ mẫu. Hãy thử lại sau ít phút.',
+    tooMany: (seconds) => `Mạng này đã tạo quá nhiều sổ mẫu. Hãy thử lại sau ${seconds} giây.`,
+    companyName: 'Công ty TNHH Đá Bình Minh (mẫu)',
+    badge: 'Sổ mẫu',
+    keepIt: 'Đăng nhập để giữ lại',
+    haveAccount: 'Đã có tài khoản?',
+    orReadOnly: 'Hoặc chỉ xem bản demo',
+  },
+  onboarding: {
+    statutory: 'bắt buộc',
+    charts: {
+      generic: 'Hệ thống tài khoản đơn giản, đánh số. Có thể đổi tên và thêm tài khoản tùy ý.',
+      au_nz:
+        'Có sẵn tài khoản GST, PAYG và hưu trí (Úc, New Zealand). Không bắt buộc, có thể thay đổi.',
+      vn_tt200: 'Dành cho doanh nghiệp lớn. Số hiệu tài khoản theo quy định của thông tư.',
+      vn_tt133:
+        'Dành cho doanh nghiệp nhỏ và vừa, gồm phần lớn doanh nghiệp xuất nhập khẩu và phân phối. Số hiệu tài khoản theo quy định của thông tư.',
+      us_gaap: 'Hệ thống bốn chữ số của Mỹ, thuế bán hàng thu hộ và nộp lại.',
+      jp: 'Tên tài khoản theo Nhật Bản, có thuế tiêu dùng đầu vào và đầu ra.',
+    },
   },
 };

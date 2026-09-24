@@ -5,14 +5,32 @@ import { OnboardingForm } from '@/components/onboarding-form';
 import { translations } from '@/server/i18n';
 import { createLedgerAction } from './actions';
 import { ScaleIcon } from '@/components/icons';
-import { SUPPORTED_CURRENCIES } from '@/lib/money';
-import { CHART_TEMPLATE_DEFINITIONS } from '@/server/domain/chart';
+import { SUPPORTED_CURRENCIES, type CurrencyCode } from '@/lib/money';
+import type { Locale } from '@/lib/i18n';
+import { CHART_TEMPLATE_DEFINITIONS, type ChartTemplate } from '@/server/domain/chart';
 
 export const metadata: Metadata = { title: 'Create your ledger' };
 export const dynamic = 'force-dynamic';
 
+/**
+ * What a person reading in each language most likely keeps books under, first.
+ *
+ * A Vietnamese small business is on Thông tư 133 far more often than 200, a
+ * Japanese one on the Japanese chart, and an English reader — this product's
+ * first market being Australia and New Zealand — on AU/NZ. The first option
+ * is the preselected one, so the common case is one click; every option is
+ * still there.
+ */
+const CHART_ORDER: Record<Locale, readonly ChartTemplate[]> = {
+  vi: ['vn_tt133', 'vn_tt200', 'generic', 'au_nz', 'jp', 'us_gaap'],
+  ja: ['jp', 'generic', 'au_nz', 'us_gaap', 'vn_tt133', 'vn_tt200'],
+  en: ['au_nz', 'generic', 'us_gaap', 'jp', 'vn_tt133', 'vn_tt200'],
+};
+
+const DEFAULT_CURRENCY: Record<Locale, CurrencyCode> = { vi: 'VND', ja: 'JPY', en: 'AUD' };
+
 export default async function OnboardingPage() {
-  const { t } = await translations();
+  const { locale, t } = await translations();
   const viewer = await currentViewer();
   if (viewer.kind === 'guest') redirect('/sign-in');
   if (viewer.kind === 'member') redirect('/');
@@ -42,15 +60,17 @@ export default async function OnboardingPage() {
           submit: t.forms.createLedger,
           failed: t.forms.somethingWrong,
           chartIsAStart: t.misc.chartIsAStart,
+          statutory: t.onboarding.statutory,
         }}
         action={createLedgerAction}
         currencies={SUPPORTED_CURRENCIES}
-        templates={Object.values(CHART_TEMPLATE_DEFINITIONS).map((template) => ({
-          id: template.id,
-          label: template.label,
-          summary: template.summary,
-          statutory: template.statutory,
+        templates={CHART_ORDER[locale].map((id) => ({
+          id,
+          label: CHART_TEMPLATE_DEFINITIONS[id].label,
+          summary: t.onboarding.charts[id],
+          statutory: CHART_TEMPLATE_DEFINITIONS[id].statutory,
         }))}
+        defaultCurrency={DEFAULT_CURRENCY[locale]}
         suggestedName={t.misc.suggestedLedgerName(firstName)}
       />
     </main>
