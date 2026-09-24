@@ -44,6 +44,12 @@ export type LedgerError =
       readonly reversedBy: string;
     }
   | {
+      /** A reversal cancels money that moved; this entry has not moved any. */
+      readonly code: 'entry_not_settled';
+      readonly transactionId: string;
+      readonly entryStatus: TransactionStatus;
+    }
+  | {
       readonly code: 'invalid_status_transition';
       readonly transactionId: string;
       readonly from: TransactionStatus;
@@ -174,6 +180,7 @@ const TITLES: Record<LedgerErrorCode, string> = {
   idempotency_key_reused: 'Idempotency key reused with a different request',
   entry_not_found: 'Journal entry not found',
   already_reversed: 'Entry has already been reversed',
+  entry_not_settled: 'Entry has not settled, so there is nothing to reverse',
   invalid_status_transition: 'Entry cannot move to that status',
   stale_account_version: 'Account changed since it was read',
   endpoint_not_found: 'Webhook endpoint not found',
@@ -256,6 +263,10 @@ export function describe(error: LedgerError): string {
       return `No journal entry with id ${error.transactionId}.`;
     case 'already_reversed':
       return `Entry ${error.transactionId} was already reversed by ${error.reversedBy}; reversing it twice would double the correction.`;
+    case 'entry_not_settled':
+      return error.entryStatus === 'pending'
+        ? `Entry ${error.transactionId} is still pending, so no money has moved to reverse. Cancel it instead.`
+        : `Entry ${error.transactionId} was cancelled before it settled, so no money moved and there is nothing to reverse.`;
     case 'invalid_status_transition':
       return error.from === 'pending'
         ? `Entry ${error.transactionId} cannot move from ${error.from} to ${error.to}; a pending entry may only be posted or archived.`

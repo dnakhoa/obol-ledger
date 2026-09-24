@@ -95,6 +95,42 @@ describe('importing deliveries', () => {
       expect(preview.rows[0]?.problem).toMatch(/measured in m2/u);
     });
 
+    // `Date.parse` rolls 30 February over into 2 March rather than refusing
+    // it, so a typo was booked on a different day from the one the preview
+    // echoed back — and month 13 passed the preview only to throw on import.
+    it.each(['2026-02-30', '30/02/2026', '2026-13-01', '01/13/2026'])(
+      'refuses %s, a day that does not exist',
+      async (date) => {
+        const preview = await services.stockImport.preview({
+          text: `sku,unit,date,quantity,cost\nPAV-600,m2,${date},10,100.00`,
+          ...accounts(),
+        });
+        expect(preview.rows[0]?.problem).toMatch(/not a date/u);
+      },
+    );
+
+    it('still reads the last day of February in a leap year', async () => {
+      const preview = await services.stockImport.preview({
+        text: 'sku,unit,date,quantity,cost\nPAV-600,m2,29/02/2028,10,100.00',
+        ...accounts(),
+      });
+      expect(preview.rows[0]?.problem).toBeUndefined();
+      expect(preview.rows[0]?.date).toBe('2028-02-29');
+    });
+
+    // A code the ledger has not seen takes its unit from its first row. The
+    // second row used to be counted at the first row's precision in the first
+    // row's unit — ten square metres plus seven pieces stored as seventeen
+    // square metres.
+    it('refuses a new product whose rows disagree about its unit', async () => {
+      const preview = await services.stockImport.preview({
+        text: 'sku,unit,date,quantity,cost\nNEW-1,m2,2026-01-10,10,100.00\nNEW-1,piece,2026-01-11,7,70.00',
+        ...accounts(),
+      });
+      expect(preview.rows[0]?.problem).toBeUndefined();
+      expect(preview.rows[1]?.problem).toMatch(/measured in m2/u);
+    });
+
     it('says which columns it did not use', async () => {
       const preview = await services.stockImport.preview({
         text: 'sku,unit,date,quantity,cost,Shipping Agent\nPAV-600,m2,2026-01-10,10,100.00,Maersk',

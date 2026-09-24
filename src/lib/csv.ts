@@ -25,6 +25,16 @@ const NEEDS_QUOTING = /[",\r\n]/u;
 /** Characters a spreadsheet treats as the start of a formula. */
 const FORMULA_START = /^[=+\-@\t\r]/u;
 
+/**
+ * A plain number, which is never a formula however it starts.
+ *
+ * Exempt because a ledger exports negative amounts on every other row, and a
+ * prefixed `'-918000000` imports as *text*: a spreadsheet's SUM then skips it
+ * without a word. `-1` evaluates to -1 whether or not the parser sees it; the
+ * `-` payloads that do harm (`-2+3+cmd|…`) are not plain numbers.
+ */
+const PLAIN_NUMBER = /^-?\d+(?:\.\d+)?$/u;
+
 export const UTF8_BOM = '﻿';
 
 export function csvCell(value: string | number | null | undefined): string {
@@ -32,7 +42,7 @@ export function csvCell(value: string | number | null | undefined): string {
 
   const text = String(value);
   // Neutralised before quoting, so the guard survives the escaping.
-  const safe = FORMULA_START.test(text) ? `'${text}` : text;
+  const safe = FORMULA_START.test(text) && !PLAIN_NUMBER.test(text) ? `'${text}` : text;
 
   return NEEDS_QUOTING.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }

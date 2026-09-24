@@ -23,7 +23,7 @@ export function SettleEntry({
   action,
 }: {
   /** Resolved on the server; a client component holds no dictionary. */
-  labels: { pending: string; cancel: string; note: string };
+  labels: { pending: string; cancel: string; note: string; explain: string };
   transactionId: string;
   action: (state: SettleFormState, formData: FormData) => Promise<SettleFormState>;
 }) {
@@ -50,11 +50,7 @@ export function SettleEntry({
           <AlertIcon width={14} height={14} />
           {labels.pending}
         </p>
-        <p className="text-ink-secondary text-xs">
-          Its funds are reserved but have not moved. The accounts show a reduced{' '}
-          <strong>available</strong> balance while the <strong>posted</strong> balance is unchanged.
-          Settling moves the money; cancelling releases the reservation and moves nothing.
-        </p>
+        <p className="text-ink-secondary text-xs">{labels.explain}</p>
       </div>
 
       {state.status === 'error' ? (

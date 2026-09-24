@@ -145,6 +145,10 @@ const vi: ErrorMessages = {
   idempotency_key_reused: (e) =>
     `Khóa chống trùng lặp ${e.key} đã được dùng cho một yêu cầu có nội dung khác.`,
   entry_not_found: (e) => `Không tìm thấy bút toán có mã ${e.transactionId}.`,
+  entry_not_settled: (e) =>
+    e.entryStatus === 'pending'
+      ? `Bút toán ${e.transactionId} vẫn đang chờ xử lý, nên chưa có tiền nào dịch chuyển để điều chỉnh. Hãy hủy bút toán thay vì điều chỉnh.`
+      : `Bút toán ${e.transactionId} đã bị hủy trước khi hoàn tất, nên không có tiền nào dịch chuyển và không có gì để điều chỉnh.`,
   already_reversed: (e) =>
     `Bút toán ${e.transactionId} đã được ghi đảo bằng bút toán ${e.reversedBy}; ghi đảo thêm lần nữa sẽ làm khoản điều chỉnh bị tính hai lần.`,
   invalid_status_transition: (e) =>
@@ -308,6 +312,10 @@ const ja: ErrorMessages = {
   idempotency_key_reused: (e) =>
     `冪等キー ${e.key} は、内容の異なるリクエストで既に使用されています。`,
   entry_not_found: (e) => `ID ${e.transactionId} の仕訳が見つかりません。`,
+  entry_not_settled: (e) =>
+    e.entryStatus === 'pending'
+      ? `仕訳 ${e.transactionId} はまだ未決済で、訂正すべき資金の移動がありません。訂正ではなく取り消してください。`
+      : `仕訳 ${e.transactionId} は決済前に取り消されたため、資金は動いておらず、訂正するものはありません。`,
   already_reversed: (e) =>
     `仕訳 ${e.transactionId} には既に反対仕訳 ${e.reversedBy} が起票されています。もう一度起票すると訂正が二重になります。`,
   invalid_status_transition: (e) =>

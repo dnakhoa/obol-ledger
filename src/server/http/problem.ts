@@ -42,6 +42,7 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   idempotency_key_reused: 409,
   entry_not_found: 404,
   already_reversed: 409,
+  entry_not_settled: 409,
   invalid_status_transition: 409,
   stale_account_version: 409,
   endpoint_not_found: 404,

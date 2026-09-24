@@ -133,7 +133,7 @@ export default async function EntryPage({ params }: PageProps) {
           </p>
           <p className="mt-1.5 text-sm font-medium">{format.full(new Date(entry.occurredAt))}</p>
           <p className="text-ink-muted mt-1 text-xs">
-            Recorded {format.full(new Date(entry.createdAt))}
+            {t.misc.recordedAt(format.full(new Date(entry.createdAt)))}
           </p>
         </div>
         <div className="rounded-card border-line bg-surface border px-4 py-3.5">
@@ -229,6 +229,7 @@ export default async function EntryPage({ params }: PageProps) {
                 pending: t.misc.entryPending,
                 cancel: t.misc.cancelIt,
                 note: t.misc.settleNote,
+                explain: t.misc.pendingExplain,
               }}
             />
           ) : isArchived ? (
@@ -246,7 +247,6 @@ export default async function EntryPage({ params }: PageProps) {
           ) : (
             <ReverseEntry
               transactionId={entry.id}
-              description={entry.description}
               action={reverseEntryAction}
               labels={{
                 description: t.forms.reversalDescription,
@@ -257,6 +257,7 @@ export default async function EntryPage({ params }: PageProps) {
                 noEditing: t.misc.noEditing,
                 reverseThis: t.misc.reverseThis,
                 note: t.misc.reverseNote,
+                explain: t.misc.reverseExplain(entry.description),
                 cancel: t.common.cancel,
               }}
             />

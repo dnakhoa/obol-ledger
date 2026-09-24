@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Card, CardBody } from '@/components/ui/card';
 import { PageHeader } from '@/components/page-header';
 import { EntryComposer } from '@/components/entry-composer';
@@ -33,12 +34,14 @@ export default async function PostEntryPage() {
 
       {accounts.length === 0 ? (
         <Card>
-          <CardBody className="text-ink-muted text-sm">
-            There are no accounts to post to yet. Run{' '}
-            <code className="bg-surface-sunken rounded px-1 py-0.5 font-mono text-xs">
-              pnpm db:seed
-            </code>{' '}
-            to load a month of example books.
+          <CardBody className="space-y-3 text-sm">
+            <p className="text-ink-muted">{t.misc.noAccountsToPost}</p>
+            <Link
+              href="/accounts/new"
+              className="text-ink font-medium underline underline-offset-2"
+            >
+              {t.misc.openChart}
+            </Link>
           </CardBody>
         </Card>
       ) : (

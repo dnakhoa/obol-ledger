@@ -323,9 +323,30 @@ export function createReportingService(database: Database, orgId: string) {
             postings,
             and(
               eq(postings.accountId, accounts.id),
+              /*
+               * Settled entries only, and not the month-end close.
+               *
+               * A pending entry has earned nothing yet and a cancelled one
+               * never will; the balance sheet reads posted balances, so
+               * counting either makes the two statements disagree.
+               *
+               * The closing entry moves a month's result into equity — it is
+               * bookkeeping, not performance. Counted, it zeroes every closed
+               * month, and because it is dated at the month's last instant it
+               * subtracts the *whole* month from any window that crosses that
+               * instant. Reopening reverses it, and that reversal is excluded
+               * for the same reason.
+               */
               sql`${postings.transactionId} in (
-                select id from transactions
-                 where occurred_at >= ${period.from} and occurred_at <= ${period.to}
+                select t.id from transactions t
+                 where t.occurred_at >= ${period.from} and t.occurred_at <= ${period.to}
+                   and t.status = 'posted'
+                   and not (t.metadata ? 'closingPeriod')
+                   and not exists (
+                     select 1 from transactions closing
+                      where closing.id = t.reverses_transaction_id
+                        and closing.metadata ? 'closingPeriod'
+                   )
               )`,
             ),
           )

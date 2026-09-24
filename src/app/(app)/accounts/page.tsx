@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/page-header';
 import { Money } from '@/components/money';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
-import { ArrowRightIcon } from '@/components/icons';
+import { ArrowRightIcon, PlusIcon } from '@/components/icons';
 import { viewerServices } from '@/server/container';
 import { translations } from '@/server/i18n';
 import { buildPosition } from '@/server/queries';
@@ -43,10 +43,18 @@ export default async function AccountsPage() {
         title={t.accounts.title}
         description={t.accounts.description}
         actions={
-          <ButtonLink href="/transfer" variant="primary">
-            {t.accounts.postEntry}
-            <ArrowRightIcon />
-          </ButtonLink>
+          // The account form had a page and no way to reach it: opening an
+          // account is the first thing a new ledger needs after its template.
+          <>
+            <ButtonLink href="/accounts/new">
+              <PlusIcon />
+              {t.statement.openAnAccount}
+            </ButtonLink>
+            <ButtonLink href="/transfer" variant="primary">
+              {t.accounts.postEntry}
+              <ArrowRightIcon />
+            </ButtonLink>
+          </>
         }
       />
 

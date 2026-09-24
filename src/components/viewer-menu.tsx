@@ -18,14 +18,27 @@ export function ViewerMenu({
   email,
   image,
   orgName,
+  canSignIn,
   labels,
 }: {
   /** Resolved on the server; a client component holds no dictionary. */
-  labels: { reading: string; signIn: string };
+  labels: {
+    reading: string;
+    signIn: string;
+    signOut: string;
+    signingOut: string;
+    readOnlyDemo: string;
+  };
   name?: string;
   email?: string;
   image?: string | null;
   orgName: string;
+  /**
+   * Whether any sign-in provider is configured. Without one the button would
+   * lead to a page that can only say no, so the visitor is told up front that
+   * the demo is for reading.
+   */
+  canSignIn: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -37,12 +50,18 @@ export function ViewerMenu({
         <p className="text-ink-muted px-1 text-[11px]">
           {labels.reading} <span className="text-ink-secondary font-medium">{orgName}</span>
         </p>
-        <Link
-          href="/sign-in"
-          className="bg-action text-action-ink hover:bg-action-hover flex h-9 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors duration-150"
-        >
-          {labels.signIn}
-        </Link>
+        {canSignIn ? (
+          <Link
+            href="/sign-in"
+            className="bg-action text-action-ink hover:bg-action-hover flex h-9 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors duration-150"
+          >
+            {labels.signIn}
+          </Link>
+        ) : (
+          <p className="border-line text-ink-secondary flex h-9 w-full items-center justify-center rounded-lg border text-xs">
+            {labels.readOnlyDemo}
+          </p>
+        )}
       </div>
     );
   }
@@ -90,7 +109,7 @@ export function ViewerMenu({
             }}
             className="text-ink-secondary hover:bg-surface-hover hover:text-ink w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors duration-150"
           >
-            {signingOut ? 'Signing out…' : 'Sign out'}
+            {signingOut ? labels.signingOut : labels.signOut}
           </button>
         </div>
       ) : null}

@@ -271,6 +271,10 @@ async function read(tx: Transactional, orgId: string, input: ImportInput): Promi
     (column) => index[column] === undefined,
   );
 
+  // A code the ledger has not seen takes its unit from its first row in the
+  // file, so a later row cannot count pieces into a product measured in m².
+  const firstUnit = new Map<string, string>();
+
   const parsed = rows.map((cells, offset): ImportRow => {
     const at = (column: keyof typeof COLUMNS) => {
       const position = index[column];
@@ -295,7 +299,13 @@ async function read(tx: Transactional, orgId: string, input: ImportInput): Promi
       createsProduct: sku !== '' && !existing,
     };
 
-    const problem = missing.length > 0 ? undefined : check(base, existing);
+    const earlier = existing ? undefined : firstUnit.get(sku);
+    if (!existing && sku !== '' && earlier === undefined) firstUnit.set(sku, unit);
+
+    const problem =
+      missing.length > 0
+        ? undefined
+        : check(base, existing ?? (earlier === undefined ? undefined : { unit: earlier }));
     return problem ? { ...base, problem } : base;
   });
 
@@ -323,7 +333,8 @@ async function read(tx: Transactional, orgId: string, input: ImportInput): Promi
 /** One sentence naming what to change, or nothing. */
 function check(
   row: Omit<ImportRow, 'problem'>,
-  existing: { unit: string; precision: number } | undefined,
+  /** The product as the ledger knows it, or as an earlier row in this file opened it. */
+  existing: { unit: string; precision?: number } | undefined,
 ): string | undefined {
   if (!row.sku) return 'This row has no product code.';
   if (!row.date) return 'The date is not a date. Use 2026-03-17, 17/03/2026 or 17-03-2026.';
@@ -368,16 +379,29 @@ function check(
 function normaliseDate(value: string): string {
   const trimmed = value.trim();
   const iso = /^(\d{4})-(\d{2})-(\d{2})/u.exec(trimmed);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  if (iso) return calendarDay(iso[1] ?? '', iso[2] ?? '', iso[3] ?? '');
 
   const dayFirst = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/u.exec(trimmed);
   if (dayFirst) {
     const [, day = '', month = '', year = ''] = dayFirst;
-    const padded = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    return Number.isNaN(Date.parse(padded)) ? '' : padded;
+    return calendarDay(year, month, day);
   }
 
   return '';
+}
+
+/**
+ * `YYYY-MM-DD` if that day exists, or nothing.
+ *
+ * Round-tripped rather than parsed: `Date.parse('2026-02-30')` answers 2 March
+ * instead of refusing, so a typo was booked on a different day from the one
+ * the preview showed — and month 13 passed the preview only to throw on
+ * import.
+ */
+function calendarDay(year: string, month: string, day: string): string {
+  const padded = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === padded ? padded : '';
 }
 
 function mapColumns(headers: readonly string[]): Partial<Record<keyof typeof COLUMNS, number>> {

@@ -38,6 +38,11 @@ export const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
     transactionId: 'txn_x',
     reversedBy: 'txn_y',
   },
+  entry_not_settled: {
+    code: 'entry_not_settled',
+    transactionId: 'txn_x',
+    entryStatus: 'archived',
+  },
   invalid_status_transition: {
     code: 'invalid_status_transition',
     transactionId: 'txn_x',

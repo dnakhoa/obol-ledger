@@ -176,6 +176,46 @@ describe('tenant isolation', () => {
         expect(results[0].value.transaction.id).not.toBe(results[1].value.transaction.id);
       }
     });
+
+    // The key is unique per tenant, so a lookup by key alone relies on the
+    // policies to find the right row. On a connection that bypasses them —
+    // the misconfiguration the health probe exists to catch — the second
+    // tenant's write overwrote the first tenant's stored response, and the
+    // first tenant's retry replayed somebody else's entry.
+    it('replays a tenant its own entry even on a connection that bypasses the policies', async () => {
+      const key = 'shared-key';
+      // Read while the policies still apply: once they are off, a listing
+      // returns every tenant's accounts.
+      const accountsOf = new Map<string, string[]>();
+      for (const org of [alpha, beta]) {
+        const [cash, revenue] = await servicesFor(db, org).accounts.list();
+        accountsOf.set(org, [cash?.id ?? '', revenue?.id ?? '']);
+      }
+      const post = async (org: string, description: string) => {
+        const [cash, revenue] = accountsOf.get(org) ?? [];
+        return servicesFor(db, org).journal.postEntry({
+          description,
+          currency: 'USD',
+          postings: [
+            { accountId: cash ?? '', amount: usd(2_500n) },
+            { accountId: revenue ?? '', amount: usd(-2_500n) },
+          ],
+          idempotency: { key, fingerprint: 'identical-fingerprint' },
+        });
+      };
+
+      const first = await post(alpha, 'Alpha invoice');
+      await db.execute(sql`RESET ROLE`);
+      await post(beta, 'Beta payroll');
+      const retry = await post(alpha, 'Alpha invoice');
+
+      expect(first.ok && retry.ok).toBe(true);
+      if (first.ok && retry.ok) {
+        expect(retry.value.replayed).toBe(true);
+        expect(retry.value.transaction.id).toBe(first.value.transaction.id);
+        expect(retry.value.transaction.description).toBe('Alpha invoice');
+      }
+    });
   });
 });
 

@@ -57,6 +57,14 @@ export const POST = defineRoute(
 );
 
 /**
+ * The scheduler's method. Vercel Cron issues a GET, and with only POST
+ * exported every scheduled run was refused with a 405 — the outbox drained
+ * only when somebody pressed the button. POST stays for that button and for
+ * anything that already calls it.
+ */
+export const GET = POST;
+
+/**
  * Vercel Cron presents `Authorization: Bearer $CRON_SECRET`.
  *
  * Compared in constant time, because this is a bearer token like any other and
