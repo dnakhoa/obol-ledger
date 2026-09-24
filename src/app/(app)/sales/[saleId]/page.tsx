@@ -108,7 +108,7 @@ export default async function SalePage({ params }: { params: Promise<{ saleId: s
         <Card className={sale.margin.amount.startsWith('-') ? 'border-negative' : ''}>
           <CardBody className="space-y-1">
             <p className="text-ink-muted text-xs">{t.sales.margin}</p>
-            <p className="numeric text-2xl font-semibold">
+            <p className="numeric flex flex-wrap items-baseline text-2xl font-semibold">
               <Money value={sale.margin} signed showCurrency={foreign} />
               <MarginPercent basisPoints={sale.marginBasisPoints} className="text-sm" />
             </p>

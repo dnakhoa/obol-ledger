@@ -261,6 +261,31 @@ describe('sales', () => {
       });
     });
 
+    it('takes its due date from the customer’s terms when it states none', async () => {
+      const onSixty = await services.accounts.open({
+        name: '131 Nhà thầu Hà Nội (60 ngày)',
+        type: 'asset',
+        currency: 'VND',
+        openItems: true,
+        paymentTermsDays: 60,
+      });
+      if (!onSixty.ok) throw new Error(onSixty.error.code);
+
+      const sold = await services.sales.sell({
+        reference: 'HD-0008',
+        customerAccountId: onSixty.value.id,
+        revenueAccountId: revenue.id,
+        currency: 'VND',
+        occurredAt: on(10),
+        lines: [{ itemId: tiles, quantity: 10n, amount: 1_600_000n }],
+      });
+      if (!sold.ok) throw new Error(sold.error.code);
+      // Written onto the invoice, so changing the customer's terms later
+      // cannot make this one retrospectively on time.
+      expect(sold.value.sale.dueOn).toBe('2026-03-11');
+      expect(sold.value.entry.metadata).toMatchObject({ dueDate: '2026-03-11' });
+    });
+
     it('refuses a due date before the invoice', async () => {
       const result = await services.sales.sell({
         reference: 'HD-0004',

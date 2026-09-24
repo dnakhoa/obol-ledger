@@ -231,6 +231,16 @@ const vi: ErrorMessages = {
   sale_not_found: (e) => `Không tìm thấy hóa đơn bán hàng có mã ${e.saleId}.`,
   due_before_invoice: (e) =>
     `Hóa đơn lập ngày ${e.invoicedOn} nhưng hạn thanh toán là ${e.dueOn}, sớm hơn ngày lập. Thường đó là gõ nhầm năm, và nó sẽ khiến một hóa đơn vừa lập bị tính là quá hạn nhiều tháng.`,
+  account_code_required: (e) =>
+    `${capitalise(VI_CHART[e.chartTemplate as ChartTemplate] ?? e.chartTemplate)} quy định số hiệu cho mọi tài khoản — theo Thông tư 200, chữ số đầu chính là loại tài khoản — nên tài khoản này cũng cần một số hiệu.`,
+  account_code_disagrees: (e) =>
+    `Theo Thông tư 200, chữ số đầu của số hiệu là loại tài khoản, và ${e.accountCode} không bắt đầu bằng chữ số của loại này: 1 và 2 là tài sản, 3 là nợ phải trả, 4 là vốn chủ sở hữu, 5 và 7 là doanh thu, 6 và 8 là chi phí.`,
+  account_code_taken: (e) =>
+    `Đã có tài khoản khác mang số hiệu ${e.accountCode}. Mỗi số hiệu chỉ gắn với một tài khoản, nếu không báo cáo sắp theo số hiệu sẽ gộp hai tài khoản vào một chỗ.`,
+  open_items_not_permitted: () =>
+    'Chỉ khoản phải thu hoặc phải trả mới có công nợ để theo dõi theo tuổi nợ. Tài khoản loại này không có tuổi nợ.',
+  payment_terms_need_open_items: () =>
+    'Thời hạn thanh toán cho biết khi nào khách hàng hoặc nhà cung cấp phải trả, nên chỉ có nghĩa với tài khoản theo dõi công nợ. Hãy đánh dấu ô đó, hoặc để trống thời hạn.',
 };
 
 const jp = writing('ja');
@@ -385,6 +395,16 @@ const ja: ErrorMessages = {
   sale_not_found: (e) => `ID ${e.saleId} の販売が見つかりません。`,
   due_before_invoice: (e) =>
     `請求日は ${e.invoicedOn} ですが、支払期日の ${e.dueOn} はそれより前です。多くは年の入力ミスで、このままでは発行したばかりの請求書が何か月も延滞と表示されます。`,
+  account_code_required: () =>
+    'この勘定科目体系ではすべての勘定に科目コードが必要です（ベトナムの Thông tư 200 では先頭の数字が科目の区分を表します）。この勘定にもコードを付けてください。',
+  account_code_disagrees: (e) =>
+    `Thông tư 200 では科目コードの先頭の数字が区分を表しますが、${e.accountCode} はこの区分の数字で始まっていません。1・2 は資産、3 は負債、4 は純資産、5・7 は収益、6・8 は費用です。`,
+  account_code_taken: (e) =>
+    `科目コード ${e.accountCode} は別の勘定がすでに使っています。コードは一つの勘定を指すもので、重複するとコード順の帳票で二つが同じ位置に並びます。`,
+  open_items_not_permitted: () =>
+    '未決済残高として管理できるのは債権か債務の勘定だけです。この区分の勘定には年齢がありません。',
+  payment_terms_need_open_items: () =>
+    '支払条件は得意先や仕入先がいつ支払うかを表すものなので、未決済残高として管理する勘定でのみ意味を持ちます。そちらにチェックを入れるか、条件を空欄にしてください。',
 };
 
 const TRANSLATIONS: Record<TranslatedLocale, ErrorMessages> = { vi, ja };
@@ -396,4 +416,9 @@ export function translateError(error: LedgerError, locale: TranslatedLocale): st
   // The table's own type is what guarantees every code has a sentence.
   const render = TRANSLATIONS[locale][error.code] as (error: LedgerError) => string;
   return render(error);
+}
+
+/** The chart names sit mid-sentence elsewhere; this one opens a sentence. */
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }

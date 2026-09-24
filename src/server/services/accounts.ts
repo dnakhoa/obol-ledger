@@ -6,6 +6,7 @@ import type { CurrencyCode } from '@/lib/money';
 import type { AccountType } from '@/server/domain/account';
 import type { LedgerError } from '@/server/domain/errors';
 import { accounts, organizations } from '@/server/db/schema';
+import { agreesWithTt200, type ChartTemplate } from '@/server/domain/chart';
 import { withTenant } from '@/server/db/tenancy';
 import type { Database, Transactional } from '@/server/db/types';
 import { toAccountDto } from './serialize';
@@ -31,6 +32,8 @@ export type CreateAccountInput = {
   readonly monetary?: boolean | undefined;
   /** Whether this account is managed as a set of open items that age. */
   readonly openItems?: boolean | undefined;
+  /** Days this customer or supplier has to pay. Only on an open-item account. */
+  readonly paymentTermsDays?: number | undefined;
 };
 
 /**
@@ -83,6 +86,18 @@ export function createAccountService(database: Database, orgId: string) {
       });
     },
 
+    /** Which chart the tenant is on, which decides whether a code is optional. */
+    async chart(): Promise<ChartTemplate> {
+      return withTenant(database, orgId, async (tx) => {
+        const [org] = await tx
+          .select({ chartTemplate: organizations.chartTemplate })
+          .from(organizations)
+          .where(eq(organizations.id, orgId))
+          .limit(1);
+        return (org?.chartTemplate ?? 'generic') as ChartTemplate;
+      });
+    },
+
     async byId(id: string): Promise<Result<AccountDto, LedgerError>> {
       return withTenant(database, orgId, async (tx) => {
         const [row] = await tx.select().from(accounts).where(eq(accounts.id, id)).limit(1);
@@ -93,6 +108,51 @@ export function createAccountService(database: Database, orgId: string) {
           ? ok(toAccountDto(row, await functionalCurrency(tx)))
           : err({ code: 'account_not_found', accountId: id });
       });
+    },
+
+    /**
+     * Opens an account for a person — from the dashboard or the API — and
+     * refuses with a reason rather than a constraint violation.
+     *
+     * Every rule here is also a CHECK or an index, so `create` below cannot
+     * write a bad row either; what this adds is the sentence. It exists
+     * because the first person to open an account on a Thông tư 200 ledger
+     * found out the hard way: the form had no code field, the database
+     * requires one on a statutory chart, and the answer was a 500.
+     */
+    async open(input: CreateAccountInput): Promise<Result<AccountDto, LedgerError>> {
+      const refusal = await withTenant(database, orgId, async (tx): Promise<LedgerError | null> => {
+        const [org] = await tx
+          .select({ chartTemplate: organizations.chartTemplate })
+          .from(organizations)
+          .where(eq(organizations.id, orgId))
+          .limit(1);
+        const chartTemplate = org?.chartTemplate ?? 'generic';
+
+        if (chartTemplate === 'vn_tt200') {
+          if (!input.code) return { code: 'account_code_required', chartTemplate };
+          if (!agreesWithTt200(input.code, input.type)) {
+            return { code: 'account_code_disagrees', accountCode: input.code, type: input.type };
+          }
+        }
+        if (input.code) {
+          const [taken] = await tx
+            .select({ id: accounts.id })
+            .from(accounts)
+            .where(eq(accounts.code, input.code))
+            .limit(1);
+          if (taken) return { code: 'account_code_taken', accountCode: input.code };
+        }
+        if (input.openItems && input.type !== 'asset' && input.type !== 'liability') {
+          return { code: 'open_items_not_permitted', type: input.type };
+        }
+        if (input.paymentTermsDays !== undefined && !input.openItems) {
+          return { code: 'payment_terms_need_open_items' };
+        }
+        return null;
+      });
+      if (refusal) return err(refusal);
+      return ok(await this.create(input));
     },
 
     async create(input: CreateAccountInput): Promise<AccountDto> {
@@ -110,6 +170,9 @@ export function createAccountService(database: Database, orgId: string) {
             ...(input.code ? { code: input.code } : {}),
             monetary: input.monetary ?? (input.type === 'asset' || input.type === 'liability'),
             openItems: input.openItems ?? false,
+            ...(input.paymentTermsDays === undefined
+              ? {}
+              : { paymentTermsDays: input.paymentTermsDays }),
             ...(input.role ? { role: input.role } : {}),
           })
           .returning();

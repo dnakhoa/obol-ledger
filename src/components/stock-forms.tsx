@@ -343,9 +343,10 @@ export type WriteOffLabels = {
  * Stock leaving without a sale.
  *
  * The same shape as shipping it out, plus the two things a write-off needs
- * and a shipment does not: why, and which expense takes the loss. The reason
- * has no default — "damaged" pre-selected is how every stocktake shortfall
- * ends up recorded as breakage.
+ * and a shipment does not: why, and which expense takes the loss. Neither
+ * has a default — "damaged" pre-selected is how every stocktake shortfall
+ * ends up recorded as breakage, and the first expense in the chart is how it
+ * ends up in finance costs.
  */
 export function WriteOffForm({
   itemId,
@@ -393,7 +394,10 @@ export function WriteOffForm({
           </Select>
         </Field>
         <Field label={labels.lossAccount} htmlFor={`${id}-loss`} hint={labels.lossAccountHint}>
-          <Select id={`${id}-loss`} name="expenseAccountId" required>
+          <Select id={`${id}-loss`} name="expenseAccountId" required defaultValue="">
+            <option value="" disabled>
+              —
+            </option>
             {expenseAccounts.map((account) => (
               <option key={account.id} value={account.id}>
                 {account.label}

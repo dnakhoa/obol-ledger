@@ -79,6 +79,8 @@ const ACCOUNTS: {
   overdraft?: boolean;
   monetary?: boolean;
   openItems?: boolean;
+  /** Days the counterparty has to pay; aged receivables count lateness from here. */
+  terms?: number;
   role?: AccountRole;
 }[] = [
   { key: 'cash', code: '111', name: 'Tiền mặt', type: 'asset', currency: 'VND' },
@@ -101,6 +103,7 @@ const ACCOUNTS: {
     key: 'arUsd',
     // A claim on somebody, so it is managed as open items and ages.
     openItems: true,
+    terms: 30,
     code: '1311',
     name: 'Phải thu của khách hàng — USD',
     type: 'asset',
@@ -111,6 +114,7 @@ const ACCOUNTS: {
     key: 'arEur',
     // A claim on somebody, so it is managed as open items and ages.
     openItems: true,
+    terms: 30,
     code: '1312',
     name: 'Phải thu của khách hàng — EUR',
     type: 'asset',
@@ -121,6 +125,7 @@ const ACCOUNTS: {
     key: 'arAud',
     // A claim on somebody, so it is managed as open items and ages.
     openItems: true,
+    terms: 30,
     code: '1313',
     name: 'Phải thu của khách hàng — AUD',
     type: 'asset',
@@ -139,6 +144,7 @@ const ACCOUNTS: {
     // Domestic customers, in dong. The export side is invoiced abroad and
     // zero-rated; this is the half that actually carries output VAT.
     openItems: true,
+    terms: 45,
     code: '131',
     name: 'Phải thu của khách hàng — VND',
     type: 'asset',
@@ -190,6 +196,7 @@ const ACCOUNTS: {
     key: 'payable',
     // A claim on somebody, so it is managed as open items and ages.
     openItems: true,
+    terms: 30,
     code: '331',
     name: 'Phải trả cho người bán',
     type: 'liability',
@@ -470,6 +477,7 @@ async function main(): Promise<void> {
         overdraftAllowed: account.overdraft ?? false,
         ...(account.monetary === undefined ? {} : { monetary: account.monetary }),
         ...(account.openItems === undefined ? {} : { openItems: account.openItems }),
+        ...(account.terms === undefined ? {} : { paymentTermsDays: account.terms }),
         ...(account.role ? { role: account.role } : {}),
       });
       ids[account.key] = created.id;
@@ -819,7 +827,7 @@ async function main(): Promise<void> {
         buyer: 'Southern Landscape Supplies, Brisbane',
         product: 'Đá lát granite 400×400×30',
         item: 'pavers',
-        share: 0.17,
+        share: 0.1,
         invoice: 'INV-2601',
       },
       {
@@ -867,7 +875,7 @@ async function main(): Promise<void> {
         buyer: 'Auckland Paving Centre',
         product: 'Đá lát granite 600×300×30',
         item: 'pavers',
-        share: 0.18,
+        share: 0.12,
         invoice: 'INV-2605',
       },
       {
@@ -939,7 +947,7 @@ async function main(): Promise<void> {
         buyer: 'Auckland Paving Centre',
         product: 'Bộ đá trang trí sân vườn',
         item: 'pavers',
-        share: 0.16,
+        share: 0.11,
         invoice: 'INV-2611',
       },
       {
@@ -951,7 +959,7 @@ async function main(): Promise<void> {
         buyer: 'Southern Landscape Supplies, Brisbane',
         product: 'Đá lát granite 450×900×60',
         item: 'pavers',
-        share: 0.19,
+        share: 0.12,
         invoice: 'INV-2612',
       },
     ];

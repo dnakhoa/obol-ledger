@@ -204,6 +204,13 @@
       "when": 1789964000000,
       "tag": "0028_writeoffs",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1789965000000,
+      "tag": "0029_payment_terms",
+      "breakpoints": true
     }
   ]
 }

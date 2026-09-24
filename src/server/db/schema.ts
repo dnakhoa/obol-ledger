@@ -356,6 +356,8 @@ export const accounts = pgTable(
      * that would only work on one chart.
      */
     openItems: boolean('open_items').notNull().default(false),
+    /** Days a customer or supplier has to pay; null assumes thirty. Only on open items. */
+    paymentTermsDays: integer('payment_terms_days'),
     /** Optimistic-concurrency token, incremented on every balance change. */
     version: integer('version').notNull().default(0),
     /**

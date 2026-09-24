@@ -20,7 +20,7 @@ function invoice(id: string, days: number, amount: bigint): AgingEntry {
 }
 
 describe('aging a receivable', () => {
-  it('buckets by how long the money has been outstanding', () => {
+  it('buckets by how late the money is, assuming thirty days when nothing says', () => {
     const aging = ageAccount(
       [
         invoice('INV-1', 10, 1_000_00n),
@@ -32,15 +32,50 @@ describe('aging a receivable', () => {
       'debit',
     );
 
+    // With no terms stated, each invoice is due thirty days after it was
+    // raised — so these land where the age-based report used to put them,
+    // under labels that now say what they meant.
     expect(aging.byBucket).toEqual({
       current: 1_000_00n,
-      days31to60: 2_000_00n,
-      days61to90: 3_000_00n,
+      days1to30: 2_000_00n,
+      days31to60: 3_000_00n,
+      days61to90: 0n,
       over90: 4_000_00n,
     });
     expect(aging.total).toBe(10_000_00n);
-    // 9,000 of 10,000 is past thirty days.
+    // 9,000 of 10,000 is past due.
     expect(aging.overdueBasisPoints).toBe(9000);
+  });
+
+  it('is not late on sixty-day terms at forty days', () => {
+    // The distributor's case. Counted from the invoice date, a forty-day-old
+    // invoice looks late; on sixty-day terms it has twenty days to go.
+    const aging = ageAccount([invoice('INV-1', 40, 1_000_00n)], ASOF, 'debit', 60);
+    expect(aging.items[0]).toMatchObject({ bucket: 'current', daysOverdue: 0, ageDays: 40 });
+    expect(aging.items[0]?.dueOn).toEqual(daysBefore(-20));
+    expect(aging.overdueBasisPoints).toBe(0);
+  });
+
+  it('lets an invoice’s own due date win over the account’s terms', () => {
+    // An export sold on thirty days to a customer whose account says sixty:
+    // the invoice is the contract.
+    const aging = ageAccount(
+      [{ ...invoice('INV-1', 45, 1_000_00n), dueOn: daysBefore(15) }],
+      ASOF,
+      'debit',
+      60,
+    );
+    expect(aging.items[0]).toMatchObject({ bucket: 'days1to30', daysOverdue: 15 });
+  });
+
+  it('counts payment on receipt as due the day it was raised', () => {
+    const aging = ageAccount([invoice('INV-1', 1, 1_000_00n)], ASOF, 'debit', 0);
+    expect(aging.items[0]).toMatchObject({ bucket: 'days1to30', daysOverdue: 1 });
+  });
+
+  it('is not late on the day it falls due', () => {
+    const aging = ageAccount([{ ...invoice('INV-1', 30, 1_000_00n), dueOn: ASOF }], ASOF, 'debit');
+    expect(aging.items[0]).toMatchObject({ bucket: 'current', daysOverdue: 0 });
   });
 
   it('settles the oldest invoice first', () => {
@@ -108,7 +143,9 @@ describe('aging a payable', () => {
     );
 
     expect(aging.total).toBe(3_000_00n);
-    expect(aging.items[0]?.bucket).toBe('over90');
+    // A hundred days old, due at thirty: seventy days late.
+    expect(aging.items[0]?.bucket).toBe('days61to90');
+    expect(aging.items[0]?.daysOverdue).toBe(70);
   });
 });
 
@@ -133,13 +170,14 @@ describe('settling in a stable order', () => {
 describe('buckets', () => {
   it.each([
     [0, 'current'],
-    [30, 'current'],
+    [1, 'days1to30'],
+    [30, 'days1to30'],
     [31, 'days31to60'],
     [60, 'days31to60'],
     [61, 'days61to90'],
     [90, 'days61to90'],
     [91, 'over90'],
-  ])('%i days is %s', (days, expected) => {
+  ])('%i days late is %s', (days, expected) => {
     expect(bucketFor(days)).toBe(expected);
   });
 });

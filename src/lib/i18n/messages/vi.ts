@@ -601,6 +601,17 @@ export const vi: Messages = {
     accountCheckFields: 'Chưa mở được tài khoản. Hãy kiểm tra các ô được đánh dấu.',
     accountExists: (name, currency) => `Đã có tài khoản tên “${name}” theo dõi bằng ${currency}.`,
     alreadyInUse: 'Tên này đã được dùng',
+    accountCode: 'Số hiệu tài khoản',
+    accountCodeHint:
+      'Chỉ gồm chữ số. Bắt buộc với hệ thống tài khoản theo quy định, nơi chữ số đầu là loại tài khoản.',
+    accountCodeRequiredHint:
+      'Bắt buộc: theo Thông tư 200, chữ số đầu là loại tài khoản — 131 là phải thu, 331 là phải trả.',
+    openItems: 'Theo dõi công nợ khách hàng hoặc nhà cung cấp',
+    openItemsNote:
+      'Số dư là tập hợp các hóa đơn chưa thanh toán, nên tài khoản này hiện trong báo cáo tuổi nợ phải thu hoặc phải trả. Mỗi khách hàng một tài khoản chi tiết thì báo cáo mới phân biệt được từng khách.',
+    paymentTerms: 'Thời hạn thanh toán (ngày)',
+    paymentTermsHint:
+      'Số ngày được phép trả chậm. Để trống thì mặc định 30; 0 là trả ngay khi nhận hàng.',
   },
 
   palette: {
@@ -622,19 +633,26 @@ export const vi: Messages = {
     caption: (account) => `${account}, nợ cũ nhất trước`,
     invoice: 'Số hóa đơn',
     dated: 'Ngày',
-    age: 'Tuổi nợ',
     outstanding: 'Còn lại',
-    days: (count) => `${count} ngày`,
-    current: 'Đến 30 ngày',
-    days31to60: '31–60 ngày',
-    days61to90: '61–90 ngày',
-    over90: 'Trên 90 ngày',
+    current: 'Chưa đến hạn',
+    days1to30: 'Quá hạn 1–30 ngày',
+    days31to60: 'Quá hạn 31–60 ngày',
+    days61to90: 'Quá hạn 61–90 ngày',
+    over90: 'Quá hạn trên 90 ngày',
+    due: 'Hạn thanh toán',
+    late: 'Quá hạn',
+    lateDays: (count) => `${count} ngày`,
+    notYetDue: 'Chưa',
+    terms: (days) => (days === 0 ? 'Thanh toán khi nhận hàng' : `Thời hạn ${days} ngày`),
+    termsAssumed: (days) => `Mặc định thời hạn ${days} ngày — tài khoản chưa đặt thời hạn`,
     total: 'Cộng',
-    overdue: (percent) => `${percent}% quá 30 ngày`,
+    overdue: (percent) => `${percent}% đã quá hạn`,
     emptyTitle: 'Không còn công nợ',
     emptyBody: 'Mọi hóa đơn trên các tài khoản này đều đã thanh toán xong.',
     convention:
       'Hệ thống không ghi nhận khoản thanh toán ứng với hóa đơn nào, nên mặc định trừ vào hóa đơn cũ nhất trước. Đó là quy ước chứ không phải sự thật — điều này quan trọng khi khách trả hóa đơn sau nhưng đang khiếu nại hóa đơn trước.',
+    dueConvention:
+      'Số ngày quá hạn tính từ hạn thanh toán ghi trên chính hóa đơn nếu có — mọi hóa đơn lập ở trang Bán hàng đều có — nếu không thì theo thời hạn thanh toán của tài khoản, hoặc 30 ngày nếu chưa đặt.',
     credit: 'trả thừa',
   },
 
@@ -857,7 +875,7 @@ export const vi: Messages = {
     customer: 'Khách hàng',
     date: 'Ngày',
     due: 'Hạn thanh toán',
-    onReceipt: 'Khi nhận hàng',
+    onReceipt: 'Mặc định 30 ngày',
     invoiced: 'Tổng tiền',
     revenue: 'Doanh thu',
     cost: 'Giá vốn',
@@ -885,7 +903,8 @@ export const vi: Messages = {
     noTax: 'Không chịu thuế',
     invoiceDate: 'Ngày hóa đơn',
     dueDate: 'Hạn thanh toán',
-    dueDateHint: 'Để trống nếu thanh toán ngay khi nhận hàng. Báo cáo tuổi nợ tính từ ngày này.',
+    dueDateHint:
+      'Để trống để dùng thời hạn thanh toán của khách hàng. Báo cáo tuổi nợ tính số ngày quá hạn từ ngày này.',
     linesLegend: 'Các dòng hàng',
     product: 'Mặt hàng',
     quantity: (unit) => `Số lượng (${unit})`,

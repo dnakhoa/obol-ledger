@@ -100,12 +100,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     }));
 
   // Where a loss can go: any open expense except the cost of sales, which is
-  // exactly where shrinkage must not hide.
+  // exactly where shrinkage must not hide, and nothing chosen for the person.
   const expenseAccounts: AccountOption[] = accounts
     .filter(
       (account) =>
         account.status === 'open' &&
         account.type === 'expense' &&
+        // An account with a structural job — FX gain and loss — takes only
+        // what that job puts there.
+        account.role === null &&
         account.balance.currency === functional &&
         account.id !== item.cogsAccountId,
     )

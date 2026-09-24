@@ -140,4 +140,9 @@ export const EVERY_VARIANT: Record<LedgerError['code'], LedgerError> = {
   sale_reference_taken: { code: 'sale_reference_taken', reference: 'INV-2607' },
   sale_not_found: { code: 'sale_not_found', saleId: 'sale_1' },
   due_before_invoice: { code: 'due_before_invoice', dueOn: '2025-03-01', invoicedOn: '2026-03-01' },
+  account_code_required: { code: 'account_code_required', chartTemplate: 'vn_tt200' },
+  account_code_disagrees: { code: 'account_code_disagrees', accountCode: '511', type: 'asset' },
+  account_code_taken: { code: 'account_code_taken', accountCode: '1311' },
+  open_items_not_permitted: { code: 'open_items_not_permitted', type: 'revenue' },
+  payment_terms_need_open_items: { code: 'payment_terms_need_open_items' },
 };

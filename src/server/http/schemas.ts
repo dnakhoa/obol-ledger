@@ -64,6 +64,19 @@ export const createAccountSchema = z.object({
   currency: currencySchema,
   overdraftAllowed: z.boolean().default(false),
   metadata: metadataSchema,
+  /**
+   * The number the account is filed under. Required on a statutory chart —
+   * under Thông tư 200 the leading digit is the class — and optional elsewhere.
+   */
+  code: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{1,10}$/u, 'An account code is up to ten digits')
+    .optional(),
+  /** A receivable or payable whose balance is a set of unsettled invoices, and so ages. */
+  openItems: z.boolean().optional(),
+  /** Days the customer or supplier has to pay. Only on an open-item account. */
+  paymentTermsDays: z.number().int().min(0).max(365).optional(),
 });
 
 export type CreateAccountBody = z.infer<typeof createAccountSchema>;

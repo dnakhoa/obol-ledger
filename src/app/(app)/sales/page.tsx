@@ -173,7 +173,7 @@ export default async function SalesPage() {
               <tbody>
                 {sales.map((sale) => (
                   <Tr key={sale.id}>
-                    <Td>
+                    <Td className="whitespace-nowrap">
                       <Link
                         href={`/sales/${sale.id}`}
                         className="hover:text-action font-medium underline-offset-4 hover:underline"
@@ -181,9 +181,9 @@ export default async function SalesPage() {
                         {sale.reference}
                       </Link>
                     </Td>
-                    <Td>{sale.customerName}</Td>
-                    <Td>{DATE.day(sale.occurredAt)}</Td>
-                    <Td>
+                    <Td className="min-w-40">{sale.customerName}</Td>
+                    <Td className="whitespace-nowrap">{DATE.day(sale.occurredAt)}</Td>
+                    <Td className="whitespace-nowrap">
                       {sale.dueOn ? (
                         DATE.day(new Date(`${sale.dueOn}T12:00:00Z`))
                       ) : (

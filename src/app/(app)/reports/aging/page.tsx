@@ -12,7 +12,7 @@ import { ArrowLeftIcon } from '@/components/icons';
 import { viewerServices } from '@/server/container';
 import { translations } from '@/server/i18n';
 import { dateFormats, type Messages } from '@/lib/i18n';
-import { AGING_BUCKETS } from '@/server/domain/aging';
+import { AGING_BUCKETS, DEFAULT_TERMS_DAYS } from '@/server/domain/aging';
 import type { AgedReport } from '@/server/services/aging';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -77,7 +77,8 @@ export default async function AgingPage() {
       )}
 
       <Card>
-        <CardBody className="text-ink-muted text-xs">
+        <CardBody className="text-ink-muted space-y-2 text-xs">
+          <p>{t.aging.dueConvention}</p>
           <p>{t.aging.convention}</p>
         </CardBody>
       </Card>
@@ -108,7 +109,12 @@ function Section({
                 {account.accountCode ? `${account.accountCode} — ` : ''}
                 {account.accountName}
               </CardTitle>
-              <CardDescription>{title}</CardDescription>
+              <CardDescription>
+                {title} ·{' '}
+                {account.paymentTermsDays === null
+                  ? t.aging.termsAssumed(DEFAULT_TERMS_DAYS)
+                  : t.aging.terms(account.paymentTermsDays)}
+              </CardDescription>
             </div>
             <div className="text-right">
               <p className="numeric text-sm font-semibold">
@@ -122,7 +128,7 @@ function Section({
             </div>
           </CardHeader>
 
-          <CardBody className="grid gap-3 sm:grid-cols-4">
+          <CardBody className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {AGING_BUCKETS.map((bucket) => (
               <div key={bucket} className="border-line bg-surface-sunken rounded-lg border p-3">
                 <p className="text-ink-muted text-[11px]">{t.aging[bucket]}</p>
@@ -139,7 +145,8 @@ function Section({
                 <tr>
                   <Th>{t.aging.invoice}</Th>
                   <Th>{t.aging.dated}</Th>
-                  <Th align="right">{t.aging.age}</Th>
+                  <Th>{t.aging.due}</Th>
+                  <Th align="right">{t.aging.late}</Th>
                   <Th align="right">{t.aging.outstanding}</Th>
                 </tr>
               </thead>
@@ -155,8 +162,15 @@ function Section({
                       ) : null}
                     </Td>
                     <Td numeric>{format.day(item.occurredAt)}</Td>
+                    <Td numeric>{format.day(item.dueOn)}</Td>
                     <Td align="right" numeric>
-                      {t.aging.days(item.ageDays)}
+                      {item.daysOverdue > 0 ? (
+                        <span className={item.daysOverdue > 60 ? 'text-negative font-medium' : ''}>
+                          {t.aging.lateDays(item.daysOverdue)}
+                        </span>
+                      ) : (
+                        <span className="text-ink-muted text-xs">{t.aging.notYetDue}</span>
+                      )}
                     </Td>
                     <Td align="right" numeric>
                       <Money value={item.outstanding} signed />

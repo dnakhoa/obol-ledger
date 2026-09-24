@@ -19,6 +19,12 @@ const INITIAL: AccountFormState = { status: 'idle' };
  */
 /** Resolved on the server, so no dictionary reaches the client bundle. */
 export type AccountFormLabels = {
+  readonly code: string;
+  readonly codeHint: string;
+  readonly openItems: string;
+  readonly openItemsNote: string;
+  readonly paymentTerms: string;
+  readonly paymentTermsHint: string;
   readonly details: string;
   readonly intro: string;
   readonly neverDeleted: string;
@@ -47,9 +53,15 @@ export type AccountFormLabels = {
 export function AccountForm({
   action,
   labels,
+  codeRequired = false,
+  defaultCurrency = 'USD',
 }: {
   action: (state: AccountFormState, formData: FormData) => Promise<AccountFormState>;
   labels: AccountFormLabels;
+  /** On a statutory chart the code is the law, not a convenience. */
+  codeRequired?: boolean;
+  /** The books' own currency: most accounts a business opens are in it. */
+  defaultCurrency?: string;
 }) {
   // The class name and its one-line explanation, both from the dictionary —
   // the same pair the chart of accounts shows, so the two cannot disagree.
@@ -96,13 +108,51 @@ export function AccountForm({
           </Field>
 
           <Field label={labels.currency} htmlFor="currency" error={errorFor('currency')}>
-            <Select id="currency" name="currency" defaultValue="USD">
+            <Select id="currency" name="currency" defaultValue={defaultCurrency}>
               {SUPPORTED_CURRENCIES.map((currency) => (
                 <option key={currency} value={currency}>
                   {currency}
                 </option>
               ))}
             </Select>
+          </Field>
+
+          <Field label={labels.code} htmlFor="code" hint={labels.codeHint} error={errorFor('code')}>
+            <Input
+              id="code"
+              name="code"
+              inputMode="numeric"
+              pattern="[0-9]{1,10}"
+              maxLength={10}
+              required={codeRequired}
+              placeholder="1311"
+              autoComplete="off"
+              invalid={Boolean(errorFor('code'))}
+              aria-describedby={describedBy('code', 'hint', errorFor('code'))}
+            />
+          </Field>
+
+          <Field
+            label={labels.paymentTerms}
+            htmlFor="paymentTermsDays"
+            hint={labels.paymentTermsHint}
+            error={errorFor('paymentTermsDays')}
+          >
+            <Input
+              id="paymentTermsDays"
+              name="paymentTermsDays"
+              type="number"
+              min={0}
+              max={365}
+              step={1}
+              placeholder="30"
+              invalid={Boolean(errorFor('paymentTermsDays'))}
+              aria-describedby={describedBy(
+                'paymentTermsDays',
+                'hint',
+                errorFor('paymentTermsDays'),
+              )}
+            />
           </Field>
 
           <Field
@@ -120,6 +170,20 @@ export function AccountForm({
             </Select>
           </Field>
         </CardBody>
+
+        <div className="border-line border-t px-4 py-4 sm:px-5">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              name="openItems"
+              className="border-line text-action mt-0.5 size-4 rounded"
+            />
+            <span>
+              <span className="block text-sm font-medium">{labels.openItems}</span>
+              <span className="text-ink-muted block text-xs">{labels.openItemsNote}</span>
+            </span>
+          </label>
+        </div>
 
         <div className="border-line border-t px-4 py-4 sm:px-5">
           <label className="flex cursor-pointer items-start gap-3">

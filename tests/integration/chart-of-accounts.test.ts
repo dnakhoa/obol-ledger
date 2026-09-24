@@ -210,6 +210,83 @@ describe('chart of accounts', () => {
       );
     });
 
+    it('lets a person open a customer account, and says why when it refuses', async () => {
+      // The form and the API used to have no code field, so on a Thông tư 200
+      // ledger every account a person tried to open died on the CHECK above
+      // as a 500. `open` states each rule before the database has to.
+      const user = await createUser('vn@example.test');
+      const { orgId } = await createLedger({
+        userId: user.id,
+        name: 'Công ty Phân phối',
+        functionalCurrency: 'VND',
+        chartTemplate: 'vn_tt200',
+      });
+      const service = servicesFor(db, orgId).accounts;
+      const customer = {
+        name: 'Phải thu — Công ty Xây dựng Hòa Bình',
+        type: 'asset' as const,
+        currency: 'VND' as const,
+      };
+
+      expect(await service.open(customer)).toEqual({
+        ok: false,
+        error: { code: 'account_code_required', chartTemplate: 'vn_tt200' },
+      });
+      expect(await service.open({ ...customer, code: '3311' })).toEqual({
+        ok: false,
+        error: { code: 'account_code_disagrees', accountCode: '3311', type: 'asset' },
+      });
+      // 131 is on the template already.
+      expect(await service.open({ ...customer, code: '131' })).toEqual({
+        ok: false,
+        error: { code: 'account_code_taken', accountCode: '131' },
+      });
+      expect(await service.open({ ...customer, code: '1311', paymentTermsDays: 45 })).toEqual({
+        ok: false,
+        error: { code: 'payment_terms_need_open_items' },
+      });
+      expect(
+        await service.open({
+          name: 'Doanh thu khác',
+          type: 'revenue',
+          currency: 'VND',
+          code: '7119',
+          openItems: true,
+        }),
+      ).toEqual({ ok: false, error: { code: 'open_items_not_permitted', type: 'revenue' } });
+
+      const opened = await service.open({
+        ...customer,
+        code: '1311',
+        openItems: true,
+        paymentTermsDays: 45,
+      });
+      expect(opened).toMatchObject({
+        ok: true,
+        value: { code: '1311', openItems: true, paymentTermsDays: 45 },
+      });
+    });
+
+    it('holds the terms rule in the database too', async () => {
+      const user = await createUser('vn@example.test');
+      const { orgId } = await createLedger({
+        userId: user.id,
+        name: 'Công ty Phân phối',
+        functionalCurrency: 'VND',
+        chartTemplate: 'vn_tt200',
+      });
+      await expectDatabaseError(
+        servicesFor(db, orgId).accounts.create({
+          name: 'Tiền mặt có kỳ hạn',
+          type: 'asset',
+          currency: 'VND',
+          code: '1113',
+          paymentTermsDays: 30,
+        }),
+        /accounts_payment_terms_check/u,
+      );
+    });
+
     it('refuses an account with no code at all', async () => {
       const user = await createUser('vn@example.test');
       const { orgId } = await createLedger({

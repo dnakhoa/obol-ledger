@@ -7,7 +7,7 @@ import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { createAccountSchema } from '@/server/http/schemas';
 import { rateLimit } from '@/server/http/rate-limit';
 import { logger } from '@/server/observability/logger';
-import { translations } from '@/server/i18n';
+import { describeError, translations } from '@/server/i18n';
 
 export type AccountFormState = {
   readonly status: 'idle' | 'error';
@@ -19,7 +19,7 @@ export async function createAccountAction(
   _previous: AccountFormState,
   formData: FormData,
 ): Promise<AccountFormState> {
-  const { t } = await translations();
+  const { locale, t } = await translations();
   const requestHeaders = await headers();
   const client = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
   const decision = rateLimit(`account:${client}`, Date.now(), 20);
@@ -35,6 +35,9 @@ export async function createAccountAction(
     type: formData.get('type'),
     currency: formData.get('currency'),
     overdraftAllowed: formData.get('overdraftAllowed') === 'on',
+    openItems: formData.get('openItems') === 'on',
+    ...optional('code', formData.get('code')),
+    ...optional('paymentTermsDays', formData.get('paymentTermsDays'), Number),
   });
 
   if (!parsed.success) {
@@ -55,8 +58,18 @@ export async function createAccountAction(
       return { status: 'error', message: await refusalMessage(writer.reason) };
     }
 
-    const account = await writer.services.accounts.create(parsed.data);
-    accountId = account.id;
+    const opened = await writer.services.accounts.open(parsed.data);
+    if (!opened.ok) {
+      const field =
+        opened.error.code === 'payment_terms_need_open_items'
+          ? 'paymentTermsDays'
+          : opened.error.code === 'open_items_not_permitted'
+            ? 'type'
+            : 'code';
+      const message = describeError(opened.error, locale);
+      return { status: 'error', message, fieldErrors: [{ field, message }] };
+    }
+    accountId = opened.value.id;
   } catch (error) {
     // `(org_id, name, currency)` is unique so a tenant cannot end up with two
     // accounts a human would read as the same one.
@@ -84,4 +97,14 @@ function isUniqueViolation(error: unknown): boolean {
     current = current.cause;
   }
   return false;
+}
+
+/** A blank field is absent, not an empty string the schema then refuses. */
+function optional<K extends string, V>(
+  key: K,
+  value: FormDataEntryValue | null,
+  convert: (text: string) => V = (text) => text as V,
+): Partial<Record<K, V>> {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text ? ({ [key]: convert(text) } as Record<K, V>) : {};
 }

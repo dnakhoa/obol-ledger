@@ -593,6 +593,16 @@ export const en = {
     accountExists: (name: string, currency: string) =>
       `An account named “${name}” already exists in ${currency}.`,
     alreadyInUse: 'Already in use',
+    accountCode: 'Account code',
+    accountCodeHint:
+      'Digits only. Required on a statutory chart, where the first digit is the class.',
+    accountCodeRequiredHint:
+      'Required: under Thông tư 200 the first digit is the class — 131 a receivable, 331 a payable.',
+    openItems: 'Track as a customer or supplier',
+    openItemsNote:
+      'The balance is a set of unpaid invoices, so it appears in the aged receivables or payables. One account per customer is how the report tells them apart.',
+    paymentTerms: 'Payment terms (days)',
+    paymentTermsHint: 'How long they have to pay. Blank assumes 30; 0 means on receipt.',
   },
 
   palette: {
@@ -614,19 +624,26 @@ export const en = {
     caption: (account: string) => `${account}, oldest first`,
     invoice: 'Invoice',
     dated: 'Dated',
-    age: 'Age',
     outstanding: 'Outstanding',
-    days: (count: number) => `${count} days`,
-    current: 'Up to 30 days',
-    days31to60: '31–60 days',
-    days61to90: '61–90 days',
-    over90: 'Over 90 days',
+    current: 'Not yet due',
+    days1to30: '1–30 days late',
+    days31to60: '31–60 days late',
+    days61to90: '61–90 days late',
+    over90: 'Over 90 days late',
+    due: 'Due',
+    late: 'Late',
+    lateDays: (count: number) => `${count} days`,
+    notYetDue: 'Not yet',
+    terms: (days: number) => (days === 0 ? 'Payment on receipt' : `${days}-day terms`),
+    termsAssumed: (days: number) => `${days}-day terms assumed — none set on the account`,
     total: 'Total',
-    overdue: (percent: string) => `${percent}% past 30 days`,
+    overdue: (percent: string) => `${percent}% overdue`,
     emptyTitle: 'Nothing outstanding',
     emptyBody: 'Every invoice on these accounts has been settled.',
     convention:
       'Nothing records which invoice a payment settled, so the oldest open one is taken first. That is a convention, not a fact — it matters when a customer pays a later invoice and disputes an earlier one.',
+    dueConvention:
+      'Lateness counts from the invoice’s own due date where it has one — every invoice raised on the Sales page does — and otherwise from the account’s payment terms, or thirty days where none are set.',
     credit: 'in credit',
   },
 
@@ -849,7 +866,7 @@ export const en = {
     customer: 'Customer',
     date: 'Date',
     due: 'Due',
-    onReceipt: 'On receipt',
+    onReceipt: '30 days, assumed',
     invoiced: 'Invoiced',
     revenue: 'Revenue',
     cost: 'Cost',
@@ -877,7 +894,8 @@ export const en = {
     noTax: 'No tax',
     invoiceDate: 'Invoice date',
     dueDate: 'Payment due',
-    dueDateHint: 'Leave blank for payment on receipt. Aged receivables count from this date.',
+    dueDateHint:
+      'Leave blank to use the customer’s payment terms. Aged receivables count lateness from this date.',
     linesLegend: 'Lines',
     product: 'Product',
     quantity: (unit: string) => `Quantity (${unit})`,

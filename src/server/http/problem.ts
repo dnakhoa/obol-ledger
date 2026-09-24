@@ -92,6 +92,11 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   sale_reference_taken: 409,
   sale_not_found: 404,
   due_before_invoice: 422,
+  account_code_required: 422,
+  account_code_disagrees: 422,
+  account_code_taken: 409,
+  open_items_not_permitted: 422,
+  payment_terms_need_open_items: 422,
 };
 
 export function statusFor(error: LedgerError): number {

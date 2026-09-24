@@ -169,7 +169,7 @@ export function SaleForm({
               key={line.key}
               role="group"
               aria-label={labels.lineLabel[index]}
-              className="border-line grid gap-3 rounded-lg border p-3 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] sm:items-end"
+              className="border-line grid gap-3 rounded-lg border p-3 sm:grid-cols-[2fr_1fr_1fr_1.25fr_auto] sm:items-end"
             >
               <Field label={labels.product} htmlFor={`${row}-item`}>
                 <Select

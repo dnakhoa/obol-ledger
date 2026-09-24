@@ -52,6 +52,7 @@ export function toAccountDto(
     role: row.role,
     monetary: row.monetary,
     openItems: row.openItems,
+    paymentTermsDays: row.paymentTermsDays,
     createdAt: row.createdAt.toISOString(),
   };
 }

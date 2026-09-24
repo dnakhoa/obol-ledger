@@ -79,7 +79,7 @@ describe('aged receivables', () => {
     if (!result.ok) throw new Error(result.error.code);
   }
 
-  it('buckets what is owed by how long it has been owed', async () => {
+  it('buckets what is owed by how late it is', async () => {
     await invoice(10, 1_000_00n, 'INV-1');
     await invoice(45, 2_000_00n, 'INV-2');
     await invoice(120, 4_000_00n, 'INV-3');
@@ -90,11 +90,66 @@ describe('aged receivables', () => {
     if (!account) return;
 
     expect(account.total.minorUnits).toBe('700000');
+    // No terms on the account, so thirty days are assumed: 45 days old is
+    // 15 days late, 120 days old is 90 days late.
+    expect(account.paymentTermsDays).toBeNull();
     expect(account.byBucket.current.minorUnits).toBe('100000');
-    expect(account.byBucket.days31to60.minorUnits).toBe('200000');
-    expect(account.byBucket.over90.minorUnits).toBe('400000');
-    // Six sevenths of it is past thirty days, which is the fact worth seeing.
+    expect(account.byBucket.days1to30.minorUnits).toBe('200000');
+    expect(account.byBucket.days61to90.minorUnits).toBe('400000');
+    // Six sevenths of it is past due, which is the fact worth seeing.
     expect(account.overdueBasisPoints).toBe(8571);
+  });
+
+  it('counts from the due date the invoice carries', async () => {
+    const result = await services.journal.postEntry({
+      description: 'Export INV-9',
+      currency: 'USD',
+      occurredAt: daysBefore(50),
+      metadata: { invoice: 'INV-9', dueDate: daysBefore(-10).toISOString().slice(0, 10) },
+      postings: [
+        { accountId: receivable.id, amount: usd(5_000_00n) },
+        { accountId: revenue.id, amount: usd(-5_000_00n) },
+      ],
+    });
+    if (!result.ok) throw new Error(result.error.code);
+
+    const report = await services.aging.report('asset', ASOF);
+    const item = report.accounts[0]?.items[0];
+    // Fifty days old and not late: it is due in ten days.
+    expect(item).toMatchObject({
+      reference: 'INV-9',
+      ageDays: 50,
+      daysOverdue: 0,
+      bucket: 'current',
+    });
+  });
+
+  it('counts from the account’s own payment terms', async () => {
+    const onSixty = await services.accounts.open({
+      name: 'Builder on 60 days',
+      type: 'asset',
+      currency: 'USD',
+      overdraftAllowed: true,
+      openItems: true,
+      paymentTermsDays: 60,
+    });
+    if (!onSixty.ok) throw new Error(onSixty.error.code);
+    const posted = await services.journal.postEntry({
+      description: 'Slabs INV-10',
+      currency: 'USD',
+      occurredAt: daysBefore(75),
+      metadata: { invoice: 'INV-10' },
+      postings: [
+        { accountId: onSixty.value.id, amount: usd(1_000_00n) },
+        { accountId: revenue.id, amount: usd(-1_000_00n) },
+      ],
+    });
+    if (!posted.ok) throw new Error(posted.error.code);
+
+    const report = await services.aging.report('asset', ASOF);
+    const account = report.accounts.find((a) => a.accountId === onSixty.value.id);
+    expect(account?.paymentTermsDays).toBe(60);
+    expect(account?.items[0]).toMatchObject({ daysOverdue: 15, bucket: 'days1to30' });
   });
 
   it('carries the invoice number through from the entry metadata', async () => {
@@ -181,6 +236,7 @@ describe('aged payables', () => {
     const report = await services.aging.report('liability', asOf);
     const account = report.accounts.find((a) => a.accountId === payable.id);
     expect(account?.total.minorUnits).toBe('300000');
-    expect(account?.items[0]?.bucket).toBe('over90');
+    // A hundred days old on assumed thirty-day terms: seventy days late.
+    expect(account?.items[0]?.bucket).toBe('days61to90');
   });
 });

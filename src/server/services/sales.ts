@@ -202,6 +202,16 @@ export function createSalesService(database: Database, orgId: string) {
         const customer = await customerAccount(tx, input.customerAccountId);
         if (!customer.ok) return customer;
 
+        // The customer's agreed terms decide when an invoice is due unless the
+        // invoice says otherwise. Written onto the sale, not re-derived later:
+        // changing a customer to sixty days must not make last year's invoices
+        // retrospectively on time.
+        const dueOn =
+          input.dueOn ??
+          (customer.value.paymentTermsDays === null
+            ? undefined
+            : addDays(invoicedOn, customer.value.paymentTermsDays));
+
         const revenue = await revenueAccount(tx, input.revenueAccountId, functional);
         if (!revenue.ok) return revenue;
 
@@ -321,7 +331,7 @@ export function createSalesService(database: Database, orgId: string) {
             ...(input.metadata ?? {}),
             invoice: input.reference,
             sale: saleId,
-            ...(input.dueOn ? { dueDate: input.dueOn } : {}),
+            ...(dueOn ? { dueDate: dueOn } : {}),
           },
           ...(input.actor ? { actor: input.actor } : {}),
           postings: [
@@ -351,7 +361,7 @@ export function createSalesService(database: Database, orgId: string) {
           baseTaxMinor: priced.baseTax,
           baseCostMinor: baseCost,
           occurredAt,
-          dueOn: input.dueOn ?? null,
+          dueOn: dueOn ?? null,
           transactionId: entry.value.transaction.id,
           ...(input.metadata ? { metadata: input.metadata } : {}),
         });
@@ -574,9 +584,14 @@ function compareMinor(a: string, b: string): number {
 async function customerAccount(
   tx: Transactional,
   accountId: string,
-): Promise<Result<{ name: string }, LedgerError>> {
+): Promise<Result<{ name: string; paymentTermsDays: number | null }, LedgerError>> {
   const [row] = await tx
-    .select({ name: accounts.name, type: accounts.type, status: accounts.status })
+    .select({
+      name: accounts.name,
+      type: accounts.type,
+      status: accounts.status,
+      paymentTermsDays: accounts.paymentTermsDays,
+    })
     .from(accounts)
     .where(eq(accounts.id, accountId))
     .limit(1);
@@ -585,7 +600,13 @@ async function customerAccount(
   if (row.type !== 'asset') {
     return err({ code: 'account_wrong_type', accountId, expected: 'asset', actual: row.type });
   }
-  return ok({ name: row.name });
+  return ok({ name: row.name, paymentTermsDays: row.paymentTermsDays });
+}
+
+/** `2026-01-10` plus 60 → `2026-03-11`, in UTC so no timezone moves the day. */
+function addDays(date: string, days: number): string {
+  const [year = 0, month = 1, day = 1] = date.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
 /**
