@@ -4,8 +4,9 @@
 [![Live](https://img.shields.io/badge/live-obol--ledger.vercel.app-0f172a)](https://obol-ledger.vercel.app)
 [![Licence](https://img.shields.io/badge/licence-MIT-0f172a)](LICENSE)
 
-**[Live demo →](https://obol-ledger.vercel.app)** · seeded with a month of
-trading for a coffee roastery, and you can post entries yourself.
+**[Live demo →](https://obol-ledger.vercel.app)** · seeded with a quarter's
+trading for a Vietnamese stone exporter — FIFO lots, export invoices in three
+currencies, landed cost and VAT returns — kept in dong under Thông tư 200.
 
 A double-entry ledger with a typed HTTP API and a server-rendered dashboard.
 Entries are balanced by construction, history is append-only, and the rules are
@@ -373,7 +374,7 @@ Any Postgres 15+ will do — local, containerised, or managed.
 pnpm install
 cp .env.example .env.local     # point DATABASE_URL at your Postgres
 pnpm db:migrate                # apply the schema and its invariants
-pnpm db:seed                   # a month of trading for a coffee roastery
+pnpm db:seed                   # a quarter of trading for a stone exporter
 pnpm dev
 ```
 

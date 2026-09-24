@@ -138,7 +138,8 @@ export const vi: Messages = {
     postEntry: 'Ghi bút toán',
 
     emptyTitle: 'Chưa có tài khoản nào',
-    emptyBody: 'Tài khoản được tạo qua API. Chạy pnpm db:seed để nạp một tháng số liệu mẫu.',
+    emptyBody:
+      'Bút toán chuyển tiền giữa các tài khoản, nên cần có hệ thống tài khoản trước. Hãy mở một tài khoản để bắt đầu.',
 
     asset: 'Tài sản',
     liability: 'Nợ phải trả',
@@ -496,6 +497,24 @@ export const vi: Messages = {
     cancelIt: 'Hủy bút toán',
     cancelledNote:
       'Bút toán này đã bị hủy trước khi hoàn tất, nên chưa bao giờ tác động vào số dư. Không có gì để điều chỉnh \u2014 điều chỉnh là để hủy phần tiền đã thực sự dịch chuyển, mà ở đây thì không.',
+    reverseExplain: (description) =>
+      `Một bút toán đối ứng của “${description}” sẽ được ghi với mọi số tiền đổi dấu. Cả hai bút toán vẫn nằm trên sổ và tác động ròng bằng không. Mỗi bút toán chỉ điều chỉnh được một lần; muốn hoàn tác bút toán điều chỉnh thì phải điều chỉnh chính nó.`,
+    pendingExplain:
+      'Số tiền đã được giữ lại nhưng chưa dịch chuyển. Số dư khả dụng của các tài khoản giảm, còn số dư đã ghi sổ giữ nguyên. Tất toán sẽ chuyển tiền; hủy sẽ giải phóng khoản giữ và không chuyển gì cả.',
+    recordedAt: (when) => `Ghi nhận lúc ${when}`,
+    welcome: (name) => (name ? `Chào ${name}` : 'Chào bạn'),
+    suggestedLedgerName: (name) => (name ? `Sổ sách của ${name}` : 'Sổ sách của tôi'),
+    signingOut: 'Đang đăng xuất…',
+    noAccountsToPost:
+      'Chưa có tài khoản nào để ghi sổ. Bút toán chuyển tiền giữa các tài khoản, nên hãy mở một tài khoản trước.',
+    openChart: 'Mở tài khoản',
+    signInOff:
+      'Bản triển khai này đã tắt đăng nhập, nên sổ mẫu chỉ để xem. Mọi thứ trên đó đều là dữ liệu thật — số dư, báo cáo và tài liệu API.',
+    signInOffDev:
+      'Để bật, hãy đặt GITHUB_CLIENT_ID và GITHUB_CLIENT_SECRET, hoặc cặp khóa của Google.',
+    justLooking: 'Chỉ xem thôi?',
+    noAccountNeeded: 'Không cần tài khoản.',
+    readOnlyDemo: 'Sổ mẫu chỉ xem',
   },
 
   entry: {

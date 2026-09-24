@@ -132,7 +132,7 @@ export const en = {
 
     emptyTitle: 'No accounts yet',
     emptyBody:
-      'Accounts are created through the API. Run pnpm db:seed to load a month of example books.',
+      'An entry moves money between accounts, so the chart comes first. Open an account to start.',
 
     asset: 'Assets',
     liability: 'Liabilities',
@@ -493,6 +493,24 @@ export const en = {
     cancelIt: 'Cancel it',
     cancelledNote:
       'This entry was cancelled before it settled, so it never reached the balances. There is nothing to reverse \u2014 a reversal cancels money that moved, and none did.',
+    reverseExplain: (description: string) =>
+      `A mirror of \u201c${description}\u201d will be written with every amount negated. Both entries stay on the record and the net effect becomes zero. An entry can only be reversed once, and the reversal itself can only be undone by reversing it in turn.`,
+    pendingExplain:
+      'Its funds are reserved but have not moved. The accounts show a reduced available balance while the posted balance is unchanged. Settling moves the money; cancelling releases the reservation and moves nothing.',
+    recordedAt: (when: string) => `Recorded ${when}`,
+    welcome: (name: string) => (name ? `Welcome, ${name}` : 'Welcome'),
+    suggestedLedgerName: (name: string) => (name ? `${name}’s books` : 'My books'),
+    signingOut: 'Signing out\u2026',
+    noAccountsToPost:
+      'There are no accounts to post to yet. An entry moves money between accounts, so open one first.',
+    openChart: 'Open an account',
+    signInOff:
+      'Sign-in is switched off on this deployment, so the demo is read-only. Everything on it is live \u2014 the balances, the reports and the API reference.',
+    signInOffDev:
+      'To switch it on, set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, or the Google pair.',
+    justLooking: 'Just looking?',
+    noAccountNeeded: 'No account needed.',
+    readOnlyDemo: 'Read-only demo',
   },
 
   entry: {

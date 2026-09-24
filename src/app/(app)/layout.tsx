@@ -6,6 +6,7 @@ import { LanguageToggle } from '@/components/language-toggle';
 import { CommandPalette, PaletteTrigger } from '@/components/command-palette';
 import { ViewerMenu } from '@/components/viewer-menu';
 import { currentViewer, orgName } from '@/server/auth/viewer';
+import { configuredProviders } from '@/server/auth/config';
 import { ScaleIcon } from '@/components/icons';
 import { translations } from '@/server/i18n';
 
@@ -79,7 +80,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <ViewerMenu
             {...identity}
             orgName={ledgerName}
-            labels={{ reading: t.misc.reading, signIn: t.common.signIn }}
+            canSignIn={configuredProviders().length > 0}
+            labels={{
+              reading: t.misc.reading,
+              signIn: t.common.signIn,
+              signOut: t.common.signOut,
+              signingOut: t.misc.signingOut,
+              readOnlyDemo: t.misc.readOnlyDemo,
+            }}
           />
           <LanguageToggle current={locale} label={t.common.language} />
           <ThemeToggle labels={themeLabels} />

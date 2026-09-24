@@ -17,7 +17,7 @@ export default async function OnboardingPage() {
   if (viewer.kind === 'guest') redirect('/sign-in');
   if (viewer.kind === 'member') redirect('/');
 
-  const firstName = viewer.name.split(' ')[0] ?? 'there';
+  const firstName = viewer.name.split(' ')[0] ?? '';
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 px-4 py-10">
@@ -25,7 +25,7 @@ export default async function OnboardingPage() {
         <span className="bg-action text-action-ink mx-auto flex size-10 items-center justify-center rounded-xl">
           <ScaleIcon width={20} height={20} />
         </span>
-        <h1 className="text-2xl font-semibold tracking-tight">Welcome, {firstName}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t.misc.welcome(firstName)}</h1>
         <p className="text-ink-secondary text-sm">{t.misc.onboardingIntro}</p>
       </div>
 
@@ -51,7 +51,7 @@ export default async function OnboardingPage() {
           summary: template.summary,
           statutory: template.statutory,
         }))}
-        suggestedName={`${firstName}'s books`}
+        suggestedName={t.misc.suggestedLedgerName(firstName)}
       />
     </main>
   );

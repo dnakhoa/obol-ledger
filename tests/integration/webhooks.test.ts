@@ -147,12 +147,17 @@ describe('webhooks', () => {
 
   describe('delivery', () => {
     function dispatcherWith(handler: (request: Request) => Response | Promise<Response>) {
-      const calls: { url: string; headers: Headers; body: string }[] = [];
+      const calls: {
+        url: string;
+        headers: Headers;
+        body: string;
+        redirect: RequestRedirect | undefined;
+      }[] = [];
       const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         const url = typeof input === 'string' ? input : input.toString();
         const headers = new Headers(init?.headers);
         const body = String(init?.body ?? '');
-        calls.push({ url, headers, body });
+        calls.push({ url, headers, body, redirect: init?.redirect });
         return handler(new Request(url, { method: 'POST', headers, body }));
       });
       return {
@@ -213,6 +218,31 @@ describe('webhooks', () => {
       // The subscriber's own error text, kept so they can debug it themselves.
       expect(row?.lastError).toContain('upstream on fire');
       expect(row?.nextAttemptAt.getTime()).toBeGreaterThan(Date.now() - 1000);
+    });
+
+    // The address check vets the URL that was registered, not wherever that
+    // URL sends us next. Followed, a public endpoint answering
+    // `302 Location: http://169.254.169.254/…` would reach the metadata
+    // service with the ledger's own network position — and the response
+    // excerpt lands in a delivery log the subscriber can read.
+    it('does not follow a redirect, and does not retry one', async () => {
+      await register();
+      await postAnEntry();
+
+      const { calls, dispatcher } = dispatcherWith(
+        () =>
+          new Response(null, {
+            status: 302,
+            headers: { location: 'http://169.254.169.254/latest/meta-data/' },
+          }),
+      );
+      const result = await dispatcher.dispatch();
+
+      expect(calls.every((call) => call.redirect === 'manual')).toBe(true);
+      expect(result.failed).toBe(result.claimed);
+      const row = (await deliveries())[0];
+      expect(row?.status).toBe('failed');
+      expect(row?.lastError).toContain('redirect');
     });
 
     it('gives up immediately on a 404, which retrying cannot fix', async () => {

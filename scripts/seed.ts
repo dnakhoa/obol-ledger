@@ -626,6 +626,8 @@ async function main(): Promise<void> {
     // Quantities are scaled integers, like money: m² to two places, m³ to three.
     const SCALE: Record<string, bigint> = { m2: 100n, m3: 1000n };
     const produced: Record<string, bigint> = {};
+    // Factory labour as it is accrued, so payday can pay what was earned.
+    const labourAccrued: { day: number; amount: number }[] = [];
     console.log(`opened ${PRODUCTS.length} stock items`);
 
     // Quarry blocks bought, and the factory turning them into product.
@@ -646,6 +648,7 @@ async function main(): Promise<void> {
         { account: 'wip', amount: dong(labour) },
         { account: 'payroll', amount: dong(-labour) },
       ]);
+      labourAccrued.push({ day: day - 1, amount: labour });
       // The run comes off the line as a *lot*: a quantity at a price, priced
       // a little higher than the run before it. The entry posted is the one
       // that was posted before — debit 155, credit 154 — but it now opens a
@@ -1158,11 +1161,19 @@ async function main(): Promise<void> {
     // ---- The rest of running a factory -------------------------------------
 
     for (const day of [90, 60, 30]) {
-      const wages = between(1_900_000_000, 2_400_000_000);
-      await post('Thanh toán lương cho người lao động', daysAgo(day, 9), [
-        { account: 'payroll', amount: dong(wages) },
-        { account: 'bankVnd', amount: dong(-wages) },
-      ]);
+      // What the factory earned since the last payday, not a random figure.
+      // Paying a number unrelated to the accrual overpaid the staff by about
+      // 1.2 billion dong over the quarter, and the balance sheet showed the
+      // business being owed money by its own employees — 334 below zero.
+      const earned = labourAccrued.filter((accrual) => accrual.day > day);
+      const wages = earned.reduce((sum, accrual) => sum + accrual.amount, 0);
+      for (const accrual of earned) labourAccrued.splice(labourAccrued.indexOf(accrual), 1);
+      if (wages > 0) {
+        await post('Thanh toán lương cho người lao động', daysAgo(day, 9), [
+          { account: 'payroll', amount: dong(wages) },
+          { account: 'bankVnd', amount: dong(-wages) },
+        ]);
+      }
 
       const admin = between(320_000_000, 520_000_000);
       await post('Chi phí quản lý doanh nghiệp', daysAgo(day, 14), [

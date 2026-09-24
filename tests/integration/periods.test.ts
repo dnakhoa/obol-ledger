@@ -319,6 +319,49 @@ describe('period close', () => {
     });
   });
 
+  describe('the income statement across a close', () => {
+    // The closing entry moves a month's result into equity; it is not
+    // something the business earned or spent. Counted, it zeroes a closed
+    // month's performance and — dated at the month's last instant — drags the
+    // whole month's revenue into any window that happens to span that instant.
+    it('still reports what a closed month earned', async () => {
+      await earn(10_000n, inJanuary(5));
+      await spend(4_000n, inJanuary(20));
+      expect((await services.periods.close(JANUARY, NOW)).ok).toBe(true);
+
+      const january = await services.reporting.incomeStatement({
+        from: inJanuary(1),
+        to: new Date(Date.UTC(2026, 0, 31, 23, 59, 59, 999)),
+      });
+      expect(january.revenue.total.amount).toBe('100.00');
+      expect(january.netIncome.amount).toBe('60.00');
+    });
+
+    it('does not carry a closed month into a window that crosses its end', async () => {
+      await earn(10_000n, inJanuary(5));
+      await earn(1_000n, inFebruary(3));
+      expect((await services.periods.close(JANUARY, NOW)).ok).toBe(true);
+
+      const window = await services.reporting.incomeStatement({
+        from: inJanuary(21),
+        to: inFebruary(20),
+      });
+      expect(window.revenue.total.amount).toBe('10.00');
+    });
+
+    it('is unchanged by reopening a month', async () => {
+      await earn(10_000n, inJanuary(5));
+      await services.periods.close(JANUARY, NOW);
+      await services.periods.reopen(JANUARY);
+
+      const january = await services.reporting.incomeStatement({
+        from: inJanuary(1),
+        to: new Date(Date.UTC(2026, 0, 31, 23, 59, 59, 999)),
+      });
+      expect(january.revenue.total.amount).toBe('100.00');
+    });
+  });
+
   describe('listing', () => {
     it('reports every month with entries, closed or not', async () => {
       await earn(10_000n, inJanuary(5));

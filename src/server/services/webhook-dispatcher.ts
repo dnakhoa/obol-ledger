@@ -186,11 +186,28 @@ export function createDispatcher(database: Database, orgId: string, deps: Dispat
         // quiet holds the worker until the platform kills the whole function,
         // taking every other delivery in the batch with it.
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        // Not followed. `checkTarget` vetted the registered URL, not wherever
+        // it redirects: a public host answering `302` to a private address
+        // would otherwise reach it from inside, and the body would land in a
+        // log the subscriber can read.
+        redirect: 'manual',
       });
 
       const durationMs = Date.now() - startedAt;
       if (response.ok) {
         return finish(delivery, { ok: true, status: response.status, durationMs });
+      }
+
+      if (response.status >= 300 && response.status < 400) {
+        // A moved endpoint is the subscriber's to update, and retrying will
+        // meet the same redirect.
+        return finish(delivery, {
+          ok: false,
+          status: response.status,
+          retryable: false,
+          error: `HTTP ${response.status}: redirect not followed — register the final URL`,
+          durationMs,
+        });
       }
 
       const excerpt = (await response.text().catch(() => '')).slice(0, ERROR_EXCERPT_CHARS);

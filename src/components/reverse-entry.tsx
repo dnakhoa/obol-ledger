@@ -24,7 +24,6 @@ const INITIAL: ReverseFormState = { status: 'idle' };
 export function ReverseEntry({
   labels,
   transactionId,
-  description,
   action,
 }: {
   /** Resolved on the server; a client component holds no dictionary. */
@@ -37,10 +36,10 @@ export function ReverseEntry({
     noEditing: string;
     reverseThis: string;
     note: string;
+    explain: string;
     cancel: string;
   };
   transactionId: string;
-  description: string;
   action: (state: ReverseFormState, formData: FormData) => Promise<ReverseFormState>;
 }) {
   const [state, submit, pending] = useActionState(action, INITIAL);
@@ -83,11 +82,7 @@ export function ReverseEntry({
           <AlertIcon width={14} height={14} />
           {labels.note}
         </p>
-        <p className="text-ink-secondary text-xs">
-          A mirror of &ldquo;{description}&rdquo; will be written with every amount negated. Both
-          entries stay on the record and the net effect becomes zero. An entry can only be reversed
-          once, and the reversal itself can only be undone by reversing it in turn.
-        </p>
+        <p className="text-ink-secondary text-xs">{labels.explain}</p>
       </div>
 
       {state.status === 'error' ? (
@@ -100,13 +95,7 @@ export function ReverseEntry({
       ) : null}
 
       <Field label={labels.description} htmlFor="reason" hint={labels.hint}>
-        <Input
-          id="reason"
-          name="reason"
-          maxLength={280}
-          placeholder={`Reversal of ${description}`}
-          aria-describedby="reason-hint"
-        />
+        <Input id="reason" name="reason" maxLength={280} aria-describedby="reason-hint" />
       </Field>
 
       <div className="flex items-center gap-2">

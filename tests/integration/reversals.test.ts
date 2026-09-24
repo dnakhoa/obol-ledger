@@ -165,4 +165,50 @@ describe('reversing entries', () => {
     const rows = await services.reporting.trialBalance();
     expect(rows.every((row) => row.balanced)).toBe(true);
   });
+
+  /*
+   * A reversal cancels money that moved. A pending entry has not moved any
+   * yet and a cancelled one never will, so the mirror of either would move
+   * money that was never there — written as posted, straight into balances.
+   * The entry page hides the button for both; the API and the server action
+   * take any id, so the service is where the rule has to live.
+   */
+  describe('an entry that never settled', () => {
+    async function hold(amount: bigint) {
+      const held = await services.journal.postEntry({
+        description: 'Card authorisation',
+        currency: 'USD',
+        status: 'pending',
+        postings: [
+          { accountId: cash.id, amount: usd(amount) },
+          { accountId: revenue.id, amount: usd(-amount) },
+        ],
+      });
+      if (!held.ok) throw new Error(`setup failed: ${held.error.code}`);
+      return held.value.transaction;
+    }
+
+    it('refuses to reverse a cancelled entry, and moves nothing', async () => {
+      const held = await hold(30_000n);
+      expect((await services.journal.archivePending(held.id)).ok).toBe(true);
+
+      const result = await services.journal.reverseEntry({ transactionId: held.id });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe('entry_not_settled');
+
+      const after = await services.accounts.byId(cash.id);
+      expect(after.ok && after.value.balance.amount).toBe('500.00');
+    });
+
+    it('refuses to reverse a pending entry — it can be cancelled instead', async () => {
+      const held = await hold(30_000n);
+
+      const result = await services.journal.reverseEntry({ transactionId: held.id });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe('entry_not_settled');
+
+      const after = await services.accounts.byId(cash.id);
+      expect(after.ok && after.value.balance.amount).toBe('500.00');
+    });
+  });
 });

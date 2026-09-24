@@ -135,7 +135,7 @@ export const ja: Messages = {
 
     emptyTitle: '勘定科目がまだありません',
     emptyBody:
-      '勘定科目は API から作成します。pnpm db:seed で 1 か月分のサンプル帳簿を読み込めます。',
+      '仕訳は勘定間で金額を動かすものなので、まず勘定科目が必要です。勘定科目を作成して始めましょう。',
 
     asset: '資産',
     liability: '負債',
@@ -488,6 +488,24 @@ export const ja: Messages = {
     cancelIt: '取り消す',
     cancelledNote:
       'この仕訳は決済前に取り消されたため、残高には一度も反映されていません。訂正するものはありません \u2014 反対仕訳は実際に動いた金額を打ち消すものであり、ここでは何も動いていないからです。',
+    reverseExplain: (description) =>
+      `「${description}」の金額をすべて符号反転した反対仕訳を記帳します。両方の仕訳が帳簿に残り、正味の影響はゼロになります。訂正できるのは一度だけで、反対仕訳を取り消すには、その反対仕訳をさらに訂正します。`,
+    pendingExplain:
+      '資金は拘束されていますが、まだ動いていません。各勘定の利用可能残高は減り、記帳済み残高は変わりません。決済すると資金が動き、取り消すと拘束が解除されて何も動きません。',
+    recordedAt: (when) => `記録日時 ${when}`,
+    welcome: (name) => (name ? `ようこそ、${name} さん` : 'ようこそ'),
+    suggestedLedgerName: (name) => (name ? `${name} さんの帳簿` : '自分の帳簿'),
+    signingOut: 'ログアウト中…',
+    noAccountsToPost:
+      '記帳先の勘定科目がまだありません。仕訳は勘定間で金額を動かすものなので、先に勘定科目を作成してください。',
+    openChart: '勘定科目を作成',
+    signInOff:
+      'このデプロイではサインインが無効になっているため、デモは閲覧専用です。表示されている内容はすべて実データです — 残高、レポート、API リファレンスも。',
+    signInOffDev:
+      '有効にするには GITHUB_CLIENT_ID と GITHUB_CLIENT_SECRET、または Google の組を設定してください。',
+    justLooking: '見るだけですか？',
+    noAccountNeeded: 'アカウントは不要です。',
+    readOnlyDemo: '閲覧専用デモ',
   },
 
   entry: {

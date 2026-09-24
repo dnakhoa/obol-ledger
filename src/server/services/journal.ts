@@ -194,7 +194,9 @@ export function createJournalService(database: Database, orgId: string) {
               responseStatus: 201,
               responseBody: entry,
             })
-            .where(eq(idempotencyKeys.key, input.idempotency.key));
+            .where(
+              and(eq(idempotencyKeys.orgId, orgId), eq(idempotencyKeys.key, input.idempotency.key)),
+            );
         }
 
         return { transaction: entry, replayed: false };
@@ -237,7 +239,10 @@ export function createJournalService(database: Database, orgId: string) {
     const [existing] = await tx
       .select()
       .from(idempotencyKeys)
-      .where(eq(idempotencyKeys.key, idempotency.key))
+      // Scoped here as well as by row-level security: the key is only unique
+      // per tenant, and a connection that bypasses the policies would otherwise
+      // replay another tenant's entry.
+      .where(and(eq(idempotencyKeys.orgId, orgId), eq(idempotencyKeys.key, idempotency.key)))
       .limit(1);
 
     if (!existing) throw new Error(`idempotency key ${idempotency.key} vanished mid-transaction`);
@@ -704,6 +709,18 @@ export function createJournalService(database: Database, orgId: string) {
           throw new DomainAbort({ code: 'entry_not_found', transactionId: input.transactionId });
         }
 
+        // The mirror is written as posted, so reversing an entry that never
+        // moved money — pending, or cancelled before it settled — would move
+        // money that was never there. The entry page hides the button for
+        // both; the API and the server action take any id.
+        if (original.status !== 'posted') {
+          throw new DomainAbort({
+            code: 'entry_not_settled',
+            transactionId: original.id,
+            entryStatus: original.status as TransactionStatus,
+          });
+        }
+
         const [existing] = await tx
           .select({ id: transactions.id })
           .from(transactions)
@@ -778,7 +795,9 @@ export function createJournalService(database: Database, orgId: string) {
           await tx
             .update(idempotencyKeys)
             .set({ transactionId: entry.id, responseStatus: 201, responseBody: entry })
-            .where(eq(idempotencyKeys.key, input.idempotency.key));
+            .where(
+              and(eq(idempotencyKeys.orgId, orgId), eq(idempotencyKeys.key, input.idempotency.key)),
+            );
         }
 
         return { transaction: entry, replayed: false };

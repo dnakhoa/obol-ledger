@@ -35,6 +35,9 @@ const DELIBERATELY_ENGLISH = [
   'components/api-key-form.tsx',
   'components/endpoint-form.tsx',
   'app/opengraph-image.tsx',
+  // Shown only when the database has no schema: its reader is whoever runs
+  // the deployment, and the commands in it are the same in every language.
+  'components/setup-notice.tsx',
 ];
 
 /** Text that is not prose: identifiers, format examples, units. */
@@ -50,8 +53,14 @@ const NOT_PROSE =
  * translating. It shipped an untranslated paragraph onto the error page and
  * reported 421 passing tests while doing it. The `s` flag does not help: there
  * is no `.` here for it to widen.
+ *
+ * Text can also sit against an expression rather than a tag — `Set{' '}<code>`,
+ * `Recorded {when}`, `{' '}— no account needed.` — so a run may start after
+ * `}` and end before `{`, and may open with a dash. Requiring `>…<` on both
+ * sides let three English sentences onto the sign-in page, and five more
+ * elsewhere, while this test passed.
  */
-const TEXT = />\s*([A-Z][A-Za-z0-9\s,.'’—–&;:!?%/()-]{6,}?)\s*</gsu;
+const TEXT = /[>}]\s*([A-Z—–][A-Za-z0-9\s,.'’—–&;:!?%/()-]{6,}?)\s*(?=[<{])/gsu;
 
 /** Props whose value is shown to a person. */
 const PROP =
@@ -81,6 +90,8 @@ function englishIn(source: string): string[] {
     // anchored exemption, which is a confusing way to be told nothing is wrong.
     const text = (match[1] ?? '').trim().split(/\s+/u).join(' ');
     if (text.includes('{') || text.includes('}')) continue;
+    // A dash standing in for an empty cell is punctuation, not prose.
+    if (!/\p{L}/u.test(text)) continue;
     if (NOT_PROSE.test(text)) continue;
     found.push(text);
   }

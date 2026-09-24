@@ -38,24 +38,36 @@ export default async function SignInPage() {
         </CardHeader>
         <CardBody>
           {providers.length === 0 ? (
-            <p className="text-ink-secondary text-sm">
-              No sign-in provider is configured on this deployment. Set{' '}
-              <code className="font-mono text-xs">GITHUB_CLIENT_ID</code> and{' '}
-              <code className="font-mono text-xs">GITHUB_CLIENT_SECRET</code> to enable one.
-            </p>
+            // A visitor to the published demo is told what they can still do;
+            // the environment variables are for whoever runs the deployment,
+            // so they appear only where that person is the one looking.
+            <div className="space-y-3">
+              <p className="text-ink-secondary text-sm">{t.misc.signInOff}</p>
+              {process.env.NODE_ENV === 'production' ? null : (
+                <p className="text-ink-muted text-xs">{t.misc.signInOffDev}</p>
+              )}
+              <Link
+                href="/"
+                className="bg-action text-action-ink hover:bg-action-hover flex h-10 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors duration-150"
+              >
+                {t.misc.readDemo}
+              </Link>
+            </div>
           ) : (
             <SignInButtons providers={providers} />
           )}
         </CardBody>
       </Card>
 
-      <p className="text-ink-muted text-center text-xs">
-        Just looking?{' '}
-        <Link href="/" className="hover:text-ink-secondary underline">
-          {t.misc.readDemo}
-        </Link>{' '}
-        — no account needed.
-      </p>
+      {providers.length === 0 ? null : (
+        <p className="text-ink-muted text-center text-xs">
+          {t.misc.justLooking}{' '}
+          <Link href="/" className="hover:text-ink-secondary underline">
+            {t.misc.readDemo}
+          </Link>{' '}
+          · {t.misc.noAccountNeeded}
+        </p>
+      )}
     </main>
   );
 }

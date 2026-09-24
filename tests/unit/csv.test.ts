@@ -6,8 +6,18 @@ describe('csv', () => {
     // The hazard is not theoretical and not about commas. A cell beginning
     // with one of these is executed by Excel, Sheets and LibreOffice, and on a
     // ledger the attacker's input channel is "type an entry description".
-    it.each(['=1+1', '+1', '-1', '@SUM(A1)', '\tx', '\rx'])('neutralises %j', (payload) => {
-      expect(csvCell(payload).replace(/^"/u, '')).toMatch(/^'/u);
+    it.each(['=1+1', '+1', '-1+1', "-2+3+cmd|' /C calc'!A0", '@SUM(A1)', '\tx', '\rx'])(
+      'neutralises %j',
+      (payload) => {
+        expect(csvCell(payload).replace(/^"/u, '')).toMatch(/^'/u);
+      },
+    );
+
+    // A ledger exports negative numbers on every other row. Prefixed, they
+    // import as text — which a spreadsheet's SUM skips without a word — and a
+    // bare number is not a formula however it starts: `-1` evaluates to -1.
+    it.each(['-1', '-918000000', '-1234.56', -42])('leaves the number %j a number', (value) => {
+      expect(csvCell(value)).toBe(String(value));
     });
 
     it('neutralises the exfiltration payload specifically', () => {

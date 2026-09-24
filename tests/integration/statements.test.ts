@@ -189,6 +189,44 @@ describe('financial statements', () => {
       expect(statement.profitable).toBe(false);
     });
 
+    it('counts only settled entries — not a pending sale, nor a cancelled one', async () => {
+      // A pending entry reserves funds without moving them, and a cancelled
+      // one never moved any: neither has earned anything yet. The balance
+      // sheet already agrees — it reads posted balances — so a statement that
+      // counted them would disagree with the balance sheet about the same day.
+      const at = new Date('2026-03-12T12:00:00Z');
+      const pending = await services.journal.postEntry({
+        description: 'Pending sale',
+        currency: 'USD',
+        occurredAt: at,
+        status: 'pending',
+        postings: [
+          { accountId: cash.id, amount: usd(5_000n) },
+          { accountId: revenue.id, amount: usd(-5_000n) },
+        ],
+      });
+      const cancelled = await services.journal.postEntry({
+        description: 'Cancelled sale',
+        currency: 'USD',
+        occurredAt: at,
+        status: 'pending',
+        postings: [
+          { accountId: cash.id, amount: usd(7_000n) },
+          { accountId: revenue.id, amount: usd(-7_000n) },
+        ],
+      });
+      if (!pending.ok || !cancelled.ok) throw new Error('could not post');
+      const archived = await services.journal.archivePending(cancelled.value.transaction.id);
+      expect(archived.ok).toBe(true);
+
+      const statement = await services.reporting.incomeStatement(march);
+      expect(statement.revenue.total.amount).toBe('0.00');
+
+      expect((await services.journal.postPending(pending.value.transaction.id)).ok).toBe(true);
+      const settled = await services.reporting.incomeStatement(march);
+      expect(settled.revenue.total.amount).toBe('50.00');
+    });
+
     it('includes accounts with no activity, so the shape of the period is visible', async () => {
       const statement = await services.reporting.incomeStatement(march);
       expect(statement.revenue.lines.map((line) => line.accountName)).toEqual(['Sales']);

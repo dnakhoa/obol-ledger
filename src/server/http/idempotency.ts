@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Result } from '@/lib/result';
 import { servicesFor, type Services } from '@/server/container';
 import { db } from '@/server/db/client';
@@ -84,7 +84,7 @@ export async function createIdempotently<T>(
           responseStatus: 201,
           responseBody: { data: created.body, location: created.location },
         })
-        .where(eq(idempotencyKeys.key, key));
+        .where(and(eq(idempotencyKeys.orgId, context.orgId), eq(idempotencyKeys.key, key)));
       return { created, replayed: false };
     });
     return respond(outcome.created, outcome.replayed);
@@ -138,7 +138,10 @@ async function claim(
   const [existing] = await tx
     .select()
     .from(idempotencyKeys)
-    .where(eq(idempotencyKeys.key, key))
+    // Scoped here as well as by row-level security: the key is only unique per
+    // tenant, and a connection that bypasses the policies would otherwise
+    // replay another tenant's response.
+    .where(and(eq(idempotencyKeys.orgId, orgId), eq(idempotencyKeys.key, key)))
     .limit(1);
   if (!existing) throw new Error(`idempotency key ${key} vanished mid-transaction`);
   if (existing.fingerprint !== fingerprint) {
