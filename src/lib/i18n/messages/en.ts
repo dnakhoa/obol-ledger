@@ -35,6 +35,10 @@ export const en = {
     pageNotFound: 'That page does not exist',
     keepYourOwnBooks: 'Keep your own books',
     working: 'Working…',
+    refusalSignIn:
+      'Sign in to keep your own books. This is the published demo, which anyone can read and nobody can change.',
+    refusalNoLedger: 'This account has no ledger yet. Create one to start posting entries.',
+    refusalReadOnly: 'Your role on this ledger is read-only.',
   },
 
   nav: {
@@ -42,6 +46,7 @@ export const en = {
     overview: 'Overview',
     accounts: 'Accounts',
     stock: 'Stock',
+    sales: 'Sales',
     journal: 'Journal',
     reports: 'Reports',
     monthEnd: 'Month end',
@@ -101,6 +106,22 @@ export const en = {
     entryDescription: 'Description',
     accounts: 'Accounts',
     amount: 'Amount',
+    theBooks: 'The books',
+    trading: 'The business at a glance',
+    stockOnHand: 'Stock on hand',
+    stockAgrees: (products: number) => `${products} products · agrees with the accounts`,
+    stockDisagrees: 'Out of step with the accounts — check',
+    owedToYou: 'Owed to you',
+    invoicesLate: (count: number, days: number) =>
+      `${count} invoice${count === 1 ? '' : 's'} late · oldest ${days} days`,
+    nothingLate: 'Nothing late',
+    owedToSuppliers: 'Owed to suppliers',
+    billsLate: (count: number) => `${count} bill${count === 1 ? '' : 's'} past due`,
+    nothingPastDue: 'Nothing past due',
+    marginThisMonth: 'Gross margin this month',
+    marginDetail: (invoices: number, percent: string) =>
+      `${percent} on ${invoices} invoice${invoices === 1 ? '' : 's'}`,
+    noInvoicesYet: 'No invoices raised this month',
   },
 
   accounts: {
@@ -148,6 +169,7 @@ export const en = {
     description:
       'Every delivery is kept as its own lot with its own price. When something ships, the ledger works out what it cost from the lots it came from — and tells you which ones.',
     importButton: 'Import from a spreadsheet',
+    sellButton: 'Raise an invoice',
 
     inTheYard: 'What is in the yard',
     inTheYardHint: 'Values are what you paid, not what you will sell it for.',
@@ -264,6 +286,24 @@ export const en = {
     shippedOut: 'Shipped out',
     nothingMoved: 'Nothing has moved yet',
     nothingMovedBody: 'Deliveries and shipments will be listed here.',
+    writeOffTitle: 'Write stock off',
+    writeOffHint:
+      'Broken, past its date, lost, or short at a stocktake. Costed from the lots exactly as a sale would be, and posted to the expense you choose — so shrinkage does not hide inside cost of sales.',
+    writeOffButton: 'Write it off',
+    howMuchWrittenOff: (unit: string) => `How much (${unit})`,
+    reason: 'Why',
+    reasonDamaged: 'Damaged or broken',
+    reasonExpired: 'Past its date',
+    reasonLost: 'Lost',
+    reasonCountShortfall: 'Short at stocktake',
+    reasonOther: 'Other',
+    lossAccount: 'Loss account',
+    lossAccountHint: 'An expense: stock losses, breakage, obsolescence.',
+    writeOffReferenceHint: 'The stocktake sheet or damage report.',
+    needLossAccount: 'Open an expense account for stock losses on the',
+    writtenOff: 'Written off',
+    sold: 'Sold',
+    soldFor: 'Sold for',
   },
 
   journal: {
@@ -300,6 +340,12 @@ export const en = {
     title: 'Post an entry',
     description:
       'Record a journal entry. The balance is checked as you type, again in the domain layer, and a third time by Postgres at COMMIT.',
+    tooMany: (seconds: number) => `Too many entries posted. Try again in ${seconds} seconds.`,
+    checkFields: 'The entry could not be posted. Check the highlighted fields.',
+    notAnAmount: (line: number, amount: string, currency: string) =>
+      `Line ${line}: “${amount}” is not a valid amount in ${currency}.`,
+    notRepresentable: (currency: string) => `Not representable in ${currency}`,
+    posted: (id: string) => `Entry posted as ${id}.`,
   },
 
   reports: {
@@ -372,6 +418,18 @@ export const en = {
     noMonths: 'No entries yet, so no months to close.',
     reopen: 'Reopen',
     stepNumber: (n: number) => `Step ${n}`,
+
+    rateNotANumber: 'Enter a rate as a plain number, for example 25700.',
+    rateSaved: (base: string, rate: string, functional: string, day: string) =>
+      `Saved 1 ${base} = ${rate} ${functional} for ${day}.`,
+    pickMonth: 'Pick a month first.',
+    revalued: (count: number) =>
+      `Updated ${count} foreign ${count === 1 ? 'balance' : 'balances'} to the month-end rate.`,
+    nothingToRevalue:
+      'Checked every foreign balance — the rates had not moved, so nothing needed changing.',
+    monthClosed: (month: string) => `${month} is closed. Its figures will not change again.`,
+    monthReopened: (month: string) =>
+      `${month} is open again. The closing entry has been reversed, and both stay on the record.`,
   },
 
   misc: {
@@ -449,6 +507,19 @@ export const en = {
     sumsToZero: 'Summing to zero, verified at COMMIT',
     metadata: 'Metadata',
     account: 'Account',
+    ownedByStockTitle: 'Written by the stock records',
+    ownedByStock:
+      'This entry moved stock as well as money, so it cannot be reversed here — that would move the account without moving the lots behind it. Correct it from the stock pages: a write-off, or a further charge on the shipment.',
+    openSale: 'Open the invoice',
+    cancelledByReversal:
+      'This entry was cancelled by a later reversing entry. It stays on the record; its net effect is zero.',
+    cancelsEarlier: 'This entry exists to cancel an earlier one. Both stay on the record.',
+    viewOriginal: 'View the original',
+    reservedNotMoved: 'Reserved, not yet moved',
+    cancelledNeverMoved: 'Cancelled; never moved',
+    debitSideMatches: 'Debit side; credits match exactly',
+    metadataHintBefore: 'The caller’s own references. Opaque to the ledger, and searchable —',
+    metadataHintAfter: 'on the journal.',
   },
 
   statement: {
@@ -524,6 +595,30 @@ export const en = {
     reversalHint:
       'Optional. Defaults to \u201cReversal of \u2026\u201d, which is usually what you want.',
     postReversal: 'Post the reversing entry',
+    tooManyReversals: (seconds: number) => `Too many reversals. Try again in ${seconds} seconds.`,
+    noEntryGiven: 'No entry was specified.',
+    reversedBy: (id: string) => `Reversed by ${id}.`,
+    tooManyTransitions: (seconds: number) => `Too many requests. Try again in ${seconds} seconds.`,
+    transitionUnavailable: 'That action is not available for this entry.',
+    settled: 'Entry settled.',
+    cancelledNothingMoved: 'Entry cancelled; nothing moved.',
+
+    tooManyAccounts: (seconds: number) =>
+      `Too many accounts created. Try again in ${seconds} seconds.`,
+    accountCheckFields: 'The account could not be opened. Check the highlighted fields.',
+    accountExists: (name: string, currency: string) =>
+      `An account named “${name}” already exists in ${currency}.`,
+    alreadyInUse: 'Already in use',
+    accountCode: 'Account code',
+    accountCodeHint:
+      'Digits only. Required on a statutory chart, where the first digit is the class.',
+    accountCodeRequiredHint:
+      'Required: under Thông tư 200 the first digit is the class — 131 a receivable, 331 a payable.',
+    openItems: 'Track as a customer or supplier',
+    openItemsNote:
+      'The balance is a set of unpaid invoices, so it appears in the aged receivables or payables. One account per customer is how the report tells them apart.',
+    paymentTerms: 'Payment terms (days)',
+    paymentTermsHint: 'How long they have to pay. Blank assumes 30; 0 means on receipt.',
   },
 
   palette: {
@@ -545,19 +640,26 @@ export const en = {
     caption: (account: string) => `${account}, oldest first`,
     invoice: 'Invoice',
     dated: 'Dated',
-    age: 'Age',
     outstanding: 'Outstanding',
-    days: (count: number) => `${count} days`,
-    current: 'Up to 30 days',
-    days31to60: '31–60 days',
-    days61to90: '61–90 days',
-    over90: 'Over 90 days',
+    current: 'Not yet due',
+    days1to30: '1–30 days late',
+    days31to60: '31–60 days late',
+    days61to90: '61–90 days late',
+    over90: 'Over 90 days late',
+    due: 'Due',
+    late: 'Late',
+    lateDays: (count: number) => `${count} days`,
+    notYetDue: 'Not yet',
+    terms: (days: number) => (days === 0 ? 'Payment on receipt' : `${days}-day terms`),
+    termsAssumed: (days: number) => `${days}-day terms assumed — none set on the account`,
     total: 'Total',
-    overdue: (percent: string) => `${percent}% past 30 days`,
+    overdue: (percent: string) => `${percent}% overdue`,
     emptyTitle: 'Nothing outstanding',
     emptyBody: 'Every invoice on these accounts has been settled.',
     convention:
       'Nothing records which invoice a payment settled, so the oldest open one is taken first. That is a convention, not a fact — it matters when a customer pays a later invoice and disputes an earlier one.',
+    dueConvention:
+      'Lateness counts from the invoice’s own due date where it has one — every invoice raised on the Sales page does — and otherwise from the account’s payment terms, or thirty days where none are set.',
     credit: 'in credit',
   },
 
@@ -615,6 +717,13 @@ export const en = {
       'Returns are filed in order, oldest first. An unused credit passes from each return to the next, so skipping one would leave the next one short without anything to show it.',
     carriedExplainer:
       'You paid more tax than you charged, so there is nothing to pay. The difference is not refunded — it stays as credit and comes off the next return.',
+    pickPeriod: 'Pick a period first.',
+    filedNothingOwed: (credit: string) =>
+      `Filed. Nothing to pay — ${credit} of credit goes into the next return.`,
+    filedOwing: (payable: string) =>
+      `Filed. ${payable} is now owed, and sits in the tax payable account until you pay it.`,
+    codeIncomplete: 'Give the rate a name and a percentage, for example 10 or 8.25.',
+    codeAdded: (name: string) => `Added ${name}.`,
   },
 
   shipments: {
@@ -674,6 +783,15 @@ export const en = {
     submit: 'Add this charge',
     checkFirst: 'Check what it does',
     previewTitle: 'What this charge will do',
+
+    shipmentIncomplete: 'Give the shipment a reference and the date it arrived.',
+    recorded: (reference: string) => `Recorded ${reference}.`,
+    amountNotANumber: 'Enter the amount as a plain number.',
+    chargeIncomplete: 'Check the amount, the description and the accounts.',
+    addedToStock: (amount: string) => `Added. ${amount} went onto the stock.`,
+    addedSplit: (toStock: string, toCogs: string) =>
+      `Added. ${toStock} went onto the stock still held, and ${toCogs} to cost of sales for the part already sold.`,
+    addedReclaimable: 'Added. Nothing was added to the stock, because this charge is reclaimable.',
   },
 
   stockImport: {
@@ -739,6 +857,166 @@ export const en = {
     fixFirst:
       'Fix the rows marked above and check again. The import is all or nothing — it will not bring in the good rows and leave the rest.',
     rowProblem: (line: number, problem: string) => `Row ${line}: ${problem}`,
+    pasteRows: 'Paste the rows in, and choose where the deliveries are charged.',
+    rowsLost: 'The rows were lost. Paste them again.',
+    noColumn: (columns: string) =>
+      `This file has no ${columns} column, so there is nothing to import from it yet. Check the header row.`,
+    rowsNeedFixing: (problems: number, rows: number) =>
+      `${problems} of ${rows} rows need fixing first. Nothing has been imported.`,
+    readyToImport: (rows: number, products: number, readOnly: string) =>
+      `${rows} deliver${rows === 1 ? 'y' : 'ies'} ready${products > 0 ? `, opening ${products} new product${products === 1 ? '' : 's'}` : ''}${readOnly === 'yes' ? '. Sign in to import them into your own books' : '. Nothing has been imported yet'}.`,
+    imported: (lots: number, products: number) =>
+      `Imported ${lots} deliver${lots === 1 ? 'y' : 'ies'}${products > 0 ? `, opening ${products} new product${products === 1 ? '' : 's'}` : ''}. Each one has been posted to the ledger too.`,
+  },
+  sales: {
+    title: 'Sales',
+    description:
+      'Every invoice ships its stock and posts what it cost in the same entry, so each one knows what it made.',
+    marginsButton: 'Gross margin',
+
+    recentTitle: 'Recent invoices',
+    recentHint:
+      'The invoice total is in the currency it was raised in. Revenue, cost and margin are in the books’ own currency: revenue at the rate on the invoice date, cost at the rate each lot arrived at.',
+    tableCaption: 'Invoices, most recent first, with their margin',
+    invoice: 'Invoice',
+    customer: 'Customer',
+    date: 'Date',
+    due: 'Due',
+    onReceipt: '30 days, assumed',
+    invoiced: 'Invoiced',
+    revenue: 'Revenue',
+    cost: 'Cost',
+    margin: 'Margin',
+    emptyTitle: 'No invoices yet',
+    emptyBody:
+      'Raise one below. It ships the stock, posts the receivable and the revenue, and costs the goods from the lots they came out of — in one entry.',
+
+    newTitle: 'Raise an invoice',
+    newHint:
+      'The whole invoice is one entry, so the receivable, the revenue, the tax and the cost of the goods cannot disagree. If any line is short of stock, nothing is written.',
+    needSetup:
+      'You need a product with stock on hand, a customer account (an asset — one per customer is how aged receivables tell them apart) and a revenue account. Set them up on the',
+    stockLink: 'stock page',
+    andThe: 'and the',
+    invoiceNumber: 'Invoice number',
+    invoiceNumberHint: 'Issued once. Customers pay against it.',
+    customerAccount: 'Customer',
+    customerAccountHint: 'Their receivable account, or a bank account for a cash sale.',
+    revenueAccount: 'Revenue account',
+    currency: 'Invoiced in',
+    currencyHint:
+      'An export is invoiced in the buyer’s currency; the rate on the invoice date is used.',
+    taxCode: 'Tax',
+    noTax: 'No tax',
+    invoiceDate: 'Invoice date',
+    dueDate: 'Payment due',
+    dueDateHint:
+      'Leave blank to use the customer’s payment terms. Aged receivables count lateness from this date.',
+    linesLegend: 'Lines',
+    product: 'Product',
+    quantity: (unit: string) => `Quantity (${unit})`,
+    lineTotal: 'Line total before tax',
+    lot: 'Lot',
+    byMethod: 'By costing method',
+    remove: 'Remove',
+    addLine: 'Add a line',
+    removeLine: (line: number) => `Remove line ${line}`,
+    lineLabel: (line: number) => `Line ${line}`,
+    submit: 'Raise invoice',
+
+    allSales: 'All sales',
+    linesTitle: 'Lines',
+    linesHint:
+      'What each line was sold for, what it cost from the lots, and which lots it shipped from.',
+    linesCaption: 'Invoice lines with revenue, cost and margin',
+    shippedFrom: 'Shipped from',
+    net: 'Net',
+    tax: 'Tax',
+    gross: 'Total',
+    viewEntry: 'The journal entry',
+    marginOf: (percent: string) => `${percent} margin`,
+
+    // Outcomes of the form.
+    checkForm: 'Fill in an invoice number, a customer, a revenue account and at least one line.',
+    checkLine: (line: number) => `Line ${line}: choose a product and enter a quantity and a total.`,
+    tooManyDecimals: (line: number, places: number) =>
+      places === 0
+        ? `Line ${line}: this product is counted in whole units.`
+        : `Line ${line}: this product is measured to ${places} decimal place${places === 1 ? '' : 's'}.`,
+    amountNotRepresentable: (line: number, currency: string) =>
+      `Line ${line}: that total has more decimal places than ${currency} allows.`,
+    raised: (reference: string, margin: string) =>
+      `Raised ${reference}. The stock has shipped, and the invoice made ${margin}.`,
+  },
+
+  margins: {
+    title: 'Gross margin',
+    description:
+      'What was made on what was sold, by product and by customer. Revenue at the rate on each invoice’s date, cost at the rate each lot arrived at — the only two figures that add up across currencies.',
+    month: 'Month',
+    previous: 'Previous month',
+    next: 'Next month',
+    revenue: 'Revenue',
+    cost: 'Cost of sales',
+    margin: 'Gross margin',
+    marginPercent: 'Margin %',
+    invoices: 'Invoices',
+    byProduct: 'By product',
+    byProductHint:
+      'Freight and duty that arrived after the goods had gone went straight to cost of sales. They are shown separately and included in cost: they belong to the product, not to any one invoice.',
+    byProductCaption: 'Gross margin by product, largest contribution first',
+    byCustomer: 'By customer',
+    byCustomerHint:
+      'Late freight and duty are not in these figures, because they cannot be attributed to a customer — which is why the two tables’ costs differ by exactly that amount.',
+    byCustomerCaption: 'Gross margin by customer, largest contribution first',
+    product: 'Product',
+    customer: 'Customer',
+    sold: 'Sold',
+    lateCharges: 'Late freight & duty',
+    total: 'Total',
+    emptyTitle: 'Nothing sold this month',
+    emptyBody: 'Invoices raised on the Sales page appear here, costed from the lots they shipped.',
+  },
+
+  reconcile: {
+    title: 'Stock against the accounts',
+    agrees: 'The stock records agree with the accounts',
+    agreesBody:
+      'Every inventory account holds exactly what its open lots are worth. Nothing has been posted to stock except by moving stock.',
+    disagrees: 'The stock records and the accounts disagree',
+    disagreesBody:
+      'Something was posted straight to an inventory account without moving any stock, so every margin costed from the lots is out by the difference. The entries responsible are listed; reverse them, or record the stock movement they stood for.',
+    caption: 'Inventory accounts against the lots behind them',
+    account: 'Account',
+    products: 'Products',
+    ledger: 'In the accounts',
+    lots: 'In the lots',
+    difference: 'Difference',
+    unexplained: 'Posted without moving stock',
+  },
+
+  stockOutcome: {
+    checkProduct: 'Fill in a code, a name and a unit of measure.',
+    added: (name: string) => `Added ${name}. You can book a delivery against it now.`,
+    plainNumber: 'Enter a plain number, for example 1250 or 24.687.',
+    checkQuantityAndAmount: 'Check the quantity and the amount.',
+    checkQuantity: 'Check the quantity.',
+    tooManyDecimals: (places: number) =>
+      places === 0
+        ? 'This product is counted in whole units.'
+        : `This product is measured to ${places} decimal place${places === 1 ? '' : 's'}. Round the quantity, or change the product’s precision.`,
+    quantityPlain: 'Enter the quantity as a plain number.',
+    amountPlain: 'Enter the amount paid as a plain number.',
+    bookedIn: (quantity: string, unit: string) =>
+      `Booked in ${quantity} ${unit}. The purchase has been posted to the ledger as well.`,
+    lotsJoiner: ' then ',
+    shippedFrom: (lots: string) =>
+      `Shipped, costed from ${lots}. The cost of goods sold has been posted.`,
+    shipped: 'Shipped, and the cost of goods sold has been posted.',
+    chooseReason: 'Say why the stock is being written off.',
+    writtenOff: (quantity: string, unit: string) => `Wrote off ${quantity} ${unit}.`,
+    writtenOffFrom: (quantity: string, unit: string, lots: string) =>
+      `Wrote off ${quantity} ${unit}, costed from ${lots}.`,
   },
 } as const;
 

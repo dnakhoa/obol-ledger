@@ -23,8 +23,30 @@
  * it made rather than presenting the result as though nobody chose.
  */
 
-export const AGING_BUCKETS = ['current', 'days31to60', 'days61to90', 'over90'] as const;
+/**
+ * Buckets by how late the money is, not how old the invoice is.
+ *
+ * They used to be the invoice's age — up to 30 days, 31–60, and so on — which
+ * quietly assumed every customer was on thirty-day terms. On sixty-day terms
+ * an invoice forty days old is not late, and a report that files it beside the
+ * genuinely late ones teaches the reader to ignore the column that matters.
+ * So the first bucket is "not yet due", and the rest count days past due.
+ *
+ * When nothing states the terms the report still assumes thirty days, so an
+ * undated invoice lands exactly where it used to — 45 days old was "31–60",
+ * and is now "1–30 days overdue", which is what that label always meant.
+ */
+export const AGING_BUCKETS = [
+  'current',
+  'days1to30',
+  'days31to60',
+  'days61to90',
+  'over90',
+] as const;
 export type AgingBucket = (typeof AGING_BUCKETS)[number];
+
+/** The terms assumed when neither the invoice nor the account states any. */
+export const DEFAULT_TERMS_DAYS = 30;
 
 /** A posting on a receivable or payable account, in date order. */
 export type AgingEntry = {
@@ -35,6 +57,8 @@ export type AgingEntry = {
   readonly description: string;
   /** An invoice number, when the entry carried one. */
   readonly reference: string | null;
+  /** When the invoice itself says it is due. Wins over the account's terms. */
+  readonly dueOn?: Date | null | undefined;
 };
 
 export type OpenItem = {
@@ -45,6 +69,9 @@ export type OpenItem = {
   /** What is still outstanding, as a positive number. */
   readonly outstanding: bigint;
   readonly ageDays: number;
+  readonly dueOn: Date;
+  /** Days past due; zero while it is not yet due. */
+  readonly daysOverdue: number;
   readonly bucket: AgingBucket;
 };
 
@@ -52,16 +79,17 @@ export type Aging = {
   readonly items: readonly OpenItem[];
   readonly total: bigint;
   readonly byBucket: Readonly<Record<AgingBucket, bigint>>;
-  /** What is past thirty days, as a share of the total in basis points. */
+  /** What is past due, as a share of the total in basis points. */
   readonly overdueBasisPoints: number;
 };
 
 const DAY = 24 * 60 * 60 * 1000;
 
-export function bucketFor(ageDays: number): AgingBucket {
-  if (ageDays <= 30) return 'current';
-  if (ageDays <= 60) return 'days31to60';
-  if (ageDays <= 90) return 'days61to90';
+export function bucketFor(daysOverdue: number): AgingBucket {
+  if (daysOverdue <= 0) return 'current';
+  if (daysOverdue <= 30) return 'days1to30';
+  if (daysOverdue <= 60) return 'days31to60';
+  if (daysOverdue <= 90) return 'days61to90';
   return 'over90';
 }
 
@@ -77,7 +105,10 @@ export function ageAccount(
   entries: readonly AgingEntry[],
   asOf: Date,
   increases: 'debit' | 'credit',
+  /** The account's payment terms; null or absent assumes `DEFAULT_TERMS_DAYS`. */
+  termsDays: number | null = null,
 ): Aging {
+  const terms = termsDays ?? DEFAULT_TERMS_DAYS;
   const sign = increases === 'debit' ? 1n : -1n;
 
   // Oldest first, and ties broken on id — which is a ULID, so it is also
@@ -127,6 +158,14 @@ export function ageAccount(
         0,
         Math.floor((asOf.getTime() - item.entry.occurredAt.getTime()) / DAY),
       );
+      // Due at the start of the stated day, so an invoice due today is not
+      // yet late and one due yesterday is a day late.
+      const dueOn =
+        item.entry.dueOn ?? new Date(startOfDay(item.entry.occurredAt).getTime() + terms * DAY);
+      const daysOverdue = Math.max(
+        0,
+        Math.floor((startOfDay(asOf).getTime() - startOfDay(dueOn).getTime()) / DAY),
+      );
       return {
         id: item.entry.id,
         occurredAt: item.entry.occurredAt,
@@ -134,7 +173,9 @@ export function ageAccount(
         reference: item.entry.reference,
         outstanding: item.outstanding,
         ageDays,
-        bucket: bucketFor(ageDays),
+        dueOn,
+        daysOverdue,
+        bucket: bucketFor(daysOverdue),
       };
     });
 
@@ -158,4 +199,8 @@ export function ageAccount(
     // string it is about to be printed as.
     overdueBasisPoints: total > 0n ? Number((overdue * 10_000n) / total) : 0,
   };
+}
+
+function startOfDay(value: Date): Date {
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
 }

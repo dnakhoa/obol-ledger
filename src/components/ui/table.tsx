@@ -25,16 +25,35 @@ export function Table({ children, caption }: { children: ReactNode; caption?: st
   );
 }
 
+/**
+ * Columns a phone can do without.
+ *
+ * A ledger table has one or two columns that are the point — the amount, the
+ * margin — and several that qualify them. Squeezed onto 390 pixels they all
+ * wrap to one word per line, and the one that mattered is scrolled off the
+ * right edge. Each table names its secondary columns, and pages restate what
+ * those carried in the primary cell where it is needed. Spelled out rather
+ * than built, so Tailwind can see the classes.
+ */
+export type HideBelow = 'sm' | 'md' | 'lg';
+const HIDDEN: Record<HideBelow, string> = {
+  sm: 'hidden sm:table-cell',
+  md: 'hidden md:table-cell',
+  lg: 'hidden lg:table-cell',
+};
+
 export function Th({
   children,
   align = 'left',
   className,
   scope = 'col',
+  hideBelow,
 }: {
   children: ReactNode;
   align?: 'left' | 'right';
   className?: string;
   scope?: 'col' | 'row';
+  hideBelow?: HideBelow | undefined;
 }) {
   return (
     <th
@@ -42,6 +61,7 @@ export function Th({
       className={cn(
         'border-line text-ink-muted border-b px-3 py-2.5 text-[11px] font-medium tracking-wide uppercase sm:px-4',
         align === 'right' ? 'text-right' : 'text-left',
+        hideBelow && HIDDEN[hideBelow],
         className,
       )}
     >
@@ -56,6 +76,7 @@ export function Td({
   className,
   numeric = false,
   colSpan,
+  hideBelow,
 }: {
   /** Optional: a spacer cell in a grouped table legitimately holds nothing. */
   children?: ReactNode;
@@ -63,6 +84,7 @@ export function Td({
   className?: string;
   numeric?: boolean;
   colSpan?: number;
+  hideBelow?: HideBelow | undefined;
 }) {
   return (
     <td
@@ -71,6 +93,7 @@ export function Td({
         'border-line border-b px-3 py-2.5 align-middle sm:px-4',
         align === 'right' ? 'text-right' : 'text-left',
         numeric && 'numeric',
+        hideBelow && HIDDEN[hideBelow],
         className,
       )}
     >

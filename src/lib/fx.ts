@@ -89,3 +89,32 @@ export function convert(input: {
 
   return divideRounding(scaledNumerator, denominator) as MinorUnits;
 }
+
+/**
+ * The rate two amounts imply, in the same terms `convert` takes.
+ *
+ * A caller that supplies both an amount and its functional value has already
+ * decided the rate, and the posting records it for whoever audits the entry.
+ * It has to be the rate a person would quote — 25,400 dong to the dollar —
+ * which means undoing the exponent difference that `convert` applies. Dividing
+ * minor units by minor units skips that step and records 254, the factor of a
+ * hundred this module's header warns about. It shipped that way in the journal,
+ * where every dollar posting with a supplied base amount showed a rate of 254.
+ */
+export function impliedRate(input: {
+  amount: MinorUnits;
+  from: CurrencyCode;
+  baseAmount: MinorUnits;
+  to: CurrencyCode;
+}): string {
+  const amount = BigInt(input.amount) < 0n ? -BigInt(input.amount) : BigInt(input.amount);
+  const base = BigInt(input.baseAmount) < 0n ? -BigInt(input.baseAmount) : BigInt(input.baseAmount);
+  if (amount === 0n) return '1';
+
+  // rate = (base / 10^to) / (amount / 10^from), scaled by RATE_FACTOR, with
+  // the exponents folded into one fraction so there is a single rounding.
+  const exponentShift = exponentOf(input.from) - exponentOf(input.to);
+  const numerator = base * RATE_FACTOR * (exponentShift >= 0 ? 10n ** BigInt(exponentShift) : 1n);
+  const denominator = amount * (exponentShift < 0 ? 10n ** BigInt(-exponentShift) : 1n);
+  return formatRate(divideRounding(numerator, denominator));
+}

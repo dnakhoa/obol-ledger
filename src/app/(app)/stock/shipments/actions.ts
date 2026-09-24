@@ -3,9 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
-import { describe as describeError } from '@/server/domain/errors';
 import { ALLOCATION_BASES } from '@/server/domain/landed-cost';
 import { SUPPORTED_CURRENCIES, parseDecimal } from '@/lib/money';
+import { formatAmount } from '@/lib/format';
+import { describeError, translations } from '@/server/i18n';
+import type { MoneyDto } from '@/server/services/dto';
 
 export type ShipmentState = {
   readonly status: 'idle' | 'error' | 'done';
@@ -15,14 +17,15 @@ export type ShipmentState = {
 const amountField = z
   .string()
   .trim()
-  .regex(/^\d+(\.\d+)?$/u, 'Enter the amount as a plain number.');
+  .regex(/^\d+(\.\d+)?$/u);
 
 export async function recordShipmentAction(
   _previous: ShipmentState,
   formData: FormData,
 ): Promise<ShipmentState> {
+  const { locale, t } = await translations();
   const writer = await requireWriter();
-  if (!writer.allowed) return { status: 'error', message: refusalMessage(writer.reason) };
+  if (!writer.allowed) return { status: 'error', message: await refusalMessage(writer.reason) };
 
   const parsed = z
     .object({
@@ -37,7 +40,7 @@ export async function recordShipmentAction(
     });
 
   if (!parsed.success) {
-    return { status: 'error', message: 'Give the shipment a reference and the date it arrived.' };
+    return { status: 'error', message: t.shipments.shipmentIncomplete };
   }
 
   const result = await writer.services.landedCost.record({
@@ -49,8 +52,8 @@ export async function recordShipmentAction(
   revalidatePath('/stock/shipments');
   revalidatePath('/stock');
   return result.ok
-    ? { status: 'done', message: `Recorded ${parsed.data.reference}.` }
-    : { status: 'error', message: describeError(result.error) };
+    ? { status: 'done', message: t.shipments.recorded(parsed.data.reference) }
+    : { status: 'error', message: describeError(result.error, locale) };
 }
 
 /**
@@ -65,8 +68,9 @@ export async function addChargeAction(
   _previous: ShipmentState,
   formData: FormData,
 ): Promise<ShipmentState> {
+  const { locale, t } = await translations();
   const writer = await requireWriter();
-  if (!writer.allowed) return { status: 'error', message: refusalMessage(writer.reason) };
+  if (!writer.allowed) return { status: 'error', message: await refusalMessage(writer.reason) };
 
   const parsed = z
     .object({
@@ -95,15 +99,18 @@ export async function addChargeAction(
     });
 
   if (!parsed.success) {
+    // Zod's own messages are English and name the schema rather than the form,
+    // so the only thing taken from the issue is which field it was.
+    const field = parsed.error.issues[0]?.path[0];
     return {
       status: 'error',
-      message: parsed.error.issues[0]?.message ?? 'Check the amount and the description.',
+      message: field === 'amount' ? t.shipments.amountNotANumber : t.shipments.chargeIncomplete,
     };
   }
 
   const amount = parseDecimal(parsed.data.amount, parsed.data.currency);
   if (!amount.ok) {
-    return { status: 'error', message: 'Enter the amount as a plain number.' };
+    return { status: 'error', message: t.shipments.amountNotANumber };
   }
 
   const capitalise = parsed.data.capitalise === 'yes';
@@ -123,15 +130,16 @@ export async function addChargeAction(
   revalidatePath('/stock/shipments');
   revalidatePath('/stock');
 
-  if (!result.ok) return { status: 'error', message: describeError(result.error) };
+  if (!result.ok) return { status: 'error', message: describeError(result.error, locale) };
 
   const { toInventory, toCogs } = result.value.preview;
+  const money = (value: MoneyDto) => `${formatAmount(value, locale)} ${value.currency}`;
   return {
     status: 'done',
     message: capitalise
       ? BigInt(toCogs.minorUnits) === 0n
-        ? `Added. ${toInventory.amount} ${toInventory.currency} went onto the stock.`
-        : `Added. ${toInventory.amount} went onto the stock still held, and ${toCogs.amount} ${toCogs.currency} to cost of sales for the part already sold.`
-      : 'Added. Nothing was added to the stock, because this charge is reclaimable.',
+        ? t.shipments.addedToStock(money(toInventory))
+        : t.shipments.addedSplit(money(toInventory), money(toCogs))
+      : t.shipments.addedReclaimable,
   };
 }

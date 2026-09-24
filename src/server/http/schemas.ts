@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ACCOUNT_TYPES } from '@/server/domain/account';
+import { COSTING_METHODS, WRITE_OFF_REASONS } from '@/server/domain/costing';
 import { WEBHOOK_EVENT_TYPES } from '@/server/domain/webhook';
 import {
   parseDecimal,
@@ -7,7 +8,8 @@ import {
   type CurrencyCode,
   type MinorUnits,
 } from '@/lib/money';
-import { ID_PREFIXES } from '@/lib/id';
+import { MAX_PRECISION, SUPPORTED_UNITS } from '@/lib/quantity';
+import { ID_PREFIXES, type EntityKind } from '@/lib/id';
 
 /**
  * Request schemas.
@@ -62,6 +64,19 @@ export const createAccountSchema = z.object({
   currency: currencySchema,
   overdraftAllowed: z.boolean().default(false),
   metadata: metadataSchema,
+  /**
+   * The number the account is filed under. Required on a statutory chart —
+   * under Thông tư 200 the leading digit is the class — and optional elsewhere.
+   */
+  code: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{1,10}$/u, 'An account code is up to ten digits')
+    .optional(),
+  /** A receivable or payable whose balance is a set of unsettled invoices, and so ages. */
+  openItems: z.boolean().optional(),
+  /** Days the customer or supplier has to pay. Only on an open-item account. */
+  paymentTermsDays: z.number().int().min(0).max(365).optional(),
 });
 
 export type CreateAccountBody = z.infer<typeof createAccountSchema>;
@@ -252,6 +267,142 @@ export const recordRateSchema = z.object({
   asOf: z.iso.date(),
   source: z.string().trim().min(1).max(60).default('manual'),
 });
+
+/** An id of the given kind: `item_…`, `layer_…`. Refused before any query runs. */
+function idOf(kind: EntityKind) {
+  const prefix = ID_PREFIXES[kind];
+  return z.string().regex(new RegExp(`^${prefix}_[0-9A-HJKMNP-TV-Z]{26}$`, 'u'), {
+    message: `Expected an id of the form ${prefix}_<26 characters>`,
+  });
+}
+
+/**
+ * A quantity, as a decimal string.
+ *
+ * Only the shape is checked here. How many places are allowed is a property
+ * of the *item* — 24.687 tonnes is fine, 1.5 slabs is not — so the scaling
+ * happens in the handler once the item has been read, the same way an amount
+ * waits for its currency.
+ */
+const quantitySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(32)
+  .regex(/^\d+(\.\d+)?$/u, { message: 'Expected a non-negative decimal quantity, e.g. "24.687"' });
+
+/** Container number, supplier invoice, stocktake sheet — what somebody will search for. */
+const stockReferenceSchema = z.string().trim().min(1).max(60);
+
+export const createItemSchema = z.object({
+  sku: z.string().trim().min(1).max(40),
+  name: z.string().trim().min(1).max(120),
+  unit: z.enum(SUPPORTED_UNITS),
+  /** Decimal places a quantity of this item is counted to. Defaults to the unit's usual one. */
+  quantityPrecision: z.number().int().min(0).max(MAX_PRECISION).optional(),
+  inventoryAccountId: accountIdSchema,
+  cogsAccountId: accountIdSchema,
+  /** Absent inherits the organisation's method, and follows it if that changes. */
+  costingMethod: z.enum(COSTING_METHODS).optional(),
+  metadata: metadataSchema,
+});
+
+export const receiveStockSchema = z.object({
+  quantity: quantitySchema,
+  /** What was paid for the whole delivery, in `currency`. */
+  cost: decimalAmountSchema,
+  currency: currencySchema,
+  /** A payable for stock bought on terms, the bank for cash. */
+  creditAccountId: accountIdSchema,
+  occurredAt: z.iso.datetime({ offset: true }).optional(),
+  reference: stockReferenceSchema.optional(),
+  description: z.string().trim().min(1).max(280).optional(),
+  /** Lets freight and duty that arrive later find this lot. */
+  shipmentId: idOf('shipment').optional(),
+  /**
+   * Whole grams, as a string: a container of granite is 2.4 × 10^7 of them
+   * and a weight is apportioned against, so it is kept exact like a quantity.
+   */
+  weightGrams: z
+    .string()
+    .trim()
+    .regex(/^\d{1,15}$/u, { message: 'Expected whole grams as a string, e.g. "24000000"' })
+    .optional(),
+  metadata: metadataSchema,
+});
+
+export const issueStockSchema = z.object({
+  quantity: quantitySchema,
+  occurredAt: z.iso.datetime({ offset: true }).optional(),
+  /** Required when the item is costed by specific identification. */
+  layerId: idOf('costLayer').optional(),
+  reference: stockReferenceSchema.optional(),
+  description: z.string().trim().min(1).max(280).optional(),
+  metadata: metadataSchema,
+});
+
+export const writeOffStockSchema = issueStockSchema.extend({
+  reason: z.enum(WRITE_OFF_REASONS),
+  /** Where the loss is recognised: shrinkage, breakage, obsolescence. Not cost of sales. */
+  expenseAccountId: accountIdSchema,
+});
+
+export const createSaleSchema = z.object({
+  /** The invoice number. Unique, because a customer pays against it. */
+  reference: stockReferenceSchema,
+  /** The customer's receivable, or a bank account for a cash sale. */
+  customerAccountId: accountIdSchema,
+  revenueAccountId: accountIdSchema,
+  /** What the invoice is in; every line amount is in it too. */
+  currency: currencySchema,
+  taxCodeId: idOf('taxCode').optional(),
+  occurredAt: z.iso.datetime({ offset: true }).optional(),
+  /** When the customer agreed to pay. Absent means on receipt. */
+  dueOn: z.iso.date().optional(),
+  description: z.string().trim().min(1).max(280).optional(),
+  lines: z
+    .array(
+      z.object({
+        itemId: idOf('inventoryItem'),
+        /** In the item's own unit, to no more places than it is counted to. */
+        quantity: quantitySchema,
+        /**
+         * The line's net total — not a unit price — in the invoice currency.
+         * A total because that is what is printed on the invoice and what the
+         * customer agreed to; a unit price times a quantity to three places is
+         * a rounding decision this API would otherwise be making for them.
+         */
+        amount: decimalAmountSchema,
+        layerId: idOf('costLayer').optional(),
+      }),
+    )
+    .min(1)
+    .max(100),
+  metadata: metadataSchema,
+});
+
+export type CreateSaleBody = z.infer<typeof createSaleSchema>;
+
+export const salesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+/**
+ * `[from, to)`, as calendar days.
+ *
+ * Dates rather than timestamps because a margin is asked about a month or a
+ * quarter, and a day boundary is what the question means. `to` is exclusive
+ * so consecutive periods tile without a day counted twice.
+ */
+export const grossMarginQuerySchema = z
+  .object({
+    from: z.iso.date().optional(),
+    to: z.iso.date().optional(),
+  })
+  .refine((value) => !value.from || !value.to || value.from < value.to, {
+    message: 'from must be before to, which is exclusive',
+    path: ['from'],
+  });
 
 export const revaluationQuerySchema = z.object({
   /** Compute the adjustment without posting it. */

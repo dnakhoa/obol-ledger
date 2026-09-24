@@ -13,6 +13,7 @@ import { createStockImportService } from '@/server/services/stock-import';
 import { createLandedCostService } from '@/server/services/landed-cost';
 import { createAgingService } from '@/server/services/aging';
 import { createTaxService } from '@/server/services/tax';
+import { createSalesService } from '@/server/services/sales';
 import { createTaxReturnService } from '@/server/services/tax-return';
 import type { AccountRole } from '@/server/domain/period';
 import { createWebhookService } from '@/server/services/webhooks';
@@ -35,6 +36,7 @@ export function servicesFor(database: Database, orgId: string) {
     landedCost: createLandedCostService(database, orgId),
     aging: createAgingService(database, orgId),
     tax: createTaxService(database, orgId),
+    sales: createSalesService(database, orgId),
     taxReturns: createTaxReturnService(database, orgId),
   };
 }

@@ -8,7 +8,12 @@ import { cn } from '@/lib/cn';
 import { SUPPORTED_UNITS, unitLabel } from '@/lib/quantity';
 import type { Messages } from '@/lib/i18n';
 import type { StockState } from '@/app/(app)/stock/actions';
-import { createItemAction, issueAction, receiveAction } from '@/app/(app)/stock/actions';
+import {
+  createItemAction,
+  issueAction,
+  receiveAction,
+  writeOffAction,
+} from '@/app/(app)/stock/actions';
 
 const INITIAL: StockState = { status: 'idle' };
 
@@ -289,6 +294,122 @@ export function IssueForm({
         </Field>
         <Field label={labels.reference} htmlFor={`${id}-ref`} hint={labels.referenceHint}>
           <Input id={`${id}-ref`} name="reference" placeholder="SO-9004" autoComplete="off" />
+        </Field>
+        <Field label={labels.lot} htmlFor={`${id}-lot`} hint={labels.lotHint}>
+          <Select
+            id={`${id}-lot`}
+            name="layerId"
+            value={lot}
+            onChange={(event) => setLot(event.target.value)}
+            required={requiresLot}
+          >
+            <option value="">{labels.lotPlaceholder}</option>
+            {lots.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Submit pending={pending} working={labels.working}>
+          {labels.submit}
+        </Submit>
+        <Outcome state={state} />
+      </div>
+    </form>
+  );
+}
+
+export type WriteOffLabels = {
+  readonly quantity: string;
+  readonly reason: string;
+  readonly reasons: readonly { readonly value: string; readonly label: string }[];
+  readonly lossAccount: string;
+  readonly lossAccountHint: string;
+  readonly date: string;
+  readonly reference: string;
+  readonly referenceHint: string;
+  readonly lot: string;
+  readonly lotHint: string;
+  readonly lotPlaceholder: string;
+  readonly submit: string;
+  readonly working: string;
+};
+
+/**
+ * Stock leaving without a sale.
+ *
+ * The same shape as shipping it out, plus the two things a write-off needs
+ * and a shipment does not: why, and which expense takes the loss. Neither
+ * has a default — "damaged" pre-selected is how every stocktake shortfall
+ * ends up recorded as breakage, and the first expense in the chart is how it
+ * ends up in finance costs.
+ */
+export function WriteOffForm({
+  itemId,
+  unit,
+  precision,
+  today,
+  lots,
+  requiresLot,
+  expenseAccounts,
+  labels,
+}: {
+  itemId: string;
+  unit: string;
+  precision: number;
+  today: string;
+  lots: readonly LotOption[];
+  requiresLot: boolean;
+  expenseAccounts: readonly AccountOption[];
+  labels: WriteOffLabels;
+}) {
+  const [state, action, pending] = useActionState(writeOffAction, INITIAL);
+  const [lot, setLot] = useState('');
+  const id = useId();
+
+  return (
+    <form action={action} className="space-y-4">
+      <input type="hidden" name="itemId" value={itemId} />
+      <input type="hidden" name="unit" value={unit} />
+      <input type="hidden" name="precision" value={precision} />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={labels.quantity} htmlFor={`${id}-qty`}>
+          <Input id={`${id}-qty`} name="quantity" required inputMode="decimal" placeholder="37" />
+        </Field>
+        <Field label={labels.reason} htmlFor={`${id}-reason`}>
+          <Select id={`${id}-reason`} name="reason" required defaultValue="">
+            <option value="" disabled>
+              —
+            </option>
+            {labels.reasons.map((reason) => (
+              <option key={reason.value} value={reason.value}>
+                {reason.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={labels.lossAccount} htmlFor={`${id}-loss`} hint={labels.lossAccountHint}>
+          <Select id={`${id}-loss`} name="expenseAccountId" required defaultValue="">
+            <option value="" disabled>
+              —
+            </option>
+            {expenseAccounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={labels.date} htmlFor={`${id}-date`}>
+          <Input id={`${id}-date`} name="occurredAt" type="date" defaultValue={today} required />
+        </Field>
+        <Field label={labels.reference} htmlFor={`${id}-ref`} hint={labels.referenceHint}>
+          <Input id={`${id}-ref`} name="reference" placeholder="KK-2026-01" autoComplete="off" />
         </Field>
         <Field label={labels.lot} htmlFor={`${id}-lot`} hint={labels.lotHint}>
           <Select

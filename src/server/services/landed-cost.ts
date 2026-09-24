@@ -20,6 +20,7 @@ import {
 } from '@/server/db/schema';
 import { withTenant } from '@/server/db/tenancy';
 import type { Database, Transactional } from '@/server/db/types';
+import { counterpartyLeg } from './counterparty';
 import { createJournalService } from './journal';
 import { rateOn } from './rates';
 import type { MoneyDto, TransactionDto } from './dto';
@@ -244,7 +245,15 @@ export function createLandedCostService(database: Database, orgId: string) {
           }
         }
 
-        const total = base.value.amount;
+        const owed = await counterpartyLeg(
+          tx,
+          input.creditAccountId,
+          { amount: input.amount, currency: input.currency },
+          { ...base.value, currency: org.functionalCurrency },
+          -1n,
+        );
+        if (!owed.ok) return owed;
+
         const entry = await createJournalService(tx, orgId).postEntry({
           description: ledgerMessages(org.locale).landedCost(input.description),
           currency: org.functionalCurrency,
@@ -263,12 +272,7 @@ export function createLandedCostService(database: Database, orgId: string) {
               baseAmount: amount as MinorUnits,
               fxRate: '1',
             })),
-            {
-              accountId: input.creditAccountId,
-              amount: -total as MinorUnits,
-              baseAmount: -total as MinorUnits,
-              fxRate: '1',
-            },
+            owed.value,
           ],
         });
         if (!entry.ok) return entry;
@@ -561,6 +565,17 @@ async function postNonCapitalising(
   const org = await organisation(tx, orgId);
   const chargeId = newId('landedCharge');
 
+  // Import VAT is often assessed in the invoice currency and paid from a
+  // dollar account; the credit has to land in that account's own currency.
+  const owed = await counterpartyLeg(
+    tx,
+    input.creditAccountId,
+    { amount: input.amount, currency: input.currency },
+    { ...base, currency: org.functionalCurrency },
+    -1n,
+  );
+  if (!owed.ok) return owed;
+
   const entry = await createJournalService(tx, orgId).postEntry({
     description: ledgerMessages(locale).landedCost(input.description),
     currency: org.functionalCurrency,
@@ -573,12 +588,7 @@ async function postNonCapitalising(
         baseAmount: base.amount as MinorUnits,
         fxRate: '1',
       },
-      {
-        accountId: input.creditAccountId,
-        amount: -base.amount as MinorUnits,
-        baseAmount: -base.amount as MinorUnits,
-        fxRate: '1',
-      },
+      owed.value,
     ],
   });
   if (!entry.ok) return entry;

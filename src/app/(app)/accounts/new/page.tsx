@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { AccountForm } from '@/components/account-form';
 import { ArrowLeftIcon } from '@/components/icons';
 import { translations } from '@/server/i18n';
+import { viewerServices } from '@/server/container';
+import { isStatutory } from '@/server/domain/chart';
 import { createAccountAction } from './actions';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -12,6 +14,19 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function NewAccountPage() {
   const { t } = await translations();
+
+  // The chart decides whether a code is optional. Read rather than assumed,
+  // because the form used to assume and a Thông tư 200 ledger could not open
+  // an account at all. A guest reading the demo sees the demo's chart.
+  let statutory = false;
+  let functional = 'USD';
+  try {
+    const { services } = await viewerServices();
+    statutory = isStatutory(await services.accounts.chart());
+    functional = (await services.accounts.list())[0]?.baseBalance.currency ?? 'USD';
+  } catch {
+    // The form still renders; the action reports the setup problem.
+  }
 
   return (
     <>
@@ -29,7 +44,15 @@ export default async function NewAccountPage() {
 
       <AccountForm
         action={createAccountAction}
+        codeRequired={statutory}
+        defaultCurrency={functional}
         labels={{
+          code: t.forms.accountCode,
+          codeHint: statutory ? t.forms.accountCodeRequiredHint : t.forms.accountCodeHint,
+          openItems: t.forms.openItems,
+          openItemsNote: t.forms.openItemsNote,
+          paymentTerms: t.forms.paymentTerms,
+          paymentTermsHint: t.forms.paymentTermsHint,
           details: t.forms.accountDetails,
           intro: t.misc.accountFormIntro,
           neverDeleted: t.misc.accountsNeverDeleted,

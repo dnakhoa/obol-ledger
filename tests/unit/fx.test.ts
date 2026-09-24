@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { convert, formatRate, parseRate, RATE_SCALE } from '@/lib/fx';
+import { convert, formatRate, impliedRate, parseRate, RATE_SCALE } from '@/lib/fx';
 import { minorUnits, type CurrencyCode } from '@/lib/money';
 
 const rate = (value: string): bigint => {
@@ -104,5 +104,60 @@ describe('conversion', () => {
 
   it('declares the scale it keeps', () => {
     expect(RATE_SCALE).toBe(10);
+  });
+});
+
+describe('the rate two amounts imply', () => {
+  const usd = 'USD' as CurrencyCode;
+  const vnd = 'VND' as CurrencyCode;
+  const jpy = 'JPY' as CurrencyCode;
+  const bhd = 'BHD' as CurrencyCode;
+
+  it('is the rate a person would quote, not a ratio of minor units', () => {
+    // 40,000.00 USD booked at 1,016,000,000 VND. The minor units divide to
+    // 254; the rate is 25,400, and the difference is the exponent shift.
+    expect(
+      impliedRate({
+        amount: minorUnits(4_000_000n),
+        from: usd,
+        baseAmount: minorUnits(1_016_000_000n),
+        to: vnd,
+      }),
+    ).toBe('25400');
+  });
+
+  it('ignores the sign, because a credit and its debit imply one rate', () => {
+    expect(
+      impliedRate({
+        amount: minorUnits(-4_000_000n),
+        from: usd,
+        baseAmount: minorUnits(-1_016_000_000n),
+        to: vnd,
+      }),
+    ).toBe('25400');
+  });
+
+  it('inverts cleanly when the functional currency has more decimals', () => {
+    // 1,000 JPY recorded as 6.70 USD: 0.0067 dollars to the yen.
+    expect(
+      impliedRate({ amount: minorUnits(1_000n), from: jpy, baseAmount: minorUnits(670n), to: usd }),
+    ).toBe('0.0067');
+    // Three places against two: 1.000 BHD recorded as 2.65 USD.
+    expect(
+      impliedRate({ amount: minorUnits(1_000n), from: bhd, baseAmount: minorUnits(265n), to: usd }),
+    ).toBe('2.65');
+  });
+
+  it('round-trips through convert', () => {
+    const quoted = impliedRate({
+      amount: minorUnits(5_840_000n),
+      from: usd,
+      baseAmount: minorUnits(1_487_448_000n),
+      to: vnd,
+    });
+    expect(quoted).toBe('25470');
+    expect(
+      convert({ amount: minorUnits(5_840_000n), from: usd, to: vnd, rate: rate(quoted) }),
+    ).toBe(1_487_448_000n);
   });
 });

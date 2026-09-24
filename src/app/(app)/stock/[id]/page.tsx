@@ -8,13 +8,16 @@ import { Table, TableScroll, Td, Th, Tr } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/page-header';
 import { Money } from '@/components/money';
+import { StatTile } from '@/components/stat-tile';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
 import { ArrowLeftIcon } from '@/components/icons';
-import { IssueForm, ReceiveForm, type AccountOption } from '@/components/stock-forms';
+import { IssueForm, ReceiveForm, WriteOffForm, type AccountOption } from '@/components/stock-forms';
 import { viewerServices } from '@/server/container';
 import { translations } from '@/server/i18n';
-import { dateFormats } from '@/lib/i18n';
+import { dateFormats, type Messages } from '@/lib/i18n';
+import type { WriteOffReason } from '@/server/domain/costing';
+import type { MovementSummary } from '@/server/services/inventory';
 import { SUPPORTED_CURRENCIES } from '@/lib/money';
 import { toQuantityString, unitLabel } from '@/lib/quantity';
 
@@ -97,6 +100,24 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       label: account.code ? `${account.code} — ${account.name}` : account.name,
     }));
 
+  // Where a loss can go: any open expense except the cost of sales, which is
+  // exactly where shrinkage must not hide, and nothing chosen for the person.
+  const expenseAccounts: AccountOption[] = accounts
+    .filter(
+      (account) =>
+        account.status === 'open' &&
+        account.type === 'expense' &&
+        // An account with a structural job — FX gain and loss — takes only
+        // what that job puts there.
+        account.role === null &&
+        account.balance.currency === functional &&
+        account.id !== item.cogsAccountId,
+    )
+    .map((account) => ({
+      id: account.id,
+      label: account.code ? `${account.code} — ${account.name}` : account.name,
+    }));
+
   const lotOptions = lots.map((lot) => ({
     id: lot.id,
     label: t.product.lotOption(
@@ -138,6 +159,25 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     working: t.common.working,
   };
 
+  const writeOffLabels = {
+    quantity: t.product.howMuchWrittenOff(unitName),
+    reason: t.product.reason,
+    reasons: (['damaged', 'expired', 'lost', 'count_shortfall', 'other'] as const).map((value) => ({
+      value,
+      label: reasonLabel(value, t),
+    })),
+    lossAccount: t.product.lossAccount,
+    lossAccountHint: t.product.lossAccountHint,
+    date: t.product.date,
+    reference: t.product.reference,
+    referenceHint: t.product.writeOffReferenceHint,
+    lot: issueLabels.lot,
+    lotHint: issueLabels.lotHint,
+    lotPlaceholder: issueLabels.lotPlaceholder,
+    submit: t.product.writeOffButton,
+    working: t.common.working,
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -151,32 +191,18 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">{t.product.onHand}</p>
-            <p className="numeric text-2xl font-semibold">
-              {quantity(item.onHandMinor)}
-              <span className="text-ink-muted ml-1.5 text-sm font-normal">
-                {unitLabel(item.unit)}
-              </span>
-            </p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">{t.product.whatItCost}</p>
-            <p className="numeric text-2xl font-semibold">
-              <Money value={item.value} showCurrency />
-            </p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody className="space-y-1">
-            <p className="text-ink-muted text-xs">{t.product.deliveriesStillOpen}</p>
-            <p className="numeric text-2xl font-semibold">{item.openLayers}</p>
-          </CardBody>
-        </Card>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+        <StatTile
+          label={t.product.onHand}
+          value={<span className="numeric">{quantity(item.onHandMinor)}</span>}
+          unit={unitLabel(item.unit)}
+        />
+        <StatTile
+          label={t.product.whatItCost}
+          value={<Money value={item.value} />}
+          unit={item.value.currency}
+        />
+        <StatTile label={t.product.deliveriesStillOpen} value={item.openLayers} />
       </div>
 
       <Card>
@@ -192,9 +218,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               <thead>
                 <tr>
                   <Th>{t.product.reference}</Th>
-                  <Th>{t.product.arrived}</Th>
+                  <Th hideBelow="sm">{t.product.arrived}</Th>
                   <Th align="right">{t.product.left}</Th>
-                  <Th align="right">{t.product.paidForLot}</Th>
+                  <Th hideBelow="md" align="right">
+                    {t.product.paidForLot}
+                  </Th>
                   <Th align="right">{t.product.valueOfRemainder}</Th>
                 </tr>
               </thead>
@@ -213,14 +241,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                         (lot.reference ?? t.product.openingBalance)
                       )}
                     </Td>
-                    <Td>{DATE.day(lot.acquiredAt)}</Td>
+                    <Td hideBelow="sm">{DATE.day(lot.acquiredAt)}</Td>
                     <Td align="right" numeric>
                       {quantity(lot.remainingQuantityMinor)}
                       <span className="text-ink-muted ml-1 text-[11px]">
                         {t.product.ofTotal(quantity(lot.quantityMinor))}
                       </span>
                     </Td>
-                    <Td align="right" numeric>
+                    <Td hideBelow="md" align="right" numeric>
                       <Money value={lot.cost} showCurrency={lot.currency !== functional} />
                     </Td>
                     <Td align="right" numeric>
@@ -288,6 +316,37 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
       <Card>
         <CardHeader>
+          <CardTitle>{t.product.writeOffTitle}</CardTitle>
+          <CardDescription>{t.product.writeOffHint}</CardDescription>
+        </CardHeader>
+        <CardBody>
+          {lots.length === 0 ? (
+            <p className="text-ink-secondary text-sm">{t.product.nothingToShip}</p>
+          ) : expenseAccounts.length === 0 ? (
+            <p className="text-ink-secondary text-sm">
+              {t.product.needLossAccount}{' '}
+              <Link href="/accounts" className="underline underline-offset-4">
+                {t.stock.chartOfAccountsLink}
+              </Link>{' '}
+              {t.stock.firstSuffix}
+            </p>
+          ) : (
+            <WriteOffForm
+              itemId={item.id}
+              unit={item.unit}
+              precision={item.quantityPrecision}
+              today={today}
+              lots={lotOptions}
+              requiresLot={requiresLot}
+              expenseAccounts={expenseAccounts}
+              labels={writeOffLabels}
+            />
+          )}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>{t.product.movementsTitle}</CardTitle>
           <CardDescription>{t.product.movementsHint}</CardDescription>
         </CardHeader>
@@ -298,24 +357,34 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <Table caption={t.product.movementsCaption}>
               <thead>
                 <tr>
-                  <Th>{t.product.date}</Th>
+                  <Th hideBelow="sm">{t.product.date}</Th>
                   <Th>{t.product.whatHappened}</Th>
                   <Th align="right">{t.product.quantity}</Th>
-                  <Th>{t.product.costedFrom}</Th>
+                  <Th hideBelow="md">{t.product.costedFrom}</Th>
                   <Th align="right">{t.product.cost}</Th>
+                  <Th hideBelow="md" align="right">
+                    {t.product.soldFor}
+                  </Th>
                 </tr>
               </thead>
               <tbody>
                 {movements.map((movement) => (
                   <Tr key={movement.id}>
-                    <Td>{DATE.day(movement.occurredAt)}</Td>
+                    <Td hideBelow="sm">{DATE.day(movement.occurredAt)}</Td>
                     <Td>
                       <Link
-                        href={`/journal/${movement.transactionId}`}
+                        href={
+                          movement.saleId
+                            ? `/sales/${movement.saleId}`
+                            : `/journal/${movement.transactionId}`
+                        }
                         className="hover:text-action font-medium underline-offset-4 hover:underline"
                       >
-                        {movement.kind === 'receipt' ? t.product.deliveryIn : t.product.shippedOut}
+                        {movementLabel(movement, t)}
                       </Link>
+                      <span className="text-ink-muted block text-xs sm:hidden">
+                        {DATE.day(movement.occurredAt)}
+                      </span>
                       {movement.reference ? (
                         <span className="text-ink-muted ml-2 text-xs">{movement.reference}</span>
                       ) : null}
@@ -324,7 +393,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                       {movement.kind === 'receipt' ? '+' : '−'}
                       {quantity(movement.quantityMinor)}
                     </Td>
-                    <Td>
+                    <Td hideBelow="md">
                       {movement.drawnFrom.length === 0 ? (
                         <span className="text-ink-muted text-xs">—</span>
                       ) : (
@@ -341,6 +410,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     <Td align="right" numeric>
                       <Money value={movement.cost} />
                     </Td>
+                    <Td hideBelow="md" align="right" numeric>
+                      {movement.revenue ? (
+                        <Money value={movement.revenue} />
+                      ) : (
+                        <span className="text-ink-muted text-xs">—</span>
+                      )}
+                    </Td>
                   </Tr>
                 ))}
               </tbody>
@@ -350,4 +426,30 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </Card>
     </div>
   );
+}
+
+function reasonLabel(reason: WriteOffReason, t: Messages): string {
+  switch (reason) {
+    case 'damaged':
+      return t.product.reasonDamaged;
+    case 'expired':
+      return t.product.reasonExpired;
+    case 'lost':
+      return t.product.reasonLost;
+    case 'count_shortfall':
+      return t.product.reasonCountShortfall;
+    case 'other':
+      return t.product.reasonOther;
+  }
+}
+
+/** What happened, in the words the yard uses: in, sold, shipped, or written off and why. */
+function movementLabel(movement: MovementSummary, t: Messages): string {
+  if (movement.kind === 'receipt') return t.product.deliveryIn;
+  if (movement.kind === 'writeoff') {
+    return movement.reason
+      ? `${t.product.writtenOff} · ${reasonLabel(movement.reason, t)}`
+      : t.product.writtenOff;
+  }
+  return movement.saleId ? t.product.sold : t.product.shippedOut;
 }

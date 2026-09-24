@@ -13,6 +13,7 @@ import {
   ReceiptIcon,
   SettingsIcon,
   StockIcon,
+  TagIcon,
   TransferIcon,
   WebhookIcon,
 } from './icons';
@@ -36,6 +37,7 @@ export type NavLabels = {
   readonly overview: string;
   readonly accounts: string;
   readonly stock: string;
+  readonly sales: string;
   readonly journal: string;
   readonly reports: string;
   readonly monthEnd: string;
@@ -51,6 +53,7 @@ const LINKS = [
   { href: '/', key: 'overview', Icon: GaugeIcon, exact: true },
   { href: '/accounts', key: 'accounts', Icon: AccountsIcon, exact: false },
   { href: '/stock', key: 'stock', Icon: StockIcon, exact: false },
+  { href: '/sales', key: 'sales', Icon: TagIcon, exact: false },
   { href: '/journal', key: 'journal', Icon: JournalIcon, exact: false },
   { href: '/reports', key: 'reports', Icon: ReportsIcon, exact: false },
   { href: '/month-end', key: 'monthEnd', Icon: CalendarIcon, exact: false },
@@ -74,9 +77,12 @@ const LINKS = [
  * a wide table, or closing a month — which is a desk job done once, carefully.
  *
  * Stock takes a slot because it is the opposite: it is the thing somebody
- * checks standing in the yard.
+ * checks standing in the yard. Sales takes one for the same reason — an
+ * invoice is raised wherever the customer is — and the chart of accounts gives
+ * it up, because it is set up once, at a desk, and rarely visited after.
  */
 const DESKTOP_ONLY = new Set([
+  '/accounts',
   '/api-reference',
   '/tax',
   '/webhooks',

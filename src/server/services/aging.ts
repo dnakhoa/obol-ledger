@@ -30,6 +30,8 @@ export type AgedItem = {
   readonly reference: string | null;
   readonly outstanding: MoneyDto;
   readonly ageDays: number;
+  readonly dueOn: Date;
+  readonly daysOverdue: number;
   readonly bucket: AgingBucket;
 };
 
@@ -38,6 +40,8 @@ export type AgedAccount = {
   readonly accountName: string;
   readonly accountCode: string | null;
   readonly currency: CurrencyCode;
+  /** The account's stated terms; null when none are set and thirty is assumed. */
+  readonly paymentTermsDays: number | null;
   readonly total: MoneyDto;
   readonly byBucket: Readonly<Record<AgingBucket, MoneyDto>>;
   readonly overdueBasisPoints: number;
@@ -76,6 +80,7 @@ export function createAgingService(database: Database, orgId: string) {
             code: accounts.code,
             currency: accounts.currency,
             type: accounts.type,
+            paymentTermsDays: accounts.paymentTermsDays,
           })
           .from(accounts)
           .where(
@@ -119,9 +124,10 @@ export function createAgingService(database: Database, orgId: string) {
             amount: row.amount,
             description: row.description,
             reference: row.metadata['invoice'] ?? row.metadata['reference'] ?? null,
+            dueOn: dueDateOf(row.metadata['dueDate']),
           }));
 
-          const aging = ageAccount(entries, asOf, normalBalanceOf(type));
+          const aging = ageAccount(entries, asOf, normalBalanceOf(type), account.paymentTermsDays);
           if (aging.items.length === 0) continue;
 
           const currency = account.currency as CurrencyCode;
@@ -130,6 +136,7 @@ export function createAgingService(database: Database, orgId: string) {
             accountName: account.name,
             accountCode: account.code,
             currency,
+            paymentTermsDays: account.paymentTermsDays,
             total: toMoneyDto(aging.total as MinorUnits, currency),
             byBucket: bucketsAsMoney(aging, currency),
             overdueBasisPoints: aging.overdueBasisPoints,
@@ -140,6 +147,8 @@ export function createAgingService(database: Database, orgId: string) {
               reference: item.reference,
               outstanding: toMoneyDto(item.outstanding as MinorUnits, currency),
               ageDays: item.ageDays,
+              dueOn: item.dueOn,
+              daysOverdue: item.daysOverdue,
               bucket: item.bucket,
             })),
           });
@@ -183,4 +192,17 @@ async function functionalCurrency(tx: Transactional, orgId: string): Promise<Cur
     .where(eq(organizations.id, orgId))
     .limit(1);
   return (row?.currency ?? 'USD') as CurrencyCode;
+}
+
+/**
+ * An invoice's own due date, from the metadata a sale writes.
+ *
+ * Anything that is not a plain calendar date is ignored rather than guessed
+ * at: metadata is the caller's free text, and "end of month" parsed as a date
+ * would age an invoice from a day nobody meant.
+ */
+function dueDateOf(value: string | undefined): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return null;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }

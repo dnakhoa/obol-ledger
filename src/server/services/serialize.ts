@@ -51,6 +51,8 @@ export function toAccountDto(
     metadata: row.metadata,
     role: row.role,
     monetary: row.monetary,
+    openItems: row.openItems,
+    paymentTermsDays: row.paymentTermsDays,
     createdAt: row.createdAt.toISOString(),
   };
 }

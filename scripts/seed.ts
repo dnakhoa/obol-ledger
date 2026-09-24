@@ -16,6 +16,7 @@ import type { AccountType } from '../src/server/domain/account';
 import type { AccountRole } from '../src/server/domain/period';
 import { createTaxService } from '../src/server/services/tax';
 import { createTaxReturnService } from '../src/server/services/tax-return';
+import { createSalesService } from '../src/server/services/sales';
 import { describeTarget, schemaConnectionString, sslFor } from './connection';
 
 /**
@@ -78,6 +79,8 @@ const ACCOUNTS: {
   overdraft?: boolean;
   monetary?: boolean;
   openItems?: boolean;
+  /** Days the counterparty has to pay; aged receivables count lateness from here. */
+  terms?: number;
   role?: AccountRole;
 }[] = [
   { key: 'cash', code: '111', name: 'Tiền mặt', type: 'asset', currency: 'VND' },
@@ -100,6 +103,7 @@ const ACCOUNTS: {
     key: 'arUsd',
     // A claim on somebody, so it is managed as open items and ages.
     openItems: true,
+    terms: 30,
     code: '1311',
     name: 'Phải thu của khách hàng — USD',
     type: 'asset',
@@ -110,6 +114,7 @@ const ACCOUNTS: {
     key: 'arEur',
     // A claim on somebody, so it is managed as open items and ages.
     openItems: true,
+    terms: 30,
     code: '1312',
     name: 'Phải thu của khách hàng — EUR',
     type: 'asset',
@@ -120,6 +125,7 @@ const ACCOUNTS: {
     key: 'arAud',
     // A claim on somebody, so it is managed as open items and ages.
     openItems: true,
+    terms: 30,
     code: '1313',
     name: 'Phải thu của khách hàng — AUD',
     type: 'asset',
@@ -138,6 +144,7 @@ const ACCOUNTS: {
     // Domestic customers, in dong. The export side is invoiced abroad and
     // zero-rated; this is the half that actually carries output VAT.
     openItems: true,
+    terms: 45,
     code: '131',
     name: 'Phải thu của khách hàng — VND',
     type: 'asset',
@@ -189,6 +196,7 @@ const ACCOUNTS: {
     key: 'payable',
     // A claim on somebody, so it is managed as open items and ages.
     openItems: true,
+    terms: 30,
     code: '331',
     name: 'Phải trả cho người bán',
     type: 'liability',
@@ -285,6 +293,15 @@ const ACCOUNTS: {
     key: 'admin',
     code: '642',
     name: 'Chi phí quản lý doanh nghiệp',
+    type: 'expense',
+    currency: 'VND',
+  },
+  // Stock lost beyond what the trade accepts: broken in the yard, short at a
+  // count. Not 632 — shrinkage inside cost of sales is shrinkage nobody sees.
+  {
+    key: 'stockLoss',
+    code: '811',
+    name: 'Chi phí khác — hao hụt, mất mát hàng tồn kho',
     type: 'expense',
     currency: 'VND',
   },
@@ -460,6 +477,7 @@ async function main(): Promise<void> {
         overdraftAllowed: account.overdraft ?? false,
         ...(account.monetary === undefined ? {} : { monetary: account.monetary }),
         ...(account.openItems === undefined ? {} : { openItems: account.openItems }),
+        ...(account.terms === undefined ? {} : { paymentTermsDays: account.terms }),
         ...(account.role ? { role: account.role } : {}),
       });
       ids[account.key] = created.id;
@@ -752,6 +770,36 @@ async function main(): Promise<void> {
       entries += 1;
     }
 
+    // The tax codes come before the first invoice, because an export is raised
+    // at 0% and a code has to exist for the return to count it.
+    const tax = createTaxService(database, orgId);
+    const taxReturns = createTaxReturnService(database, orgId);
+
+    const vat10 = await tax.create({
+      name: 'GTGT 10%',
+      rateBasisPoints: 1000,
+      treatment: 'vat',
+      inputAccountId: ids['vatIn'] ?? '',
+      outputAccountId: ids['vatOut'] ?? '',
+    });
+    if (!vat10.ok) throw new Error(`tax code failed: ${vat10.error.code}`);
+
+    // Exports. Zero-rated rather than untaxed — the distinction matters,
+    // because a zero-rated supply still carries the right to reclaim input
+    // tax and an exempt one does not. It appears on the return at nil.
+    const vat0 = await tax.create({
+      name: 'GTGT 0% — xuất khẩu',
+      rateBasisPoints: 0,
+      treatment: 'vat',
+      // Both accounts, even at 0%. A zero-rated supply is taxable at nil, not
+      // exempt, so the right to reclaim input tax survives — which is exactly
+      // why exporters end up in permanent credit.
+      inputAccountId: ids['vatIn'] ?? '',
+      outputAccountId: ids['vatOut'] ?? '',
+    });
+    if (!vat0.ok) throw new Error(`tax code failed: ${vat0.error.code}`);
+    const sales = createSalesService(database, orgId);
+
     const CONTAINERS: {
       day: number;
       currency: 'USD' | 'EUR' | 'AUD';
@@ -779,7 +827,7 @@ async function main(): Promise<void> {
         buyer: 'Southern Landscape Supplies, Brisbane',
         product: 'Đá lát granite 400×400×30',
         item: 'pavers',
-        share: 0.17,
+        share: 0.1,
         invoice: 'INV-2601',
       },
       {
@@ -827,7 +875,7 @@ async function main(): Promise<void> {
         buyer: 'Auckland Paving Centre',
         product: 'Đá lát granite 600×300×30',
         item: 'pavers',
-        share: 0.18,
+        share: 0.12,
         invoice: 'INV-2605',
       },
       {
@@ -899,7 +947,7 @@ async function main(): Promise<void> {
         buyer: 'Auckland Paving Centre',
         product: 'Bộ đá trang trí sân vườn',
         item: 'pavers',
-        share: 0.16,
+        share: 0.11,
         invoice: 'INV-2611',
       },
       {
@@ -911,49 +959,58 @@ async function main(): Promise<void> {
         buyer: 'Southern Landscape Supplies, Brisbane',
         product: 'Đá lát granite 450×900×60',
         item: 'pavers',
-        share: 0.19,
+        share: 0.12,
         invoice: 'INV-2612',
       },
     ];
 
     for (const container of CONTAINERS) {
-      const revenueVnd = Math.round(container.amount * Number(container.rate));
+      const invoicedAt = daysAgo(container.day, 10);
 
-      // The export invoice. One entry, two currencies: the receivable is in
-      // the buyer's money and the revenue is in dong, at the rate on the day.
-      await post(
-        `Xuất khẩu — ${container.product} → ${container.buyer}`,
-        daysAgo(container.day, 10),
-        [
-          {
-            account: container.account,
-            amount: foreign(container.amount),
-            fxRate: container.rate,
-          },
-          { account: 'revenue', amount: dong(-revenueVnd) },
-        ],
-        { metadata: { invoice: container.invoice, market: container.currency } },
-      );
+      // The rate on the day of the invoice, recorded as the bank quoted it.
+      // Month-end rates alone would price every container in a month at the
+      // same rate, which is not how an exporter's month goes.
+      const rate = await rates.record({
+        base: container.currency,
+        quote: 'VND',
+        rate: container.rate,
+        asOf: invoicedAt.toISOString().slice(0, 10),
+        source: 'seed',
+      });
+      if (!rate.ok) throw new Error(`rate for ${container.invoice} rejected`);
 
-      // The cost of the stone that left — worked out from the lots it came
-      // out of rather than from a percentage of the sale.
+      // The export invoice and the stone that left, as one entry: the
+      // receivable in the buyer's money, revenue in dong at the rate on the
+      // day, zero-rated, and the cost of the stone drawn from the lots it
+      // came out of.
       //
-      // This is the substance of the change. The old line took 52% of revenue,
-      // which is a number nobody could check and which quietly made every
-      // container equally profitable. Now the earliest lots go first, the
-      // later ones cost more, and the margin on each container differs because
-      // the stone in it genuinely did.
+      // This is the substance of the demo. The old seed posted the invoice
+      // and the cost as two unrelated entries, so nothing could say what
+      // INV-2607 made. Now the earliest lots go first, the later ones cost
+      // more, and the margin on each container differs because the stone in
+      // it genuinely did — and the sale knows it.
       const shipped =
         ((produced[container.item] ?? 0n) * BigInt(Math.round(container.share * 1000))) / 1000n;
-      const issued = await inventory.issue({
-        itemId: itemIds[container.item] ?? '',
-        quantity: shipped as never,
-        occurredAt: daysAgo(container.day, 10),
+      const sold = await sales.sell({
         reference: container.invoice,
-        description: `Giá vốn — ${container.invoice}`,
+        customerAccountId: ids[container.account] ?? '',
+        revenueAccountId: ids['revenue'] ?? '',
+        currency: container.currency,
+        taxCodeId: vat0.value.id,
+        occurredAt: invoicedAt,
+        // Thirty days from the bill of lading is the usual export term.
+        dueOn: new Date(invoicedAt.getTime() + 30 * 86_400_000).toISOString().slice(0, 10),
+        description: `Xuất khẩu — ${container.product} → ${container.buyer}`,
+        metadata: { market: container.currency },
+        lines: [
+          {
+            itemId: itemIds[container.item] ?? '',
+            quantity: shipped,
+            amount: BigInt(foreign(container.amount)),
+          },
+        ],
       });
-      if (!issued.ok)
-        throw new Error(`issue failed for ${container.invoice}: ${issued.error.code}`);
+      if (!sold.ok) throw new Error(`sale failed for ${container.invoice}: ${sold.error.code}`);
       entries += 1;
 
       // Freight and customs, paid in dong to a local forwarder.
@@ -962,6 +1019,28 @@ async function main(): Promise<void> {
         { account: 'selling', amount: dong(freight) },
         { account: 'bankVnd', amount: dong(-freight) },
       ]);
+    }
+
+    // ---- The quarterly stocktake --------------------------------------------
+    //
+    // Pavers break in the yard and a count never quite matches the lots. The
+    // shortfall leaves at what those lots cost, drawn by the same method as a
+    // sale, into 811 rather than 632 — shrinkage inside cost of sales is
+    // shrinkage nobody sees growing. Sized from what is actually on hand, so
+    // the seed cannot ask for stone it no longer has.
+    const paverStock = await inventory.item(itemIds['pavers'] ?? '');
+    const shortfall = (BigInt(paverStock?.onHandMinor ?? '0') / 200n / 100n) * 100n;
+    if (shortfall > 0n) {
+      const counted = await inventory.writeOff({
+        itemId: itemIds['pavers'] ?? '',
+        quantity: shortfall as never,
+        reason: 'count_shortfall',
+        expenseAccountId: ids['stockLoss'] ?? '',
+        occurredAt: daysAgo(4, 17),
+        reference: 'BBKK-Q3',
+      });
+      if (!counted.ok) throw new Error(`stocktake failed: ${counted.error.code}`);
+      entries += 1;
     }
 
     // ---- Customers paying, at a rate that is never the invoiced one ---------
@@ -1134,33 +1213,6 @@ async function main(): Promise<void> {
     // difference. That is the whole mechanism of a VAT return in two months,
     // and it is the part a demo has to show, because "what happened to the
     // credit I did not use" is the question the spreadsheet never answered.
-
-    const tax = createTaxService(database, orgId);
-    const taxReturns = createTaxReturnService(database, orgId);
-
-    const vat10 = await tax.create({
-      name: 'GTGT 10%',
-      rateBasisPoints: 1000,
-      treatment: 'vat',
-      inputAccountId: ids['vatIn'] ?? '',
-      outputAccountId: ids['vatOut'] ?? '',
-    });
-    if (!vat10.ok) throw new Error(`tax code failed: ${vat10.error.code}`);
-
-    // Exports. Zero-rated rather than untaxed — the distinction matters,
-    // because a zero-rated supply still carries the right to reclaim input
-    // tax and an exempt one does not. It appears on the return at nil.
-    const vat0 = await tax.create({
-      name: 'GTGT 0% — xuất khẩu',
-      rateBasisPoints: 0,
-      treatment: 'vat',
-      // Both accounts, even at 0%. A zero-rated supply is taxable at nil, not
-      // exempt, so the right to reclaim input tax survives — which is exactly
-      // why exporters end up in permanent credit.
-      inputAccountId: ids['vatIn'] ?? '',
-      outputAccountId: ids['vatOut'] ?? '',
-    });
-    if (!vat0.ok) throw new Error(`tax code failed: ${vat0.error.code}`);
 
     const TAXED: {
       day: number;

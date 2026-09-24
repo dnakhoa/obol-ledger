@@ -50,6 +50,10 @@ export type AccountDto = {
   readonly role: string | null;
   /** Retranslated at each period end when held in a foreign currency. */
   readonly monetary: boolean;
+  /** Managed as unsettled documents — a customer or a supplier — and so aged. */
+  readonly openItems: boolean;
+  /** Days the counterparty has to pay; null when not stated. */
+  readonly paymentTermsDays: number | null;
   readonly createdAt: string;
 };
 

@@ -1,13 +1,19 @@
 import { z } from 'zod';
+import { WRITE_OFF_REASONS } from '@/server/domain/costing';
 import {
   createAccountSchema,
   createApiKeySchema,
+  createItemSchema,
+  createSaleSchema,
   recordRateSchema,
   createEndpointSchema,
   createEntrySchema,
   createTransferSchema,
+  issueStockSchema,
   paginationSchema,
+  receiveStockSchema,
   updateEndpointSchema,
+  writeOffStockSchema,
 } from './schemas';
 
 /**
@@ -126,6 +132,167 @@ const transactionSchema = {
   },
 } as const;
 
+const money = { $ref: '#/components/schemas/Money' } as const;
+const nullableMoney = { oneOf: [money, { type: 'null' }] } as const;
+
+/**
+ * A quantity comes back twice, like money: exact scaled integer and decimal.
+ * `name` is the decimal field; `${name}Minor` is the integer.
+ */
+function quantityPair(name: string, what: string): Record<string, unknown> {
+  return {
+    [name]: {
+      type: 'string',
+      description: `${what}, as a decimal string to the item’s precision.`,
+      examples: ['24.687'],
+    },
+    [`${name}Minor`]: {
+      type: 'string',
+      description: `${what}, as an integer scaled by 10^quantityPrecision. Exact; store this one.`,
+      examples: ['24687'],
+    },
+  };
+}
+
+const itemSchema = {
+  type: 'object',
+  required: ['id', 'sku', 'name', 'unit', 'quantityPrecision', 'costingMethod', 'onHand', 'value'],
+  properties: {
+    id: { type: 'string', examples: ['item_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'] },
+    sku: { type: 'string' },
+    name: { type: 'string' },
+    unit: { type: 'string', examples: ['m2', 'tonne', 'piece'] },
+    quantityPrecision: {
+      type: 'integer',
+      minimum: 0,
+      maximum: 6,
+      description: 'How many decimal places a quantity of this item may have.',
+    },
+    costingMethod: { enum: ['fifo', 'weighted_average', 'specific', 'lifo'] },
+    costingInherited: {
+      type: 'boolean',
+      description: 'True when the method is the organisation’s rather than the item’s own.',
+    },
+    status: { enum: ['active', 'archived'] },
+    ...quantityPair('onHand', 'What is on hand'),
+    value: {
+      allOf: [money],
+      description:
+        'What the open lots are carried at, in the functional currency — the figure the inventory account holds.',
+    },
+    valueMinor: { type: 'string' },
+    currency: { type: 'string' },
+    openLayers: { type: 'integer' },
+    inventoryAccountId: { type: 'string' },
+    cogsAccountId: { type: 'string' },
+  },
+} as const;
+
+const layerSchema = {
+  type: 'object',
+  description: 'A lot: one delivery, at the price it was bought for.',
+  properties: {
+    id: { type: 'string', examples: ['layer_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'] },
+    reference: { type: ['string', 'null'] },
+    acquiredAt: { type: 'string', format: 'date-time' },
+    currency: { type: 'string', description: 'What the lot was paid in.' },
+    ...quantityPair('quantity', 'What arrived'),
+    ...quantityPair('remainingQuantity', 'What is left'),
+    cost: { allOf: [money], description: 'What was paid, in the currency it was paid in.' },
+    remainingValue: {
+      allOf: [money],
+      description: 'What is left of it, in the functional currency.',
+    },
+    transactionId: { type: ['string', 'null'] },
+  },
+} as const;
+
+const movementSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string', examples: ['move_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'] },
+    kind: { enum: ['receipt', 'issue', 'writeoff'] },
+    ...quantityPair('quantity', 'How much moved'),
+    cost: { allOf: [money], description: 'In the functional currency.' },
+    occurredAt: { type: 'string', format: 'date-time' },
+    reference: { type: ['string', 'null'] },
+    costingMethod: { enum: ['fifo', 'weighted_average', 'specific', 'lifo'] },
+    transactionId: { type: 'string' },
+    reason: { enum: [...WRITE_OFF_REASONS, null], description: 'Set on a write-off only.' },
+    saleId: { type: ['string', 'null'] },
+    revenue: nullableMoney,
+    drawnFrom: {
+      type: 'array',
+      description: 'The lots this movement was costed from, oldest first. Empty for a receipt.',
+      items: {
+        type: 'object',
+        properties: {
+          layerId: { type: 'string' },
+          layerReference: { type: ['string', 'null'] },
+          ...quantityPair('quantity', 'How much came from this lot'),
+          cost: money,
+        },
+      },
+    },
+  },
+} as const;
+
+const marginFields = {
+  revenue: money,
+  cost: money,
+  margin: money,
+  marginBasisPoints: {
+    type: ['integer', 'null'],
+    description: 'Margin over revenue, in hundredths of a percent. Null when there is no revenue.',
+  },
+} as const;
+
+const saleSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string', examples: ['sale_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'] },
+    reference: { type: 'string', description: 'The invoice number.' },
+    customerAccountId: { type: 'string' },
+    customerName: { type: 'string' },
+    occurredAt: { type: 'string', format: 'date-time' },
+    dueOn: { type: ['string', 'null'], format: 'date' },
+    currency: { type: 'string', description: 'What the invoice is in.' },
+    net: { allOf: [money], description: 'As invoiced, in the invoice currency.' },
+    tax: money,
+    gross: money,
+    ...marginFields,
+    transactionId: { type: 'string' },
+    lines: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          movementId: { type: 'string' },
+          itemId: { type: 'string' },
+          sku: { type: 'string' },
+          itemName: { type: 'string' },
+          unit: { type: 'string' },
+          quantityPrecision: { type: 'integer' },
+          ...quantityPair('quantity', 'How much was sold'),
+          ...marginFields,
+          drawnFrom: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                layerReference: { type: ['string', 'null'] },
+                ...quantityPair('quantity', 'How much came from this lot'),
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  description:
+    'Revenue, cost and margin are in the functional currency; net, tax and gross are as invoiced.',
+} as const;
+
 function envelope(schema: unknown, withCursor = false): Record<string, unknown> {
   return {
     type: 'object',
@@ -203,6 +370,13 @@ const idempotencyHeader = {
   schema: { type: 'string', maxLength: 255 },
 };
 
+const itemIdParameter = {
+  name: 'itemId',
+  in: 'path',
+  required: true,
+  schema: { type: 'string' },
+} as const;
+
 export function openApiDocument(): Record<string, unknown> {
   return {
     openapi: '3.1.0',
@@ -218,6 +392,8 @@ export function openApiDocument(): Record<string, unknown> {
       { name: 'Accounts' },
       { name: 'Journal' },
       { name: 'Reports' },
+      { name: 'Stock' },
+      { name: 'Sales' },
       { name: 'Webhooks' },
       { name: 'Periods' },
       { name: 'Credentials' },
@@ -240,6 +416,15 @@ export function openApiDocument(): Record<string, unknown> {
         UpdateEndpoint: jsonSchema(updateEndpointSchema),
         CreateApiKey: jsonSchema(createApiKeySchema),
         RecordRate: jsonSchema(recordRateSchema),
+        Item: itemSchema,
+        Layer: layerSchema,
+        Movement: movementSchema,
+        Sale: saleSchema,
+        CreateItem: jsonSchema(createItemSchema),
+        ReceiveStock: jsonSchema(receiveStockSchema),
+        IssueStock: jsonSchema(issueStockSchema),
+        WriteOffStock: jsonSchema(writeOffStockSchema),
+        CreateSale: jsonSchema(createSaleSchema),
       },
     },
     paths: {
@@ -925,6 +1110,257 @@ export function openApiDocument(): Record<string, unknown> {
             ...problemResponses(429),
           },
         },
+      },
+      '/items': {
+        get: {
+          tags: ['Stock'],
+          summary: 'List products with what is on hand and its value',
+          responses: {
+            '200': {
+              description: 'Products, ordered by SKU',
+              content: {
+                'application/json': {
+                  schema: envelope({ type: 'array', items: { $ref: '#/components/schemas/Item' } }),
+                },
+              },
+            },
+            ...problemResponses(429),
+          },
+        },
+        post: {
+          tags: ['Stock'],
+          summary: 'Add a product',
+          description:
+            'Both accounts must be in the functional currency: stock is non-monetary and is never retranslated. Without costingMethod the item follows the organisation’s. LIFO is refused outside a US GAAP chart.',
+          security: [{ bearerAuth: [] }],
+          parameters: [idempotencyHeader],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/CreateItem' } },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Created',
+              content: {
+                'application/json': { schema: envelope({ $ref: '#/components/schemas/Item' }) },
+              },
+            },
+            '200': { description: 'Idempotent replay of an earlier request' },
+            ...problemResponses(400, 401, 404, 409, 422, 429),
+          },
+        },
+      },
+      '/items/{itemId}': {
+        get: {
+          tags: ['Stock'],
+          summary: 'Fetch one product with its open lots and recent movements',
+          description:
+            'Lots are oldest first — the order FIFO takes them in. Movements are the 50 most recent, newest first.',
+          parameters: [itemIdParameter],
+          responses: {
+            '200': {
+              description: 'The product',
+              content: {
+                'application/json': {
+                  schema: envelope({
+                    allOf: [
+                      { $ref: '#/components/schemas/Item' },
+                      {
+                        type: 'object',
+                        properties: {
+                          layers: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/Layer' },
+                          },
+                          movements: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/Movement' },
+                          },
+                        },
+                      },
+                    ],
+                  }),
+                },
+              },
+            },
+            ...problemResponses(404, 429),
+          },
+        },
+      },
+      '/items/{itemId}/receipts': movementWrite({
+        summary: 'Book a delivery',
+        description:
+          'Posts the purchase and opens a lot in one transaction, or does neither. quantity is to the item’s precision — a digit more is a 422, never a rounding. cost is the whole delivery in currency; a foreign cost is converted at the rate on the day it arrived and frozen there. The supplier’s leg is in the credit account’s own currency.',
+        schema: 'ReceiveStock',
+      }),
+      '/items/{itemId}/issues': movementWrite({
+        summary: 'Ship stock without a sale',
+        description:
+          'Costed from the lots by the item’s method and posted to its cost of goods sold. For stock that is sold, use POST /sales, which posts the revenue beside the cost so the margin exists. Shipping more than is on hand is a 409 insufficient_stock and nothing is written.',
+        schema: 'IssueStock',
+      }),
+      '/items/{itemId}/write-offs': movementWrite({
+        summary: 'Write off stock that was not sold',
+        description: `Costed from the lots like a sale, and posted to the expense account given rather than cost of sales, so shrinkage stays visible. reason is one of ${WRITE_OFF_REASONS.join(', ')}.`,
+        schema: 'WriteOffStock',
+      }),
+      '/sales': {
+        get: {
+          tags: ['Sales'],
+          summary: 'Recent invoices, newest first',
+          parameters: [
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Invoices, with their lines and margins',
+              content: {
+                'application/json': {
+                  schema: envelope({ type: 'array', items: { $ref: '#/components/schemas/Sale' } }),
+                },
+              },
+            },
+            ...problemResponses(400, 429),
+          },
+        },
+        post: {
+          tags: ['Sales'],
+          summary: 'Invoice a customer and ship the goods',
+          description:
+            'One entry carries the receivable (in the invoice currency), the revenue and any output tax (in the functional currency) and the cost of goods sold drawn from the lots. Each line’s amount is its net total in the invoice currency, not a unit price; its quantity is to that item’s precision. Two lines of one product draw successive lots. Selling more than is on hand is a 409 insufficient_stock with the figure on hand, and nothing is written. The reference is unique.',
+          security: [{ bearerAuth: [] }],
+          parameters: [idempotencyHeader],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/CreateSale' } },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'The sale and the entry it posted',
+              content: {
+                'application/json': {
+                  schema: envelope({
+                    type: 'object',
+                    required: ['sale', 'entry'],
+                    properties: {
+                      sale: { $ref: '#/components/schemas/Sale' },
+                      entry: { $ref: '#/components/schemas/Transaction' },
+                    },
+                  }),
+                },
+              },
+            },
+            '200': { description: 'Idempotent replay of an earlier request' },
+            ...problemResponses(400, 401, 404, 409, 422, 429),
+          },
+        },
+      },
+      '/sales/{saleId}': {
+        get: {
+          tags: ['Sales'],
+          summary: 'Fetch one invoice with its lines, cost and margin',
+          parameters: [{ name: 'saleId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': {
+              description: 'The invoice',
+              content: {
+                'application/json': { schema: envelope({ $ref: '#/components/schemas/Sale' }) },
+              },
+            },
+            ...problemResponses(404, 429),
+          },
+        },
+      },
+      '/reports/gross-margin': {
+        get: {
+          tags: ['Reports', 'Sales'],
+          summary: 'Revenue, cost and margin by product and by customer',
+          description:
+            'Over [from, to): to is exclusive, so consecutive periods tile. With neither, the current calendar month; with one, the other is the edge of the month it falls in. Everything is in the functional currency — revenue at each invoice’s rate, cost at each lot’s. Freight and duty that arrived after the goods were sold appear per product as lateCharges.',
+          parameters: [
+            {
+              name: 'from',
+              in: 'query',
+              required: false,
+              description: 'First day included, YYYY-MM-DD.',
+              schema: { type: 'string', format: 'date' },
+            },
+            {
+              name: 'to',
+              in: 'query',
+              required: false,
+              description: 'First day excluded, YYYY-MM-DD.',
+              schema: { type: 'string', format: 'date' },
+            },
+          ],
+          responses: {
+            '200': { description: 'byItem, byCustomer and a total' },
+            ...problemResponses(400, 429),
+          },
+        },
+      },
+      '/reports/stock-reconciliation': {
+        get: {
+          tags: ['Reports', 'Stock'],
+          summary: 'Each inventory account against the lots behind it',
+          description:
+            'difference is ledger less lots, and zero is the only healthy value. A difference comes from an entry that moved the account without moving a lot — a hand-typed journal line — and those entries are listed under unexplained. meta.agrees is false if any account disagrees.',
+          responses: {
+            '200': { description: 'One row per inventory account' },
+            ...problemResponses(429),
+          },
+        },
+      },
+    },
+  };
+}
+
+/** Receipts, issues and write-offs answer alike: the movement and the entry it posted. */
+function movementWrite(operation: {
+  summary: string;
+  description: string;
+  schema: string;
+}): Record<string, unknown> {
+  return {
+    post: {
+      tags: ['Stock'],
+      summary: operation.summary,
+      description: operation.description,
+      security: [{ bearerAuth: [] }],
+      parameters: [itemIdParameter, idempotencyHeader],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': { schema: { $ref: `#/components/schemas/${operation.schema}` } },
+        },
+      },
+      responses: {
+        '201': {
+          description: 'The movement, and the entry it posted. Location names the entry.',
+          content: {
+            'application/json': {
+              schema: envelope({
+                type: 'object',
+                required: ['movement', 'entry'],
+                properties: {
+                  movement: { $ref: '#/components/schemas/Movement' },
+                  entry: { $ref: '#/components/schemas/Transaction' },
+                },
+              }),
+            },
+          },
+        },
+        '200': { description: 'Idempotent replay of an earlier request' },
+        ...problemResponses(400, 401, 404, 409, 422, 429),
       },
     },
   };

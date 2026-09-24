@@ -15,7 +15,8 @@ import { viewerServices } from '@/server/container';
 import { translations } from '@/server/i18n';
 import { toQuantityString, unitLabel } from '@/lib/quantity';
 import { minorUnits, toDecimalString, type CurrencyCode } from '@/lib/money';
-import type { ItemSummary } from '@/server/services/inventory';
+import type { ItemSummary, StockReconciliation } from '@/server/services/inventory';
+import { StockReconciliationCard } from '@/components/stock-reconciliation';
 import type { AccountDto } from '@/server/services/dto';
 import type { Messages } from '@/lib/i18n';
 
@@ -61,9 +62,14 @@ export default async function StockPage() {
   const { t } = await translations();
   let items: readonly ItemSummary[];
   let accounts: AccountDto[];
+  let reconciliation: StockReconciliation;
   try {
     const { services } = await viewerServices();
-    [items, accounts] = await Promise.all([services.inventory.list(), services.accounts.list()]);
+    [items, accounts, reconciliation] = await Promise.all([
+      services.inventory.list(),
+      services.accounts.list(),
+      services.inventory.reconcile(),
+    ]);
   } catch (error) {
     if (error instanceof SetupRequiredError) return <SetupNotice detail={error.message} />;
     throw error;
@@ -90,6 +96,7 @@ export default async function StockPage() {
         actions={
           <>
             <ButtonLink href="/stock/shipments">{t.shipments.title}</ButtonLink>
+            <ButtonLink href="/sales">{t.stock.sellButton}</ButtonLink>
             <ButtonLink href="/stock/import" variant="primary">
               {t.stock.importButton}
               <ArrowRightIcon />
@@ -110,8 +117,10 @@ export default async function StockPage() {
                 <tr>
                   <Th>{t.stock.product}</Th>
                   <Th align="right">{t.stock.onHand}</Th>
-                  <Th align="right">{t.stock.deliveriesOpen}</Th>
-                  <Th>{t.stock.costedBy}</Th>
+                  <Th hideBelow="md" align="right">
+                    {t.stock.deliveriesOpen}
+                  </Th>
+                  <Th hideBelow="md">{t.stock.costedBy}</Th>
                   <Th align="right">{t.stock.value}</Th>
                 </tr>
               </thead>
@@ -133,10 +142,10 @@ export default async function StockPage() {
                         {unitLabel(item.unit)}
                       </span>
                     </Td>
-                    <Td align="right" numeric>
+                    <Td hideBelow="md" align="right" numeric>
                       {item.openLayers}
                     </Td>
-                    <Td>
+                    <Td hideBelow="md">
                       <span className="text-ink-secondary text-xs">
                         {methodLabel(item.costingMethod, t)}
                       </span>
@@ -152,9 +161,12 @@ export default async function StockPage() {
               </tbody>
               <tfoot>
                 <Tr>
-                  <Td colSpan={4} className="font-medium">
-                    {t.stock.totalValue}
-                  </Td>
+                  {/* Cells rather than a colSpan, so the total stays under the
+                      value column when a phone drops the middle ones. */}
+                  <Td className="font-medium">{t.stock.totalValue}</Td>
+                  <Td />
+                  <Td hideBelow="md" />
+                  <Td hideBelow="md" />
                   <Td align="right" numeric className="font-semibold">
                     <Money
                       value={{
@@ -175,6 +187,10 @@ export default async function StockPage() {
           <EmptyState title={t.stock.emptyTitle} description={t.stock.emptyBody} />
         </Card>
       )}
+
+      {reconciliation.accounts.length > 0 ? (
+        <StockReconciliationCard reconciliation={reconciliation} />
+      ) : null}
 
       <Card>
         <CardHeader>

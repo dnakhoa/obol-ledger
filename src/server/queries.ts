@@ -29,6 +29,33 @@ export type DashboardModel = {
   readonly recent: TransactionDto[];
   readonly summary: { accountCount: number; entryCount: number; postingCount: number };
   readonly chart: { columns: VolumeColumn[]; ticks: string[]; currency: CurrencyCode };
+  /** The business at a glance, for a ledger that holds stock. Null when it holds none. */
+  readonly trading: TradingSnapshot | null;
+};
+
+/**
+ * The four numbers a trading business opens the books for.
+ *
+ * The ledger's own figures — assets, revenue, entries posted — prove the books
+ * are consistent. These say how the business is doing: what is in the yard
+ * and whether the accounts agree with it, who is late paying, what is owed to
+ * suppliers, and what this month's invoices made. Each links to the page that
+ * answers the next question.
+ */
+export type TradingSnapshot = {
+  readonly stock: MoneyDto;
+  readonly products: number;
+  /** Whether the lots and the inventory accounts agree. */
+  readonly stockAgrees: boolean;
+  /** Everything customers owe, in the functional currency. */
+  readonly receivable: MoneyDto;
+  readonly overdueInvoices: number;
+  readonly oldestDaysLate: number;
+  readonly payable: MoneyDto;
+  readonly overdueBills: number;
+  readonly margin: MoneyDto;
+  readonly marginBasisPoints: number | null;
+  readonly invoicesThisMonth: number;
 };
 
 /**
@@ -47,16 +74,35 @@ export type DashboardModel = {
  * is in.
  */
 export async function loadDashboard(locale: Locale = 'en'): Promise<DashboardModel> {
-  const { accounts, journal, reporting } = await demoServices();
+  const { accounts, journal, reporting, inventory, aging, sales } = await demoServices();
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
   // Independent reads, issued together: awaiting them in sequence would make the
   // page as slow as the sum of the queries instead of the slowest one.
-  const [accountRows, trialBalance, recent, summary, volume] = await Promise.all([
+  const [
+    accountRows,
+    trialBalance,
+    recent,
+    summary,
+    volume,
+    items,
+    reconciliation,
+    receivables,
+    payables,
+    margins,
+  ] = await Promise.all([
     accounts.list(),
     reporting.trialBalance(),
     journal.list({ limit: 6 }),
     reporting.summary(),
     reporting.dailyVolume(30),
+    inventory.list(),
+    inventory.reconcile(),
+    aging.report('asset', now),
+    aging.report('liability', now),
+    sales.margins(monthStart, monthEnd),
   ]);
 
   // The day labels along the chart follow the reader too. Without this they
@@ -77,7 +123,46 @@ export async function loadDashboard(locale: Locale = 'en'): Promise<DashboardMod
   // figure it plots is already in the functional currency.
   const currency = (volume[0]?.volume.currency ?? 'USD') as CurrencyCode;
 
+  const functional = (accountRows[0]?.baseBalance.currency ?? 'USD') as CurrencyCode;
+  // Summed from each account's functional balance: a dollar receivable and a
+  // dong one only add up once both are in dong, at the rates the ledger holds.
+  const openTotal = (type: 'asset' | 'liability') =>
+    toMoneyDto(
+      accountRows
+        .filter((account) => account.openItems && account.type === type)
+        .reduce((sum, account) => sum + BigInt(account.baseBalance.minorUnits), 0n) as MinorUnits,
+      functional,
+    );
+  const late = (report: typeof receivables) =>
+    report.accounts.flatMap((account) =>
+      account.items.filter(
+        (item) => item.daysOverdue > 0 && !item.outstanding.amount.startsWith('-'),
+      ),
+    );
+  const lateInvoices = late(receivables);
+
+  const trading: TradingSnapshot | null =
+    items.length === 0
+      ? null
+      : {
+          stock: toMoneyDto(
+            items.reduce((sum, item) => sum + BigInt(item.valueMinor), 0n) as MinorUnits,
+            functional,
+          ),
+          products: items.length,
+          stockAgrees: reconciliation.agrees,
+          receivable: openTotal('asset'),
+          overdueInvoices: lateInvoices.length,
+          oldestDaysLate: lateInvoices.reduce((max, item) => Math.max(max, item.daysOverdue), 0),
+          payable: openTotal('liability'),
+          overdueBills: late(payables).length,
+          margin: margins.total.margin,
+          marginBasisPoints: margins.total.marginBasisPoints,
+          invoicesThisMonth: margins.total.invoices,
+        };
+
   return {
+    trading,
     accounts: accountRows,
     trialBalance,
     recent: [...recent.items],

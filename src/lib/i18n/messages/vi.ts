@@ -45,6 +45,10 @@ export const vi: Messages = {
     pageNotFound: 'Trang này không tồn tại',
     keepYourOwnBooks: 'Ghi sổ của riêng bạn',
     working: 'Đang xử lý…',
+    refusalSignIn:
+      'Hãy đăng nhập để lập sổ sách của riêng bạn. Đây là bản trình diễn công khai: ai cũng xem được, không ai sửa được.',
+    refusalNoLedger: 'Tài khoản này chưa có sổ sách nào. Hãy tạo một bộ sổ để bắt đầu ghi sổ.',
+    refusalReadOnly: 'Bạn chỉ có quyền xem trên bộ sổ này.',
   },
 
   nav: {
@@ -52,6 +56,7 @@ export const vi: Messages = {
     overview: 'Tổng quan',
     accounts: 'Tài khoản',
     stock: 'Kho hàng',
+    sales: 'Bán hàng',
     journal: 'Sổ nhật ký',
     reports: 'Báo cáo',
     monthEnd: 'Khóa sổ',
@@ -110,6 +115,20 @@ export const vi: Messages = {
     entryDescription: 'Nội dung',
     accounts: 'Tài khoản',
     amount: 'Số tiền',
+    theBooks: 'Sổ sách',
+    trading: 'Tình hình kinh doanh',
+    stockOnHand: 'Hàng tồn kho',
+    stockAgrees: (products) => `${products} mặt hàng · khớp với sổ cái`,
+    stockDisagrees: 'Lệch với sổ cái — cần kiểm tra',
+    owedToYou: 'Khách hàng còn nợ',
+    invoicesLate: (count, days) => `${count} hóa đơn quá hạn · lâu nhất ${days} ngày`,
+    nothingLate: 'Không có hóa đơn quá hạn',
+    owedToSuppliers: 'Còn nợ nhà cung cấp',
+    billsLate: (count) => `${count} hóa đơn đã quá hạn trả`,
+    nothingPastDue: 'Không có khoản nào quá hạn',
+    marginThisMonth: 'Lãi gộp tháng này',
+    marginDetail: (invoices, percent) => `${percent} trên ${invoices} hóa đơn`,
+    noInvoicesYet: 'Tháng này chưa lập hóa đơn nào',
   },
 
   accounts: {
@@ -156,6 +175,7 @@ export const vi: Messages = {
     description:
       'Mỗi lần nhập hàng được giữ thành một lô riêng với giá riêng. Khi xuất hàng, hệ thống tự tính giá vốn từ chính những lô đã xuất — và cho bạn biết đó là những lô nào.',
     importButton: 'Nhập từ bảng tính',
+    sellButton: 'Lập hóa đơn bán hàng',
 
     inTheYard: 'Hàng đang có trong kho',
     inTheYardHint: 'Giá trị ở đây là giá vốn, không phải giá bán.',
@@ -270,6 +290,24 @@ export const vi: Messages = {
     shippedOut: 'Xuất kho',
     nothingMoved: 'Chưa có phát sinh nào',
     nothingMovedBody: 'Các lần nhập kho và xuất kho sẽ được liệt kê ở đây.',
+    writeOffTitle: 'Xuất hủy hàng hóa',
+    writeOffHint:
+      'Hàng hỏng, vỡ, hết hạn, mất mát hoặc thiếu khi kiểm kê. Giá vốn được tính từ các lô giống hệt như khi bán, và ghi vào tài khoản chi phí bạn chọn — để hao hụt không lẫn vào giá vốn hàng bán.',
+    writeOffButton: 'Xuất hủy',
+    howMuchWrittenOff: (unit) => `Số lượng (${unit})`,
+    reason: 'Lý do',
+    reasonDamaged: 'Hàng hỏng, vỡ',
+    reasonExpired: 'Hết hạn sử dụng',
+    reasonLost: 'Mất mát',
+    reasonCountShortfall: 'Thiếu khi kiểm kê',
+    reasonOther: 'Lý do khác',
+    lossAccount: 'Tài khoản ghi nhận tổn thất',
+    lossAccountHint: 'Một tài khoản chi phí: hao hụt, mất mát, hàng hỏng.',
+    writeOffReferenceHint: 'Số biên bản kiểm kê hoặc biên bản hàng hỏng.',
+    needLossAccount: 'Hãy mở một tài khoản chi phí cho hao hụt hàng tồn kho ở',
+    writtenOff: 'Xuất hủy',
+    sold: 'Bán',
+    soldFor: 'Doanh thu',
   },
 
   journal: {
@@ -306,6 +344,13 @@ export const vi: Messages = {
     title: 'Ghi bút toán',
     description:
       'Ghi một bút toán vào sổ. Tính cân đối được kiểm tra ngay khi bạn gõ, kiểm tra lại ở tầng nghiệp vụ, và lần thứ ba do Postgres kiểm tra tại thời điểm COMMIT.',
+    tooMany: (seconds) =>
+      `Bạn ghi quá nhiều bút toán trong thời gian ngắn. Hãy thử lại sau ${seconds} giây.`,
+    checkFields: 'Chưa ghi được bút toán. Hãy kiểm tra các ô được đánh dấu.',
+    notAnAmount: (line, amount, currency) =>
+      `Dòng ${line}: “${amount}” không phải là số tiền hợp lệ bằng ${currency}.`,
+    notRepresentable: (currency) => `Không ghi được bằng ${currency}`,
+    posted: (id) => `Đã ghi bút toán ${id}.`,
   },
 
   reports: {
@@ -378,6 +423,17 @@ export const vi: Messages = {
     noMonths: 'Chưa có phát sinh nên chưa có tháng nào để khóa.',
     reopen: 'Mở lại',
     stepNumber: (n) => `Bước ${n}`,
+
+    rateNotANumber: 'Nhập tỷ giá chỉ gồm chữ số, không có dấu phân cách hàng nghìn, ví dụ 25700.',
+    rateSaved: (base, rate, functional, day) =>
+      `Đã lưu tỷ giá ngày ${day}: 1 ${base} = ${rate} ${functional}.`,
+    pickMonth: 'Hãy chọn tháng trước.',
+    revalued: (count) => `Đã đánh giá lại ${count} số dư ngoại tệ theo tỷ giá cuối tháng.`,
+    nothingToRevalue:
+      'Đã kiểm tra mọi số dư ngoại tệ — tỷ giá không đổi nên không có gì phải điều chỉnh.',
+    monthClosed: (month) => `Đã khóa sổ ${month}. Số liệu của tháng này sẽ không thay đổi nữa.`,
+    monthReopened: (month) =>
+      `Đã mở lại ${month}. Bút toán kết chuyển đã được ghi đảo, và cả hai vẫn nằm trên sổ.`,
   },
 
   misc: {
@@ -454,6 +510,21 @@ export const vi: Messages = {
     sumsToZero: 'Cộng lại bằng 0, được kiểm tra tại thời điểm COMMIT',
     metadata: 'Dữ liệu kèm theo',
     account: 'Tài khoản',
+    ownedByStockTitle: 'Bút toán do sổ kho ghi',
+    ownedByStock:
+      'Bút toán này vừa ghi tiền vừa ghi hàng, nên không thể đảo ở đây — làm vậy sẽ thay đổi tài khoản mà không thay đổi các lô hàng đứng sau nó. Hãy điều chỉnh từ trang kho: xuất hủy, hoặc bổ sung chi phí cho lô hàng.',
+    openSale: 'Mở hóa đơn',
+    cancelledByReversal:
+      'Bút toán này đã bị hủy bởi một bút toán đảo sau đó. Nó vẫn được lưu trên sổ; tác động ròng bằng không.',
+    cancelsEarlier:
+      'Bút toán này được lập để hủy một bút toán trước đó. Cả hai đều được lưu trên sổ.',
+    viewOriginal: 'Xem bút toán gốc',
+    reservedNotMoved: 'Đã giữ chỗ, chưa ghi nhận',
+    cancelledNeverMoved: 'Đã hủy; chưa từng ghi nhận',
+    debitSideMatches: 'Bên Nợ; bên Có khớp đúng',
+    metadataHintBefore:
+      'Mã tham chiếu riêng của bên gọi. Sổ cái không diễn giải, nhưng tìm kiếm được —',
+    metadataHintAfter: 'trên sổ nhật ký.',
   },
 
   statement: {
@@ -529,6 +600,32 @@ export const vi: Messages = {
     reversalHint:
       'Không bắt buộc. Mặc định là \u201cBút toán điều chỉnh cho \u2026\u201d, thường là đủ.',
     postReversal: 'Ghi bút toán điều chỉnh',
+    tooManyReversals: (seconds) =>
+      `Bạn ghi đảo quá nhiều lần trong thời gian ngắn. Hãy thử lại sau ${seconds} giây.`,
+    noEntryGiven: 'Chưa chọn bút toán nào.',
+    reversedBy: (id) => `Đã ghi đảo bằng bút toán ${id}.`,
+    tooManyTransitions: (seconds) =>
+      `Bạn thao tác quá nhiều lần trong thời gian ngắn. Hãy thử lại sau ${seconds} giây.`,
+    transitionUnavailable: 'Không thể thực hiện thao tác này với bút toán này.',
+    settled: 'Đã tất toán bút toán.',
+    cancelledNothingMoved: 'Đã hủy bút toán; không có khoản tiền nào dịch chuyển.',
+
+    tooManyAccounts: (seconds) =>
+      `Bạn mở quá nhiều tài khoản trong thời gian ngắn. Hãy thử lại sau ${seconds} giây.`,
+    accountCheckFields: 'Chưa mở được tài khoản. Hãy kiểm tra các ô được đánh dấu.',
+    accountExists: (name, currency) => `Đã có tài khoản tên “${name}” theo dõi bằng ${currency}.`,
+    alreadyInUse: 'Tên này đã được dùng',
+    accountCode: 'Số hiệu tài khoản',
+    accountCodeHint:
+      'Chỉ gồm chữ số. Bắt buộc với hệ thống tài khoản theo quy định, nơi chữ số đầu là loại tài khoản.',
+    accountCodeRequiredHint:
+      'Bắt buộc: theo Thông tư 200, chữ số đầu là loại tài khoản — 131 là phải thu, 331 là phải trả.',
+    openItems: 'Theo dõi công nợ khách hàng hoặc nhà cung cấp',
+    openItemsNote:
+      'Số dư là tập hợp các hóa đơn chưa thanh toán, nên tài khoản này hiện trong báo cáo tuổi nợ phải thu hoặc phải trả. Mỗi khách hàng một tài khoản chi tiết thì báo cáo mới phân biệt được từng khách.',
+    paymentTerms: 'Thời hạn thanh toán (ngày)',
+    paymentTermsHint:
+      'Số ngày được phép trả chậm. Để trống thì mặc định 30; 0 là trả ngay khi nhận hàng.',
   },
 
   palette: {
@@ -550,19 +647,26 @@ export const vi: Messages = {
     caption: (account) => `${account}, nợ cũ nhất trước`,
     invoice: 'Số hóa đơn',
     dated: 'Ngày',
-    age: 'Tuổi nợ',
     outstanding: 'Còn lại',
-    days: (count) => `${count} ngày`,
-    current: 'Đến 30 ngày',
-    days31to60: '31–60 ngày',
-    days61to90: '61–90 ngày',
-    over90: 'Trên 90 ngày',
+    current: 'Chưa đến hạn',
+    days1to30: 'Quá hạn 1–30 ngày',
+    days31to60: 'Quá hạn 31–60 ngày',
+    days61to90: 'Quá hạn 61–90 ngày',
+    over90: 'Quá hạn trên 90 ngày',
+    due: 'Hạn thanh toán',
+    late: 'Quá hạn',
+    lateDays: (count) => `${count} ngày`,
+    notYetDue: 'Chưa',
+    terms: (days) => (days === 0 ? 'Thanh toán khi nhận hàng' : `Thời hạn ${days} ngày`),
+    termsAssumed: (days) => `Mặc định thời hạn ${days} ngày — tài khoản chưa đặt thời hạn`,
     total: 'Cộng',
-    overdue: (percent) => `${percent}% quá 30 ngày`,
+    overdue: (percent) => `${percent}% đã quá hạn`,
     emptyTitle: 'Không còn công nợ',
     emptyBody: 'Mọi hóa đơn trên các tài khoản này đều đã thanh toán xong.',
     convention:
       'Hệ thống không ghi nhận khoản thanh toán ứng với hóa đơn nào, nên mặc định trừ vào hóa đơn cũ nhất trước. Đó là quy ước chứ không phải sự thật — điều này quan trọng khi khách trả hóa đơn sau nhưng đang khiếu nại hóa đơn trước.',
+    dueConvention:
+      'Số ngày quá hạn tính từ hạn thanh toán ghi trên chính hóa đơn nếu có — mọi hóa đơn lập ở trang Bán hàng đều có — nếu không thì theo thời hạn thanh toán của tài khoản, hoặc 30 ngày nếu chưa đặt.',
     credit: 'trả thừa',
   },
 
@@ -619,6 +723,13 @@ export const vi: Messages = {
       'Các kỳ được kê khai lần lượt từ cũ đến mới. Số thuế chưa khấu trừ hết chuyển từ kỳ này sang kỳ kế tiếp, nên bỏ qua một kỳ sẽ làm kỳ sau thiếu số đầu kỳ mà không có dấu hiệu nào.',
     carriedExplainer:
       'Thuế đầu vào lớn hơn thuế đầu ra nên kỳ này không phải nộp. Phần chênh lệch không được hoàn mà để lại khấu trừ vào kỳ sau.',
+    pickPeriod: 'Hãy chọn kỳ kê khai trước.',
+    filedNothingOwed: (credit) =>
+      `Đã nộp tờ khai. Kỳ này không phải nộp thuế — ${credit} thuế GTGT chưa khấu trừ hết được chuyển sang kỳ sau.`,
+    filedOwing: (payable) =>
+      `Đã nộp tờ khai. Số thuế phải nộp là ${payable}, nằm trên tài khoản thuế phải nộp Nhà nước cho đến khi bạn nộp tiền.`,
+    codeIncomplete: 'Hãy đặt tên và nhập thuế suất theo phần trăm, ví dụ 10 hoặc 8.',
+    codeAdded: (name) => `Đã thêm thuế suất ${name}.`,
   },
 
   shipments: {
@@ -677,6 +788,17 @@ export const vi: Messages = {
     submit: 'Thêm chi phí này',
     checkFirst: 'Xem trước kết quả',
     previewTitle: 'Khoản này sẽ làm gì',
+
+    shipmentIncomplete: 'Hãy nhập số tham chiếu của lô hàng và ngày hàng về.',
+    recorded: (reference) => `Đã tạo lô hàng ${reference}.`,
+    amountNotANumber:
+      'Nhập số tiền chỉ gồm chữ số, không có dấu phân cách hàng nghìn; phần thập phân (nếu có) ngăn bằng dấu chấm.',
+    chargeIncomplete: 'Hãy kiểm tra số tiền, nội dung và các tài khoản.',
+    addedToStock: (amount) => `Đã thêm. ${amount} được tính vào giá trị hàng tồn kho.`,
+    addedSplit: (toStock, toCogs) =>
+      `Đã thêm. ${toStock} được tính vào giá trị hàng còn tồn kho, và ${toCogs} vào giá vốn hàng bán cho phần hàng đã bán.`,
+    addedReclaimable:
+      'Đã thêm. Không có gì được tính vào giá trị hàng tồn kho, vì khoản này được khấu trừ.',
   },
 
   stockImport: {
@@ -742,5 +864,163 @@ export const vi: Messages = {
     fixFirst:
       'Hãy sửa những dòng được đánh dấu ở trên rồi kiểm tra lại. Nhập dữ liệu theo nguyên tắc toàn bộ hoặc không gì cả — hệ thống sẽ không nhập riêng các dòng đúng và bỏ lại phần còn lại.',
     rowProblem: (line, problem) => `Dòng ${line}: ${problem}`,
+    pasteRows: 'Hãy dán các dòng vào và chọn tài khoản ghi Có cho các lần nhập hàng.',
+    rowsLost: 'Các dòng dữ liệu đã bị mất. Hãy dán lại.',
+    noColumn: (columns) =>
+      `Tệp này không có cột ${columns}, nên chưa có gì để nhập. Hãy kiểm tra dòng tiêu đề.`,
+    rowsNeedFixing: (problems, rows) =>
+      `${problems} trên ${rows} dòng cần sửa trước. Chưa có gì được nhập.`,
+    readyToImport: (rows, products, readOnly) =>
+      `Sẵn sàng nhập ${rows} lô hàng${products > 0 ? `, mở thêm ${products} mặt hàng mới` : ''}${readOnly === 'yes' ? '. Hãy đăng nhập để nhập vào sổ sách của riêng bạn' : '. Chưa có gì được nhập'}.`,
+    imported: (lots, products) =>
+      `Đã nhập ${lots} lô hàng${products > 0 ? `, mở thêm ${products} mặt hàng mới` : ''}. Mỗi lô cũng đã được ghi sổ.`,
+  },
+  sales: {
+    title: 'Bán hàng',
+    description:
+      'Mỗi hóa đơn vừa xuất kho vừa ghi giá vốn trong cùng một bút toán, nên hóa đơn nào cũng biết mình lãi bao nhiêu.',
+    marginsButton: 'Lãi gộp',
+
+    recentTitle: 'Hóa đơn gần đây',
+    recentHint:
+      'Tổng tiền hóa đơn tính theo loại tiền ghi trên hóa đơn. Doanh thu, giá vốn và lãi gộp tính theo đồng tiền hạch toán: doanh thu theo tỷ giá ngày lập hóa đơn, giá vốn theo tỷ giá ngày nhập từng lô.',
+    tableCaption: 'Hóa đơn, mới nhất trước, kèm lãi gộp',
+    invoice: 'Số hóa đơn',
+    customer: 'Khách hàng',
+    date: 'Ngày',
+    due: 'Hạn thanh toán',
+    onReceipt: 'Mặc định 30 ngày',
+    invoiced: 'Tổng tiền',
+    revenue: 'Doanh thu',
+    cost: 'Giá vốn',
+    margin: 'Lãi gộp',
+    emptyTitle: 'Chưa có hóa đơn nào',
+    emptyBody:
+      'Hãy lập hóa đơn ở bên dưới. Hệ thống sẽ xuất kho, ghi nhận công nợ phải thu và doanh thu, đồng thời tính giá vốn từ chính các lô đã xuất — tất cả trong một bút toán.',
+
+    newTitle: 'Lập hóa đơn bán hàng',
+    newHint:
+      'Cả hóa đơn là một bút toán, nên công nợ, doanh thu, thuế và giá vốn không thể lệch nhau. Nếu có dòng nào không đủ hàng, sẽ không có gì được ghi.',
+    needSetup:
+      'Bạn cần một mặt hàng còn tồn kho, một tài khoản khách hàng (tài sản — mỗi khách một tài khoản chi tiết 131 để theo dõi công nợ riêng) và một tài khoản doanh thu. Hãy thiết lập ở',
+    stockLink: 'trang kho hàng',
+    andThe: 'và',
+    invoiceNumber: 'Số hóa đơn',
+    invoiceNumberHint: 'Mỗi số chỉ dùng một lần. Khách hàng thanh toán theo số này.',
+    customerAccount: 'Khách hàng',
+    customerAccountHint: 'Tài khoản phải thu của khách, hoặc tài khoản tiền nếu bán thu tiền ngay.',
+    revenueAccount: 'Tài khoản doanh thu',
+    currency: 'Loại tiền trên hóa đơn',
+    currencyHint:
+      'Hàng xuất khẩu lập hóa đơn bằng tiền của người mua; hệ thống dùng tỷ giá ngày lập hóa đơn.',
+    taxCode: 'Thuế',
+    noTax: 'Không chịu thuế',
+    invoiceDate: 'Ngày hóa đơn',
+    dueDate: 'Hạn thanh toán',
+    dueDateHint:
+      'Để trống để dùng thời hạn thanh toán của khách hàng. Báo cáo tuổi nợ tính số ngày quá hạn từ ngày này.',
+    linesLegend: 'Các dòng hàng',
+    product: 'Mặt hàng',
+    quantity: (unit) => `Số lượng (${unit})`,
+    lineTotal: 'Thành tiền chưa thuế',
+    lot: 'Lô hàng',
+    byMethod: 'Theo phương pháp tính giá',
+    remove: 'Xóa dòng',
+    addLine: 'Thêm dòng',
+    removeLine: (line) => `Xóa dòng ${line}`,
+    lineLabel: (line) => `Dòng ${line}`,
+    submit: 'Lập hóa đơn',
+
+    allSales: 'Tất cả hóa đơn',
+    linesTitle: 'Các dòng hàng',
+    linesHint:
+      'Giá bán của từng dòng, giá vốn tính từ các lô, và dòng đó được xuất từ những lô nào.',
+    linesCaption: 'Các dòng hóa đơn kèm doanh thu, giá vốn và lãi gộp',
+    shippedFrom: 'Xuất từ lô',
+    net: 'Cộng tiền hàng',
+    tax: 'Tiền thuế GTGT',
+    gross: 'Tổng cộng thanh toán',
+    viewEntry: 'Bút toán trên sổ nhật ký',
+    marginOf: (percent) => `lãi gộp ${percent}`,
+
+    checkForm: 'Hãy điền số hóa đơn, khách hàng, tài khoản doanh thu và ít nhất một dòng hàng.',
+    checkLine: (line) => `Dòng ${line}: hãy chọn mặt hàng, nhập số lượng và thành tiền.`,
+    tooManyDecimals: (line, places) =>
+      places === 0
+        ? `Dòng ${line}: mặt hàng này tính theo đơn vị nguyên.`
+        : `Dòng ${line}: mặt hàng này chỉ tính đến ${places} chữ số thập phân.`,
+    amountNotRepresentable: (line, currency) =>
+      `Dòng ${line}: thành tiền có nhiều chữ số thập phân hơn ${currency} cho phép.`,
+    raised: (reference, margin) =>
+      `Đã lập hóa đơn ${reference}. Hàng đã xuất kho, lãi gộp của hóa đơn là ${margin}.`,
+  },
+
+  margins: {
+    title: 'Lãi gộp',
+    description:
+      'Lãi từ hàng đã bán, theo mặt hàng và theo khách hàng. Doanh thu theo tỷ giá ngày lập từng hóa đơn, giá vốn theo tỷ giá ngày nhập từng lô — hai con số duy nhất cộng được với nhau qua nhiều loại tiền.',
+    month: 'Tháng',
+    previous: 'Tháng trước',
+    next: 'Tháng sau',
+    revenue: 'Doanh thu',
+    cost: 'Giá vốn hàng bán',
+    margin: 'Lãi gộp',
+    marginPercent: 'Tỷ suất',
+    invoices: 'Số hóa đơn',
+    byProduct: 'Theo mặt hàng',
+    byProductHint:
+      'Cước vận chuyển và thuế nhập khẩu về sau khi hàng đã bán được ghi thẳng vào giá vốn. Chúng được tách riêng và tính vào giá vốn: chúng thuộc về mặt hàng, không thuộc riêng hóa đơn nào.',
+    byProductCaption: 'Lãi gộp theo mặt hàng, đóng góp lớn nhất trước',
+    byCustomer: 'Theo khách hàng',
+    byCustomerHint:
+      'Cước và thuế về muộn không có trong các số liệu này, vì không phân bổ được cho khách hàng nào — nên giá vốn của hai bảng chênh nhau đúng bằng khoản đó.',
+    byCustomerCaption: 'Lãi gộp theo khách hàng, đóng góp lớn nhất trước',
+    product: 'Mặt hàng',
+    customer: 'Khách hàng',
+    sold: 'Đã bán',
+    lateCharges: 'Cước, thuế về muộn',
+    total: 'Cộng',
+    emptyTitle: 'Tháng này chưa bán gì',
+    emptyBody: 'Hóa đơn lập ở trang Bán hàng sẽ hiện ở đây, với giá vốn tính từ các lô đã xuất.',
+  },
+
+  reconcile: {
+    title: 'Đối chiếu kho với sổ cái',
+    agrees: 'Sổ kho khớp với sổ cái',
+    agreesBody:
+      'Mỗi tài khoản hàng tồn kho có số dư đúng bằng giá trị các lô còn hàng. Không có gì được ghi vào tài khoản kho mà không đi kèm nhập hoặc xuất hàng.',
+    disagrees: 'Sổ kho và sổ cái đang lệch nhau',
+    disagreesBody:
+      'Có bút toán ghi thẳng vào tài khoản hàng tồn kho mà không nhập hay xuất hàng nào, nên mọi giá vốn tính từ các lô đều lệch đúng bằng khoản chênh. Các bút toán gây lệch được liệt kê bên dưới; hãy đảo chúng, hoặc ghi nhận nghiệp vụ nhập xuất mà chúng đại diện.',
+    caption: 'Tài khoản hàng tồn kho đối chiếu với các lô hàng',
+    account: 'Tài khoản',
+    products: 'Số mặt hàng',
+    ledger: 'Theo sổ cái',
+    lots: 'Theo các lô',
+    difference: 'Chênh lệch',
+    unexplained: 'Ghi sổ mà không nhập xuất hàng',
+  },
+
+  stockOutcome: {
+    checkProduct: 'Hãy điền mã hàng, tên hàng và đơn vị tính.',
+    added: (name) => `Đã thêm ${name}. Bây giờ bạn có thể nhập kho cho mặt hàng này.`,
+    plainNumber: 'Hãy nhập một số thông thường, ví dụ 1250 hoặc 24.687.',
+    checkQuantityAndAmount: 'Hãy kiểm tra lại số lượng và số tiền.',
+    checkQuantity: 'Hãy kiểm tra lại số lượng.',
+    tooManyDecimals: (places) =>
+      places === 0
+        ? 'Mặt hàng này tính theo đơn vị nguyên.'
+        : `Mặt hàng này chỉ tính đến ${places} chữ số thập phân. Hãy làm tròn số lượng, hoặc đổi độ chính xác của mặt hàng.`,
+    quantityPlain: 'Hãy nhập số lượng dưới dạng một số thông thường.',
+    amountPlain: 'Hãy nhập số tiền đã trả dưới dạng một số thông thường.',
+    bookedIn: (quantity, unit) =>
+      `Đã nhập kho ${quantity} ${unit}. Nghiệp vụ mua hàng cũng đã được ghi sổ.`,
+    lotsJoiner: ' rồi ',
+    shippedFrom: (lots) => `Đã xuất kho, giá vốn tính từ ${lots}. Giá vốn hàng bán đã được ghi sổ.`,
+    shipped: 'Đã xuất kho, và giá vốn hàng bán đã được ghi sổ.',
+    chooseReason: 'Hãy chọn lý do xuất hủy.',
+    writtenOff: (quantity, unit) => `Đã xuất hủy ${quantity} ${unit}.`,
+    writtenOffFrom: (quantity, unit, lots) =>
+      `Đã xuất hủy ${quantity} ${unit}, giá vốn tính từ ${lots}.`,
   },
 };

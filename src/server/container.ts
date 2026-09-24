@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { db } from './db/client';
+import type { Database } from './db/types';
 import { createAccountService } from './services/accounts';
 import { createApiKeyService } from './services/api-keys';
 import { createAuthenticationService } from './services/authentication';
@@ -14,6 +15,7 @@ import { createStockImportService } from '@/server/services/stock-import';
 import { createLandedCostService } from '@/server/services/landed-cost';
 import { createAgingService } from '@/server/services/aging';
 import { createTaxService } from '@/server/services/tax';
+import { createSalesService } from '@/server/services/sales';
 import { createTaxReturnService } from '@/server/services/tax-return';
 import { createWebhookService } from './services/webhooks';
 import { SetupRequiredError } from './setup-error';
@@ -30,9 +32,13 @@ import { currentViewer, type Viewer } from './auth/viewer';
  *
  * Lazy matters: building this at module scope would open a connection during
  * `next build`, when no database exists.
+ *
+ * `database` is a transaction when a caller needs several services' writes to
+ * commit or roll back as one — an idempotent API write claims its key and does
+ * its work in the same transaction. Each service's own `withTenant` then opens
+ * a savepoint inside it rather than a transaction of its own.
  */
-export function servicesFor(orgId: string) {
-  const database = db();
+export function servicesFor(orgId: string, database: Database = db()) {
   return {
     accounts: createAccountService(database, orgId),
     apiKeys: createApiKeyService(database, orgId),
@@ -47,6 +53,7 @@ export function servicesFor(orgId: string) {
     landedCost: createLandedCostService(database, orgId),
     aging: createAgingService(database, orgId),
     tax: createTaxService(database, orgId),
+    sales: createSalesService(database, orgId),
     taxReturns: createTaxReturnService(database, orgId),
   };
 }

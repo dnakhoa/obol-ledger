@@ -53,7 +53,7 @@ export async function issueApiKeyAction(
 
   const writer = await requireWriter();
   if (!writer.allowed) {
-    return { status: 'error', message: refusalMessage(writer.reason) };
+    return { status: 'error', message: await refusalMessage(writer.reason, 'en') };
   }
 
   const issued = await writer.services.apiKeys.issue(parsed.data.name);

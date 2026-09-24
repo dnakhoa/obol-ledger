@@ -1,6 +1,6 @@
 import { defineRoute, json, readJson } from '@/server/http/route';
 import { createAccountSchema } from '@/server/http/schemas';
-import { problem, problemResponse } from '@/server/http/problem';
+import { problem, problemFor, problemResponse } from '@/server/http/problem';
 
 export const GET = defineRoute({ name: 'accounts.list' }, async ({ services }) => {
   return json({ data: await services.accounts.list() });
@@ -13,7 +13,9 @@ export const POST = defineRoute(
     if (!body.ok) return body.response;
 
     try {
-      const account = await services.accounts.create(body.data);
+      const opened = await services.accounts.open(body.data);
+      if (!opened.ok) return problemResponse(problemFor(opened.error, requestId));
+      const account = opened.value;
       return json(
         { data: account },
         { status: 201, headers: { location: `/api/v1/accounts/${account.id}` } },

@@ -39,7 +39,7 @@ const DELIBERATELY_ENGLISH = [
 
 /** Text that is not prose: identifiers, format examples, units. */
 const NOT_PROSE =
-  /^(?:CONT-|GRN-|SO-|INV-|LOT-|PAV-|BLK-|MRB-|Obol$|API$|Webhook$|CSV$|Dr$|Cr$|ESC$)/u;
+  /^(?:CONT-|GRN-|SO-|INV-|LOT-|PAV-|BLK-|MRB-|KK-|HD-|Obol$|API$|Webhook$|CSV$|Dr$|Cr$|ESC$)/u;
 
 /**
  * JSX text nodes, across line breaks.

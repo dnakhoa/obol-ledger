@@ -86,6 +86,17 @@ const STATUS_BY_CODE: Record<LedgerError['code'], number> = {
   earlier_return_unfiled: 409,
   tax_payable_account_missing: 422,
   nothing_to_file: 422,
+  // Not bad input: the entry exists and is reversible in principle. What it conflicts with is the lots that were written beside it.
+  entry_owned_by_stock: 409,
+  sale_has_no_lines: 422,
+  sale_reference_taken: 409,
+  sale_not_found: 404,
+  due_before_invoice: 422,
+  account_code_required: 422,
+  account_code_disagrees: 422,
+  account_code_taken: 409,
+  open_items_not_permitted: 422,
+  payment_terms_need_open_items: 422,
 };
 
 export function statusFor(error: LedgerError): number {
