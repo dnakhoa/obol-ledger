@@ -301,6 +301,13 @@ export const ja: Messages = {
     title: '仕訳を入力',
     description:
       '仕訳を記帳します。貸借の一致は入力中に検証され、ドメイン層でもう一度、そして COMMIT 時に Postgres が三度目の検証を行います。',
+    tooMany: (seconds) =>
+      `短時間に多くの仕訳が記帳されました。${seconds} 秒後にもう一度お試しください。`,
+    checkFields: '仕訳を記帳できませんでした。強調表示された項目を確認してください。',
+    notAnAmount: (line, amount, currency) =>
+      `${line} 行目：「${amount}」は ${currency} の金額として正しくありません。`,
+    notRepresentable: (currency) => `${currency} では表せない金額です`,
+    posted: (id) => `仕訳 ${id} を記帳しました。`,
   },
 
   reports: {
@@ -371,6 +378,17 @@ export const ja: Messages = {
     noMonths: '仕訳がないため、締める月はまだありません。',
     reopen: '締めを解除',
     stepNumber: (n) => `手順 ${n}`,
+
+    rateNotANumber: '為替レートは桁区切りを付けず、数字のみで入力してください（例：25700）。',
+    rateSaved: (base, rate, functional, day) =>
+      `${day} の為替レート 1 ${base} = ${rate} ${functional} を登録しました。`,
+    pickMonth: '先に月を選んでください。',
+    revalued: (count) => `外貨建て残高 ${count} 件を期末レートで換算替えしました。`,
+    nothingToRevalue:
+      'すべての外貨建て残高を確認しました。レートに変動がないため、換算替えは不要でした。',
+    monthClosed: (month) => `${month}を締めました。この月の数値は今後変わりません。`,
+    monthReopened: (month) =>
+      `${month}の締めを解除しました。決算振替仕訳には反対仕訳を起票し、どちらも記録に残っています。`,
   },
 
   misc: {
@@ -520,6 +538,21 @@ export const ja: Messages = {
     reversalDescription: '反対仕訳の摘要',
     reversalHint: '任意。既定は「反対仕訳：\u2026」で、通常はそのままで構いません。',
     postReversal: '反対仕訳を記帳',
+    tooManyReversals: (seconds) =>
+      `短時間に多くの反対仕訳が起票されました。${seconds} 秒後にもう一度お試しください。`,
+    noEntryGiven: '仕訳が指定されていません。',
+    reversedBy: (id) => `反対仕訳 ${id} を起票しました。`,
+    tooManyTransitions: (seconds) =>
+      `短時間に多くの操作が行われました。${seconds} 秒後にもう一度お試しください。`,
+    transitionUnavailable: 'この仕訳ではその操作は行えません。',
+    settled: '仕訳を決済しました。',
+    cancelledNothingMoved: '仕訳を取り消しました。残高は動いていません。',
+
+    tooManyAccounts: (seconds) =>
+      `短時間に多くの勘定科目が作成されました。${seconds} 秒後にもう一度お試しください。`,
+    accountCheckFields: '勘定科目を作成できませんでした。強調表示された項目を確認してください。',
+    accountExists: (name, currency) => `${currency} 建ての勘定科目「${name}」は既に存在します。`,
+    alreadyInUse: '既に使われています',
   },
 
   palette: {
@@ -609,6 +642,13 @@ export const ja: Messages = {
       '申告は古い期間から順に行います。控除しきれなかった額は次の期間へ引き継がれるため、間を飛ばすと次の期間の期首額が欠けたまま気づけません。',
     carriedExplainer:
       '仮払消費税が仮受消費税を上回ったため、今期の納付はありません。差額は還付されず、翌期の控除に回ります。',
+    pickPeriod: '先に申告対象期間を選んでください。',
+    filedNothingOwed: (credit) =>
+      `申告しました。納付税額はありません。控除不足額 ${credit} は翌期の申告に繰り越されます。`,
+    filedOwing: (payable) =>
+      `申告しました。納付税額は ${payable} で、納付するまで未払消費税等の勘定に計上されます。`,
+    codeIncomplete: '名称と税率（％）を入力してください。例：10 または 8',
+    codeAdded: (name) => `${name} を追加しました。`,
   },
 
   shipments: {
@@ -667,6 +707,15 @@ export const ja: Messages = {
     submit: 'この費用を追加',
     checkFirst: '結果を確認',
     previewTitle: 'この費用による変化',
+
+    shipmentIncomplete: '伝票番号と入荷日を入力してください。',
+    recorded: (reference) => `${reference} を登録しました。`,
+    amountNotANumber: '金額は桁区切りを付けず、数字のみで入力してください。',
+    chargeIncomplete: '金額・摘要・勘定科目を確認してください。',
+    addedToStock: (amount) => `追加しました。${amount} を棚卸資産に加算しました。`,
+    addedSplit: (toStock, toCogs) =>
+      `追加しました。${toStock} を在庫として残っている分に加算し、販売済みの分の ${toCogs} を売上原価に計上しました。`,
+    addedReclaimable: '追加しました。この費用は控除対象のため、棚卸資産には加算していません。',
   },
 
   stockImport: {

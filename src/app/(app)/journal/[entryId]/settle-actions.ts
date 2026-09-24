@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
-import { describe as describeError } from '@/server/domain/errors';
+import { describeError, translations } from '@/server/i18n';
 import { rateLimit } from '@/server/http/rate-limit';
 import { logger } from '@/server/observability/logger';
 
@@ -23,20 +23,21 @@ export async function transitionEntryAction(
   _previous: SettleFormState,
   formData: FormData,
 ): Promise<SettleFormState> {
+  const { locale, t } = await translations();
   const requestHeaders = await headers();
   const client = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
   const decision = rateLimit(`settle:${client}`, Date.now(), 30);
   if (!decision.allowed) {
     return {
       status: 'error',
-      message: `Too many requests. Try again in ${decision.retryAfterSeconds} seconds.`,
+      message: t.forms.tooManyTransitions(decision.retryAfterSeconds),
     };
   }
 
   const transactionId = String(formData.get('transactionId') ?? '');
   const intent = String(formData.get('intent') ?? '');
   if (!transactionId || (intent !== 'post' && intent !== 'archive')) {
-    return { status: 'error', message: 'That action is not available for this entry.' };
+    return { status: 'error', message: t.forms.transitionUnavailable };
   }
 
   const writer = await requireWriter();
@@ -51,12 +52,12 @@ export async function transitionEntryAction(
 
   if (!result.ok) {
     logger.warn('ui.transition_rejected', { code: result.error.code, transactionId, intent });
-    return { status: 'error', message: describeError(result.error) };
+    return { status: 'error', message: describeError(result.error, locale) };
   }
 
   revalidatePath('/', 'layout');
   return {
     status: 'success',
-    message: intent === 'post' ? 'Entry settled.' : 'Entry cancelled; nothing moved.',
+    message: intent === 'post' ? t.forms.settled : t.forms.cancelledNothingMoved,
   };
 }

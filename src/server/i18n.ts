@@ -10,6 +10,8 @@ import {
   type Locale,
   type Messages,
 } from '@/lib/i18n';
+import { translateError } from '@/lib/i18n/errors';
+import { describe, type LedgerError } from '@/server/domain/errors';
 
 /**
  * The viewer's language, resolved on the server.
@@ -40,6 +42,18 @@ export async function viewerLocale(): Promise<Locale> {
 export async function translations(): Promise<{ locale: Locale; t: Messages }> {
   const locale = await viewerLocale();
   return { locale, t: messagesFor(locale) };
+}
+
+/**
+ * A ledger refusal, for a person reading the dashboard.
+ *
+ * English is `describe()` itself rather than a copy of it, so the dashboard
+ * and the API's problem documents cannot drift apart in the one language they
+ * share. The join is here and not in `lib/i18n` because `describe()` lives in
+ * the domain, which `lib/` may only import types from.
+ */
+export function describeError(error: LedgerError, locale: Locale): string {
+  return locale === 'en' ? describe(error) : translateError(error, locale);
 }
 
 export { DEFAULT_LOCALE };

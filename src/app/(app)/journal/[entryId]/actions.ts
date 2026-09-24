@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
-import { describe as describeError } from '@/server/domain/errors';
+import { describeError, translations } from '@/server/i18n';
 import { rateLimit } from '@/server/http/rate-limit';
 import { logger } from '@/server/observability/logger';
 
@@ -28,18 +28,19 @@ export async function reverseEntryAction(
   _previous: ReverseFormState,
   formData: FormData,
 ): Promise<ReverseFormState> {
+  const { locale, t } = await translations();
   const requestHeaders = await headers();
   const client = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
   const decision = rateLimit(`reverse:${client}`, Date.now(), 20);
   if (!decision.allowed) {
     return {
       status: 'error',
-      message: `Too many reversals. Try again in ${decision.retryAfterSeconds} seconds.`,
+      message: t.forms.tooManyReversals(decision.retryAfterSeconds),
     };
   }
 
   const transactionId = String(formData.get('transactionId') ?? '');
-  if (!transactionId) return { status: 'error', message: 'No entry was specified.' };
+  if (!transactionId) return { status: 'error', message: t.forms.noEntryGiven };
 
   const reason = reasonSchema.safeParse(formData.get('reason')).data;
 
@@ -55,14 +56,14 @@ export async function reverseEntryAction(
 
   if (!result.ok) {
     logger.warn('ui.reversal_rejected', { code: result.error.code, transactionId });
-    return { status: 'error', message: describeError(result.error) };
+    return { status: 'error', message: describeError(result.error, locale) };
   }
 
   revalidatePath('/', 'layout');
 
   return {
     status: 'success',
-    message: `Reversed by ${result.value.transaction.id}.`,
+    message: t.forms.reversedBy(result.value.transaction.id),
     reversalId: result.value.transaction.id,
   };
 }

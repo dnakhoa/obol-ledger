@@ -6,7 +6,7 @@ import { headers } from 'next/headers';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { createEntrySchema } from '@/server/http/schemas';
 import { toDraftPostings } from '@/server/http/entries';
-import { describe as describeError } from '@/server/domain/errors';
+import { describeError, translations } from '@/server/i18n';
 import { rateLimit } from '@/server/http/rate-limit';
 import { logger } from '@/server/observability/logger';
 
@@ -36,6 +36,8 @@ export async function postEntryAction(
   _previous: EntryFormState,
   formData: FormData,
 ): Promise<EntryFormState> {
+  const { locale, t } = await translations();
+
   // Server Actions are a public endpoint like any other, so they get the same
   // abuse protection the HTTP routes have.
   const requestHeaders = await headers();
@@ -44,7 +46,7 @@ export async function postEntryAction(
   if (!decision.allowed) {
     return {
       status: 'error',
-      message: `Too many entries posted. Try again in ${decision.retryAfterSeconds} seconds.`,
+      message: t.transfer.tooMany(decision.retryAfterSeconds),
     };
   }
 
@@ -69,7 +71,7 @@ export async function postEntryAction(
   if (!parsed.success) {
     return {
       status: 'error',
-      message: 'The entry could not be posted. Check the highlighted fields.',
+      message: t.transfer.checkFields,
       fieldErrors: parsed.error.issues.map((issue) => ({
         field: issue.path.join('.') || 'form',
         message: issue.message,
@@ -81,11 +83,11 @@ export async function postEntryAction(
   if (!converted.ok) {
     return {
       status: 'error',
-      message: `Line ${converted.index + 1}: "${converted.amount}" is not a valid amount in ${parsed.data.currency}.`,
+      message: t.transfer.notAnAmount(converted.index + 1, converted.amount, parsed.data.currency),
       fieldErrors: [
         {
           field: `postings.${converted.index}.amount`,
-          message: `Not representable in ${parsed.data.currency}`,
+          message: t.transfer.notRepresentable(parsed.data.currency),
         },
       ],
     };
@@ -106,7 +108,7 @@ export async function postEntryAction(
 
   if (!result.ok) {
     logger.warn('ui.entry_rejected', { code: result.error.code });
-    return { status: 'error', message: describeError(result.error) };
+    return { status: 'error', message: describeError(result.error, locale) };
   }
 
   // Balances, the journal and the dashboard all moved; drop their caches.
@@ -114,7 +116,7 @@ export async function postEntryAction(
 
   return {
     status: 'success',
-    message: `Entry posted as ${result.value.transaction.id}.`,
+    message: t.transfer.posted(result.value.transaction.id),
     entryId: result.value.transaction.id,
   };
 }

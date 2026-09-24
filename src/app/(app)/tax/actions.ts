@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
-import { describe as describeError } from '@/server/domain/errors';
+import { formatAmount } from '@/lib/format';
+import { describeError, translations } from '@/server/i18n';
+import type { MoneyDto } from '@/server/services/dto';
 import { TAX_TREATMENTS } from '@/server/domain/tax';
 
 export type TaxState = {
@@ -22,6 +24,7 @@ const monthField = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/u);
  * is to make pressing it safe.
  */
 export async function fileReturnAction(_previous: TaxState, formData: FormData): Promise<TaxState> {
+  const { locale, t } = await translations();
   const writer = await requireWriter();
   if (!writer.allowed) return { status: 'error', message: refusalMessage(writer.reason) };
 
@@ -29,22 +32,23 @@ export async function fileReturnAction(_previous: TaxState, formData: FormData):
     periodStart: formData.get('periodStart'),
     periodEnd: formData.get('periodEnd'),
   });
-  if (!parsed.success) return { status: 'error', message: 'Pick a period first.' };
+  if (!parsed.success) return { status: 'error', message: t.tax.pickPeriod };
 
   const result = await writer.services.taxReturns.file(parsed.data);
   revalidatePath('/tax');
   revalidatePath('/journal');
   revalidatePath('/accounts');
 
-  if (!result.ok) return { status: 'error', message: describeError(result.error) };
+  if (!result.ok) return { status: 'error', message: describeError(result.error, locale) };
 
   const figures = result.value.return;
+  const money = (value: MoneyDto) => `${formatAmount(value, locale)} ${value.currency}`;
   return {
     status: 'done',
     message:
       figures.payable.minorUnits === '0'
-        ? `Filed. Nothing to pay — ${figures.carriedForward.amount} of credit goes into the next return.`
-        : `Filed. ${figures.payable.amount} is now owed, and sits in the tax payable account until you pay it.`,
+        ? t.tax.filedNothingOwed(money(figures.carriedForward))
+        : t.tax.filedOwing(money(figures.payable)),
   };
 }
 
@@ -52,6 +56,7 @@ export async function createTaxCodeAction(
   _previous: TaxState,
   formData: FormData,
 ): Promise<TaxState> {
+  const { locale, t } = await translations();
   const writer = await requireWriter();
   if (!writer.allowed) return { status: 'error', message: refusalMessage(writer.reason) };
 
@@ -80,7 +85,7 @@ export async function createTaxCodeAction(
   if (!parsed.success) {
     return {
       status: 'error',
-      message: 'Give the rate a name and a percentage, for example 10 or 8.25.',
+      message: t.tax.codeIncomplete,
     };
   }
 
@@ -98,6 +103,6 @@ export async function createTaxCodeAction(
 
   revalidatePath('/tax');
   return result.ok
-    ? { status: 'done', message: `Added ${parsed.data.name}.` }
-    : { status: 'error', message: describeError(result.error) };
+    ? { status: 'done', message: t.tax.codeAdded(parsed.data.name) }
+    : { status: 'error', message: describeError(result.error, locale) };
 }

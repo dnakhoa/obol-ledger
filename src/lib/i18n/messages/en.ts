@@ -300,6 +300,12 @@ export const en = {
     title: 'Post an entry',
     description:
       'Record a journal entry. The balance is checked as you type, again in the domain layer, and a third time by Postgres at COMMIT.',
+    tooMany: (seconds: number) => `Too many entries posted. Try again in ${seconds} seconds.`,
+    checkFields: 'The entry could not be posted. Check the highlighted fields.',
+    notAnAmount: (line: number, amount: string, currency: string) =>
+      `Line ${line}: “${amount}” is not a valid amount in ${currency}.`,
+    notRepresentable: (currency: string) => `Not representable in ${currency}`,
+    posted: (id: string) => `Entry posted as ${id}.`,
   },
 
   reports: {
@@ -372,6 +378,18 @@ export const en = {
     noMonths: 'No entries yet, so no months to close.',
     reopen: 'Reopen',
     stepNumber: (n: number) => `Step ${n}`,
+
+    rateNotANumber: 'Enter a rate as a plain number, for example 25700.',
+    rateSaved: (base: string, rate: string, functional: string, day: string) =>
+      `Saved 1 ${base} = ${rate} ${functional} for ${day}.`,
+    pickMonth: 'Pick a month first.',
+    revalued: (count: number) =>
+      `Updated ${count} foreign ${count === 1 ? 'balance' : 'balances'} to the month-end rate.`,
+    nothingToRevalue:
+      'Checked every foreign balance — the rates had not moved, so nothing needed changing.',
+    monthClosed: (month: string) => `${month} is closed. Its figures will not change again.`,
+    monthReopened: (month: string) =>
+      `${month} is open again. The closing entry has been reversed, and both stay on the record.`,
   },
 
   misc: {
@@ -524,6 +542,20 @@ export const en = {
     reversalHint:
       'Optional. Defaults to \u201cReversal of \u2026\u201d, which is usually what you want.',
     postReversal: 'Post the reversing entry',
+    tooManyReversals: (seconds: number) => `Too many reversals. Try again in ${seconds} seconds.`,
+    noEntryGiven: 'No entry was specified.',
+    reversedBy: (id: string) => `Reversed by ${id}.`,
+    tooManyTransitions: (seconds: number) => `Too many requests. Try again in ${seconds} seconds.`,
+    transitionUnavailable: 'That action is not available for this entry.',
+    settled: 'Entry settled.',
+    cancelledNothingMoved: 'Entry cancelled; nothing moved.',
+
+    tooManyAccounts: (seconds: number) =>
+      `Too many accounts created. Try again in ${seconds} seconds.`,
+    accountCheckFields: 'The account could not be opened. Check the highlighted fields.',
+    accountExists: (name: string, currency: string) =>
+      `An account named “${name}” already exists in ${currency}.`,
+    alreadyInUse: 'Already in use',
   },
 
   palette: {
@@ -615,6 +647,13 @@ export const en = {
       'Returns are filed in order, oldest first. An unused credit passes from each return to the next, so skipping one would leave the next one short without anything to show it.',
     carriedExplainer:
       'You paid more tax than you charged, so there is nothing to pay. The difference is not refunded — it stays as credit and comes off the next return.',
+    pickPeriod: 'Pick a period first.',
+    filedNothingOwed: (credit: string) =>
+      `Filed. Nothing to pay — ${credit} of credit goes into the next return.`,
+    filedOwing: (payable: string) =>
+      `Filed. ${payable} is now owed, and sits in the tax payable account until you pay it.`,
+    codeIncomplete: 'Give the rate a name and a percentage, for example 10 or 8.25.',
+    codeAdded: (name: string) => `Added ${name}.`,
   },
 
   shipments: {
@@ -674,6 +713,15 @@ export const en = {
     submit: 'Add this charge',
     checkFirst: 'Check what it does',
     previewTitle: 'What this charge will do',
+
+    shipmentIncomplete: 'Give the shipment a reference and the date it arrived.',
+    recorded: (reference: string) => `Recorded ${reference}.`,
+    amountNotANumber: 'Enter the amount as a plain number.',
+    chargeIncomplete: 'Check the amount, the description and the accounts.',
+    addedToStock: (amount: string) => `Added. ${amount} went onto the stock.`,
+    addedSplit: (toStock: string, toCogs: string) =>
+      `Added. ${toStock} went onto the stock still held, and ${toCogs} to cost of sales for the part already sold.`,
+    addedReclaimable: 'Added. Nothing was added to the stock, because this charge is reclaimable.',
   },
 
   stockImport: {
