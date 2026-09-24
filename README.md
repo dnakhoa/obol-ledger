@@ -22,8 +22,10 @@ posting inserts and Postgres reports `40P01 deadlock detected`. Remove
 
 **Double-entry core** · **multi-currency** balanced in the functional currency ·
 **FIFO inventory costing** · **landed cost** spread across the lots it arrived
-with · **consumption-tax returns** that carry an unused credit forward as a
-balance rather than a number on a form · aged receivables and payables ·
+with · **sales that know their margin** — invoice and cost of goods sold in one
+entry, by product and by customer · **write-offs** with a reason · stock
+**reconciled** to the inventory accounts · **consumption-tax returns** that carry an unused credit forward as a
+balance rather than a number on a form · receivables and payables aged by **due date and payment terms** ·
 pending/posted/archived with three balances · reversals · idempotency · keyset
 pagination · optimistic concurrency · **row-level tenant isolation** ·
 **webhooks** through a transactional outbox · API key management · metadata
@@ -258,7 +260,7 @@ in the test process. The migrations are applied verbatim, so the plpgsql trigger
 and the deferred constraint are exercised as they will be in production.
 
 ```
-284 tests · 21 files · ~59s · no external services
+1,097 tests · 61 files · no external services
 ```
 
 ### Foreign exchange, for the businesses that actually feel it
@@ -282,6 +284,36 @@ Everything under it stays exact. A rate is parsed to an integer scaled by
 inside the same fraction, so there is one rounding, half away from zero.
 Reversing a foreign entry carries the _original's_ rates rather than today's,
 because a reversal exists to cancel exactly.
+
+### Selling stock, and knowing what it made
+
+A distributor's ledger could say what was invoiced and, separately, what stock
+had left. Both entries balanced; neither knew the other existed, so the margin
+on an invoice was a VLOOKUP between two exports.
+
+A sale is one entry: the receivable in the invoice's currency, revenue and
+output tax in the functional one, and the cost of goods sold drawn from the
+lots by each item's own method. Its lines _are_ its stock movements, each
+carrying what it was sold for, so margin by invoice, product and customer is a
+`GROUP BY` over facts the ledger already holds. A deferred constraint checks at
+`COMMIT` that an invoice's revenue and cost equal the sums of its lines — the
+property that makes "by product" and "by customer" two views of one total.
+
+Two lines of the same paver do not both draw from the oldest container: the
+lots are drawn down in memory, line by line, under the same row locks an issue
+takes. An export invoiced in dollars posts dollars to the buyer's receivable and
+dong to revenue at the rate on the day; freight that lands after the goods have
+gone shows against the product, not the invoice, and the report says so.
+
+The entries the stock records wrote cannot be reversed from the journal — the
+reversal would move the account and leave the lots behind — and the stock page
+and month end reconcile each inventory account to its lots, naming any
+hand-typed entry that pulled them apart. See [ADR 18](docs/adr/0018-sales-and-margin.md).
+
+Receivables age from when they fall **due** — the invoice's own date, else the
+customer's payment terms, else thirty days — rather than from the invoice date,
+because on sixty-day terms a forty-day-old invoice is not late. See
+[ADR 19](docs/adr/0019-ageing-by-due-date.md).
 
 ### The parts a product needs and a demo skips
 
@@ -364,6 +396,12 @@ Reads are public — try them against the live deployment:
 ```bash
 curl -s https://obol-ledger.vercel.app/api/v1/reports/trial-balance | jq
 ```
+
+Stock and sales are on the API too — `/api/v1/items` (receipts, issues,
+write-offs), `/api/v1/sales`, and the `gross-margin` and `stock-reconciliation`
+reports — so a warehouse system or a storefront can raise an invoice and get
+its margin back. Quantities travel as decimal strings like money, and one with
+more places than the item is measured in is refused rather than rounded.
 
 Writes need `Authorization: Bearer $LEDGER_API_TOKEN`.
 
@@ -450,6 +488,9 @@ including the metadata filter and every problem type, are in the
 - [ADR 14](docs/adr/0014-two-locales.md) — the viewer's language is not the books' language
 - [ADR 15](docs/adr/0015-landed-cost.md) — freight and duty belong in the cost of the goods
 - [ADR 16](docs/adr/0016-consumption-tax.md) — three tax mechanisms, one name
+- [ADR 17](docs/adr/0017-tax-returns.md) — a tax return is a journal entry
+- [ADR 18](docs/adr/0018-sales-and-margin.md) — a sale is the invoice and the stock that left, in one entry
+- [ADR 19](docs/adr/0019-ageing-by-due-date.md) — what is owed ages from when it falls due
 
 ## Licence
 
