@@ -45,6 +45,10 @@ export const vi: Messages = {
     pageNotFound: 'Trang này không tồn tại',
     keepYourOwnBooks: 'Ghi sổ của riêng bạn',
     working: 'Đang xử lý…',
+    refusalSignIn:
+      'Hãy đăng nhập để lập sổ sách của riêng bạn. Đây là bản trình diễn công khai: ai cũng xem được, không ai sửa được.',
+    refusalNoLedger: 'Tài khoản này chưa có sổ sách nào. Hãy tạo một bộ sổ để bắt đầu ghi sổ.',
+    refusalReadOnly: 'Bạn chỉ có quyền xem trên bộ sổ này.',
   },
 
   nav: {
@@ -326,6 +330,13 @@ export const vi: Messages = {
     title: 'Ghi bút toán',
     description:
       'Ghi một bút toán vào sổ. Tính cân đối được kiểm tra ngay khi bạn gõ, kiểm tra lại ở tầng nghiệp vụ, và lần thứ ba do Postgres kiểm tra tại thời điểm COMMIT.',
+    tooMany: (seconds) =>
+      `Bạn ghi quá nhiều bút toán trong thời gian ngắn. Hãy thử lại sau ${seconds} giây.`,
+    checkFields: 'Chưa ghi được bút toán. Hãy kiểm tra các ô được đánh dấu.',
+    notAnAmount: (line, amount, currency) =>
+      `Dòng ${line}: “${amount}” không phải là số tiền hợp lệ bằng ${currency}.`,
+    notRepresentable: (currency) => `Không ghi được bằng ${currency}`,
+    posted: (id) => `Đã ghi bút toán ${id}.`,
   },
 
   reports: {
@@ -398,6 +409,17 @@ export const vi: Messages = {
     noMonths: 'Chưa có phát sinh nên chưa có tháng nào để khóa.',
     reopen: 'Mở lại',
     stepNumber: (n) => `Bước ${n}`,
+
+    rateNotANumber: 'Nhập tỷ giá chỉ gồm chữ số, không có dấu phân cách hàng nghìn, ví dụ 25700.',
+    rateSaved: (base, rate, functional, day) =>
+      `Đã lưu tỷ giá ngày ${day}: 1 ${base} = ${rate} ${functional}.`,
+    pickMonth: 'Hãy chọn tháng trước.',
+    revalued: (count) => `Đã đánh giá lại ${count} số dư ngoại tệ theo tỷ giá cuối tháng.`,
+    nothingToRevalue:
+      'Đã kiểm tra mọi số dư ngoại tệ — tỷ giá không đổi nên không có gì phải điều chỉnh.',
+    monthClosed: (month) => `Đã khóa sổ ${month}. Số liệu của tháng này sẽ không thay đổi nữa.`,
+    monthReopened: (month) =>
+      `Đã mở lại ${month}. Bút toán kết chuyển đã được ghi đảo, và cả hai vẫn nằm trên sổ.`,
   },
 
   misc: {
@@ -564,6 +586,21 @@ export const vi: Messages = {
     reversalHint:
       'Không bắt buộc. Mặc định là \u201cBút toán điều chỉnh cho \u2026\u201d, thường là đủ.',
     postReversal: 'Ghi bút toán điều chỉnh',
+    tooManyReversals: (seconds) =>
+      `Bạn ghi đảo quá nhiều lần trong thời gian ngắn. Hãy thử lại sau ${seconds} giây.`,
+    noEntryGiven: 'Chưa chọn bút toán nào.',
+    reversedBy: (id) => `Đã ghi đảo bằng bút toán ${id}.`,
+    tooManyTransitions: (seconds) =>
+      `Bạn thao tác quá nhiều lần trong thời gian ngắn. Hãy thử lại sau ${seconds} giây.`,
+    transitionUnavailable: 'Không thể thực hiện thao tác này với bút toán này.',
+    settled: 'Đã tất toán bút toán.',
+    cancelledNothingMoved: 'Đã hủy bút toán; không có khoản tiền nào dịch chuyển.',
+
+    tooManyAccounts: (seconds) =>
+      `Bạn mở quá nhiều tài khoản trong thời gian ngắn. Hãy thử lại sau ${seconds} giây.`,
+    accountCheckFields: 'Chưa mở được tài khoản. Hãy kiểm tra các ô được đánh dấu.',
+    accountExists: (name, currency) => `Đã có tài khoản tên “${name}” theo dõi bằng ${currency}.`,
+    alreadyInUse: 'Tên này đã được dùng',
   },
 
   palette: {
@@ -654,6 +691,13 @@ export const vi: Messages = {
       'Các kỳ được kê khai lần lượt từ cũ đến mới. Số thuế chưa khấu trừ hết chuyển từ kỳ này sang kỳ kế tiếp, nên bỏ qua một kỳ sẽ làm kỳ sau thiếu số đầu kỳ mà không có dấu hiệu nào.',
     carriedExplainer:
       'Thuế đầu vào lớn hơn thuế đầu ra nên kỳ này không phải nộp. Phần chênh lệch không được hoàn mà để lại khấu trừ vào kỳ sau.',
+    pickPeriod: 'Hãy chọn kỳ kê khai trước.',
+    filedNothingOwed: (credit) =>
+      `Đã nộp tờ khai. Kỳ này không phải nộp thuế — ${credit} thuế GTGT chưa khấu trừ hết được chuyển sang kỳ sau.`,
+    filedOwing: (payable) =>
+      `Đã nộp tờ khai. Số thuế phải nộp là ${payable}, nằm trên tài khoản thuế phải nộp Nhà nước cho đến khi bạn nộp tiền.`,
+    codeIncomplete: 'Hãy đặt tên và nhập thuế suất theo phần trăm, ví dụ 10 hoặc 8.',
+    codeAdded: (name) => `Đã thêm thuế suất ${name}.`,
   },
 
   shipments: {
@@ -712,6 +756,17 @@ export const vi: Messages = {
     submit: 'Thêm chi phí này',
     checkFirst: 'Xem trước kết quả',
     previewTitle: 'Khoản này sẽ làm gì',
+
+    shipmentIncomplete: 'Hãy nhập số tham chiếu của lô hàng và ngày hàng về.',
+    recorded: (reference) => `Đã tạo lô hàng ${reference}.`,
+    amountNotANumber:
+      'Nhập số tiền chỉ gồm chữ số, không có dấu phân cách hàng nghìn; phần thập phân (nếu có) ngăn bằng dấu chấm.',
+    chargeIncomplete: 'Hãy kiểm tra số tiền, nội dung và các tài khoản.',
+    addedToStock: (amount) => `Đã thêm. ${amount} được tính vào giá trị hàng tồn kho.`,
+    addedSplit: (toStock, toCogs) =>
+      `Đã thêm. ${toStock} được tính vào giá trị hàng còn tồn kho, và ${toCogs} vào giá vốn hàng bán cho phần hàng đã bán.`,
+    addedReclaimable:
+      'Đã thêm. Không có gì được tính vào giá trị hàng tồn kho, vì khoản này được khấu trừ.',
   },
 
   stockImport: {
@@ -777,6 +832,16 @@ export const vi: Messages = {
     fixFirst:
       'Hãy sửa những dòng được đánh dấu ở trên rồi kiểm tra lại. Nhập dữ liệu theo nguyên tắc toàn bộ hoặc không gì cả — hệ thống sẽ không nhập riêng các dòng đúng và bỏ lại phần còn lại.',
     rowProblem: (line, problem) => `Dòng ${line}: ${problem}`,
+    pasteRows: 'Hãy dán các dòng vào và chọn tài khoản ghi Có cho các lần nhập hàng.',
+    rowsLost: 'Các dòng dữ liệu đã bị mất. Hãy dán lại.',
+    noColumn: (columns) =>
+      `Tệp này không có cột ${columns}, nên chưa có gì để nhập. Hãy kiểm tra dòng tiêu đề.`,
+    rowsNeedFixing: (problems, rows) =>
+      `${problems} trên ${rows} dòng cần sửa trước. Chưa có gì được nhập.`,
+    readyToImport: (rows, products, readOnly) =>
+      `Sẵn sàng nhập ${rows} lô hàng${products > 0 ? `, mở thêm ${products} mặt hàng mới` : ''}${readOnly === 'yes' ? '. Hãy đăng nhập để nhập vào sổ sách của riêng bạn' : '. Chưa có gì được nhập'}.`,
+    imported: (lots, products) =>
+      `Đã nhập ${lots} lô hàng${products > 0 ? `, mở thêm ${products} mặt hàng mới` : ''}. Mỗi lô cũng đã được ghi sổ.`,
   },
   sales: {
     title: 'Bán hàng',

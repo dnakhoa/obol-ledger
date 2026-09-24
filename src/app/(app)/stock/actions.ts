@@ -3,9 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
-import { describe as describeError } from '@/server/domain/errors';
 import { COSTING_METHODS, WRITE_OFF_REASONS } from '@/server/domain/costing';
-import { translations } from '@/server/i18n';
+import { describeError, translations } from '@/server/i18n';
 import { SUPPORTED_CURRENCIES, parseDecimal } from '@/lib/money';
 import {
   SUPPORTED_UNITS,
@@ -42,7 +41,7 @@ export async function createItemAction(
   formData: FormData,
 ): Promise<StockState> {
   const writer = await requireWriter();
-  if (!writer.allowed) return { status: 'error', message: refusalMessage(writer.reason) };
+  if (!writer.allowed) return { status: 'error', message: await refusalMessage(writer.reason) };
 
   const parsed = z
     .object({
@@ -62,7 +61,7 @@ export async function createItemAction(
       costingMethod: formData.get('costingMethod') ?? '',
     });
 
-  const { t } = await translations();
+  const { locale, t } = await translations();
   if (!parsed.success) return { status: 'error', message: t.stockOutcome.checkProduct };
 
   const method = parsed.data.costingMethod;
@@ -78,7 +77,7 @@ export async function createItemAction(
   revalidatePath('/stock');
   return result.ok
     ? { status: 'done', message: t.stockOutcome.added(parsed.data.name) }
-    : { status: 'error', message: describeError(result.error) };
+    : { status: 'error', message: describeError(result.error, locale) };
 }
 
 export async function receiveAction(
@@ -86,7 +85,7 @@ export async function receiveAction(
   formData: FormData,
 ): Promise<StockState> {
   const writer = await requireWriter();
-  if (!writer.allowed) return { status: 'error', message: refusalMessage(writer.reason) };
+  if (!writer.allowed) return { status: 'error', message: await refusalMessage(writer.reason) };
 
   const parsed = z
     .object({
@@ -110,7 +109,7 @@ export async function receiveAction(
       reference: formData.get('reference') ?? '',
     });
 
-  const { t } = await translations();
+  const { locale, t } = await translations();
   if (!parsed.success) {
     return {
       status: 'error',
@@ -152,12 +151,12 @@ export async function receiveAction(
         status: 'done',
         message: t.stockOutcome.bookedIn(parsed.data.quantity, unitLabel(parsed.data.unit)),
       }
-    : { status: 'error', message: describeError(result.error) };
+    : { status: 'error', message: describeError(result.error, locale) };
 }
 
 export async function issueAction(_previous: StockState, formData: FormData): Promise<StockState> {
   const writer = await requireWriter();
-  if (!writer.allowed) return { status: 'error', message: refusalMessage(writer.reason) };
+  if (!writer.allowed) return { status: 'error', message: await refusalMessage(writer.reason) };
 
   const parsed = z
     .object({
@@ -177,7 +176,7 @@ export async function issueAction(_previous: StockState, formData: FormData): Pr
       layerId: formData.get('layerId') ?? '',
     });
 
-  const { t } = await translations();
+  const { locale, t } = await translations();
   if (!parsed.success) {
     return {
       status: 'error',
@@ -210,7 +209,7 @@ export async function issueAction(_previous: StockState, formData: FormData): Pr
   revalidatePath('/stock');
   revalidatePath(`/stock/${parsed.data.itemId}`);
 
-  if (!result.ok) return { status: 'error', message: describeError(result.error) };
+  if (!result.ok) return { status: 'error', message: describeError(result.error, locale) };
 
   // Naming the lots is the point of the whole feature, so the confirmation
   // names them: the person can check the answer against the yard.
@@ -237,9 +236,9 @@ export async function writeOffAction(
   formData: FormData,
 ): Promise<StockState> {
   const writer = await requireWriter();
-  if (!writer.allowed) return { status: 'error', message: refusalMessage(writer.reason) };
+  if (!writer.allowed) return { status: 'error', message: await refusalMessage(writer.reason) };
 
-  const { t } = await translations();
+  const { locale, t } = await translations();
   const parsed = z
     .object({
       itemId: z.string().trim().min(1),
@@ -299,7 +298,7 @@ export async function writeOffAction(
 
   revalidatePath('/stock');
   revalidatePath(`/stock/${parsed.data.itemId}`);
-  if (!result.ok) return { status: 'error', message: describeError(result.error) };
+  if (!result.ok) return { status: 'error', message: describeError(result.error, locale) };
 
   const lots = result.value.movement.drawnFrom
     .map((draw) => draw.layerReference)

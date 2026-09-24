@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { viewerServices } from '@/server/container';
-import { translations } from '@/server/i18n';
+import { describeError, translations } from '@/server/i18n';
 import type { Messages } from '@/lib/i18n';
 import type { ImportPreview } from '@/server/services/stock-import';
 
@@ -65,16 +65,11 @@ export async function previewImportAction(
   _previous: ImportState,
   formData: FormData,
 ): Promise<ImportState> {
+  const { t } = await translations();
   const parsed = schema.safeParse(fields(formData));
-  if (!parsed.success) {
-    return {
-      status: 'error',
-      message: 'Paste the rows in, and choose where the deliveries are charged.',
-    };
-  }
+  if (!parsed.success) return { status: 'error', message: t.stockImport.pasteRows };
 
   const { services, viewer } = await viewerServices();
-  const { t } = await translations();
   const preview = await services.stockImport.preview(parsed.data);
   const readOnly = viewer.kind !== 'member' || !viewer.canWrite;
 
@@ -85,10 +80,14 @@ export async function previewImportAction(
     text: parsed.data.text,
     message:
       preview.missingColumns.length > 0
-        ? `This file has no ${preview.missingColumns.join(', ')} column, so there is nothing to import from it yet. Check the header row.`
+        ? t.stockImport.noColumn(preview.missingColumns.join(', '))
         : preview.problems > 0
-          ? `${preview.problems} of ${preview.rows.length} rows need fixing first. Nothing has been imported.`
-          : `${preview.rows.length} deliveries ready${preview.newProducts > 0 ? `, opening ${preview.newProducts} new product${preview.newProducts === 1 ? '' : 's'}` : ''}${readOnly ? '. Sign in to import them into your own books' : '. Nothing has been imported yet'}.`,
+          ? t.stockImport.rowsNeedFixing(preview.problems, preview.rows.length)
+          : t.stockImport.readyToImport(
+              preview.rows.length,
+              preview.newProducts,
+              readOnly ? 'yes' : 'no',
+            ),
   };
 }
 
@@ -97,10 +96,11 @@ export async function applyImportAction(
   formData: FormData,
 ): Promise<ImportState> {
   const writer = await requireWriter();
-  if (!writer.allowed) return { status: 'error', message: refusalMessage(writer.reason) };
+  if (!writer.allowed) return { status: 'error', message: await refusalMessage(writer.reason) };
 
+  const { locale, t } = await translations();
   const parsed = schema.safeParse(fields(formData));
-  if (!parsed.success) return { status: 'error', message: 'The rows were lost. Paste them again.' };
+  if (!parsed.success) return { status: 'error', message: t.stockImport.rowsLost };
 
   const result = await writer.services.stockImport.apply(parsed.data);
   revalidatePath('/stock');
@@ -109,7 +109,6 @@ export async function applyImportAction(
     // `import_has_problems` is the only refusal that carries line numbers, and
     // it is the one worth rendering row by row.
     if ('problems' in result.error) {
-      const { t } = await translations();
       return {
         status: 'error',
         text: parsed.data.text,
@@ -119,12 +118,19 @@ export async function applyImportAction(
         message: t.stockImport.importFailed,
       };
     }
-    return { status: 'error', text: parsed.data.text, message: result.error.code };
+    // Anything else is an ordinary refusal from the ledger — a closed
+    // period, a missing rate — and reads like one, in the reader's language.
+    // It used to be shown as its bare code.
+    return {
+      status: 'error',
+      text: parsed.data.text,
+      message: describeError(result.error, locale),
+    };
   }
 
   return {
     status: 'done',
-    message: `Imported ${result.value.lots} deliver${result.value.lots === 1 ? 'y' : 'ies'}${result.value.products > 0 ? `, opening ${result.value.products} new product${result.value.products === 1 ? '' : 's'}` : ''}. Each one has been posted to the ledger too.`,
+    message: t.stockImport.imported(result.value.lots, result.value.products),
   };
 }
 

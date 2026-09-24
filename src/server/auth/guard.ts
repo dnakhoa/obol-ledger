@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { currentViewer, type Viewer } from './viewer';
+import { messagesFor, type Locale } from '@/lib/i18n';
+import { viewerLocale } from '@/server/i18n';
 
 /** The only viewer shape that can be allowed to write. */
 type Member = Extract<Viewer, { kind: 'member' }>;
@@ -34,14 +36,27 @@ export async function requireWriter(): Promise<WriteContext> {
   return { allowed: true, services: servicesFor(viewer.orgId), viewer };
 }
 
-/** What to tell someone whose write was refused, in their own terms. */
-export function refusalMessage(reason: Exclude<WriteContext, { allowed: true }>['reason']): string {
+/**
+ * What to tell someone whose write was refused, in their own terms — and in
+ * their own language.
+ *
+ * The sign-in sentence is the one a visitor to the public demo meets first,
+ * the moment they press anything, so it was the worst possible place to be
+ * the last English sentence on a Vietnamese page. The locale is looked up
+ * here rather than passed in, because every caller wants the viewer's; the
+ * deliberately English surfaces (webhooks, settings — see ADR 14) pass `en`.
+ */
+export async function refusalMessage(
+  reason: Exclude<WriteContext, { allowed: true }>['reason'],
+  locale?: Locale,
+): Promise<string> {
+  const t = messagesFor(locale ?? (await viewerLocale()));
   switch (reason) {
     case 'sign_in_required':
-      return 'Sign in to keep your own books. This is the published demo, which anyone can read and nobody can change.';
+      return t.common.refusalSignIn;
     case 'no_ledger':
-      return 'This account has no ledger yet. Create one to start posting entries.';
+      return t.common.refusalNoLedger;
     case 'read_only':
-      return 'Your role on this ledger is read-only.';
+      return t.common.refusalReadOnly;
   }
 }

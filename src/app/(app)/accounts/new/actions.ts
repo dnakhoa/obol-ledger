@@ -7,6 +7,7 @@ import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { createAccountSchema } from '@/server/http/schemas';
 import { rateLimit } from '@/server/http/rate-limit';
 import { logger } from '@/server/observability/logger';
+import { translations } from '@/server/i18n';
 
 export type AccountFormState = {
   readonly status: 'idle' | 'error';
@@ -18,13 +19,14 @@ export async function createAccountAction(
   _previous: AccountFormState,
   formData: FormData,
 ): Promise<AccountFormState> {
+  const { t } = await translations();
   const requestHeaders = await headers();
   const client = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
   const decision = rateLimit(`account:${client}`, Date.now(), 20);
   if (!decision.allowed) {
     return {
       status: 'error',
-      message: `Too many accounts created. Try again in ${decision.retryAfterSeconds} seconds.`,
+      message: t.forms.tooManyAccounts(decision.retryAfterSeconds),
     };
   }
 
@@ -38,7 +40,7 @@ export async function createAccountAction(
   if (!parsed.success) {
     return {
       status: 'error',
-      message: 'The account could not be opened. Check the highlighted fields.',
+      message: t.forms.accountCheckFields,
       fieldErrors: parsed.error.issues.map((issue) => ({
         field: issue.path.join('.') || 'form',
         message: issue.message,
@@ -50,7 +52,7 @@ export async function createAccountAction(
   try {
     const writer = await requireWriter();
     if (!writer.allowed) {
-      return { status: 'error', message: refusalMessage(writer.reason) };
+      return { status: 'error', message: await refusalMessage(writer.reason) };
     }
 
     const account = await writer.services.accounts.create(parsed.data);
@@ -61,8 +63,8 @@ export async function createAccountAction(
     if (isUniqueViolation(error)) {
       return {
         status: 'error',
-        message: `An account named “${parsed.data.name}” already exists in ${parsed.data.currency}.`,
-        fieldErrors: [{ field: 'name', message: 'Already in use' }],
+        message: t.forms.accountExists(parsed.data.name, parsed.data.currency),
+        fieldErrors: [{ field: 'name', message: t.forms.alreadyInUse }],
       };
     }
     logger.error('ui.account_create_failed', { error });

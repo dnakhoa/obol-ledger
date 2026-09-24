@@ -51,7 +51,7 @@ export async function registerEndpointAction(
 
   const writer = await requireWriter();
   if (!writer.allowed) {
-    return { status: 'error', message: refusalMessage(writer.reason) };
+    return { status: 'error', message: await refusalMessage(writer.reason, 'en') };
   }
 
   const result = await writer.services.webhooks.register(parsed.data);

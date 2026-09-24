@@ -3,10 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
-import { describe as describeError } from '@/server/domain/errors';
 import { marginText } from '@/components/margin';
 import { formatAmount } from '@/lib/format';
-import { translations } from '@/server/i18n';
+import { describeError, translations } from '@/server/i18n';
 import { SUPPORTED_CURRENCIES, parseDecimal, type CurrencyCode } from '@/lib/money';
 import { parseQuantity } from '@/lib/quantity';
 import type { SaleLineInput } from '@/server/services/sales';
@@ -46,7 +45,7 @@ const plain = /^\d+(\.\d+)?$/u;
  */
 export async function sellAction(_previous: SaleState, formData: FormData): Promise<SaleState> {
   const writer = await requireWriter();
-  if (!writer.allowed) return { status: 'error', message: refusalMessage(writer.reason) };
+  if (!writer.allowed) return { status: 'error', message: await refusalMessage(writer.reason) };
 
   const { locale, t } = await translations();
   const parsed = header.safeParse({
@@ -123,7 +122,7 @@ export async function sellAction(_previous: SaleState, formData: FormData): Prom
 
   revalidatePath('/sales');
   revalidatePath('/stock');
-  if (!result.ok) return { status: 'error', message: describeError(result.error) };
+  if (!result.ok) return { status: 'error', message: describeError(result.error, locale) };
 
   const { sale } = result.value;
   const amount = `${formatAmount(sale.margin, locale)} ${sale.margin.currency}`;
