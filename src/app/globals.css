@@ -52,6 +52,21 @@
 
   --focus: oklch(0.55 0.2 264);
 
+  /*
+   * The terminal the attack page prints SQL into. Dark in both themes, on
+   * purpose: it is a psql session, and reads as one against either surface.
+   * Its hues are its own rather than borrowed from status, so a highlighted
+   * keyword can never be mistaken for "the books balance".
+   */
+  --terminal: oklch(0.2 0.018 262);
+  --terminal-line: oklch(0.3 0.02 262);
+  --terminal-ink: oklch(0.92 0.008 250);
+  --terminal-muted: oklch(0.66 0.02 257);
+  --terminal-keyword: oklch(0.8 0.11 264);
+  --terminal-string: oklch(0.84 0.1 80);
+  --terminal-ok: oklch(0.8 0.15 162);
+  --terminal-error: oklch(0.74 0.16 20);
+
   --radius: 0.625rem;
   --shadow-card: 0 1px 2px oklch(0.21 0.02 258 / 0.05);
   --shadow-raised:
@@ -89,6 +104,9 @@
 
   --focus: oklch(0.78 0.13 264);
 
+  --terminal: oklch(0.13 0.012 262);
+  --terminal-line: oklch(0.25 0.016 262);
+
   --shadow-card: 0 1px 2px oklch(0 0 0 / 0.3);
   --shadow-raised: 0 1px 2px oklch(0 0 0 / 0.35), 0 8px 24px -8px oklch(0 0 0 / 0.55);
 }
@@ -124,7 +142,40 @@
   --color-series-wash: var(--series-wash);
   --color-focus: var(--focus);
 
+  --color-terminal: var(--terminal);
+  --color-terminal-line: var(--terminal-line);
+  --color-terminal-ink: var(--terminal-ink);
+  --color-terminal-muted: var(--terminal-muted);
+  --color-terminal-keyword: var(--terminal-keyword);
+  --color-terminal-string: var(--terminal-string);
+  --color-terminal-ok: var(--terminal-ok);
+  --color-terminal-error: var(--terminal-error);
+
   --radius-card: var(--radius);
+
+  /*
+   * Motion that carries information, and nothing else: a verdict arriving,
+   * and a query in flight. Both are switched off wholesale by the
+   * reduced-motion rule below, like every other animation here.
+   */
+  --animate-verdict-in: verdict-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  --animate-scan: scan 1.1s ease-in-out infinite;
+
+  @keyframes verdict-in {
+    from {
+      opacity: 0;
+      transform: scale(0.85);
+    }
+  }
+
+  @keyframes scan {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(400%);
+    }
+  }
 }
 
 @layer base {

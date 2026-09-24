@@ -2,6 +2,7 @@ import { minorUnits, type CurrencyCode, type MinorUnits } from '@/lib/money';
 import { newId } from '@/lib/id';
 import { organizations } from '@/server/db/schema';
 import { createAccountService } from '@/server/services/accounts';
+import { createAttackService } from '@/server/services/attacks';
 import { createApiKeyService } from '@/server/services/api-keys';
 import { createJournalService } from '@/server/services/journal';
 import { createReportingService } from '@/server/services/reporting';
@@ -24,6 +25,7 @@ import type { AccountType } from '@/server/domain/account';
 export function servicesFor(database: Database, orgId: string) {
   return {
     accounts: createAccountService(database, orgId),
+    attacks: createAttackService(database, orgId),
     apiKeys: createApiKeyService(database, orgId),
     journal: createJournalService(database, orgId),
     reporting: createReportingService(database, orgId),

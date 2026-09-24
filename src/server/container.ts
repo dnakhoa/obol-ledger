@@ -3,6 +3,7 @@ import 'server-only';
 import { db } from './db/client';
 import type { Database } from './db/types';
 import { createAccountService } from './services/accounts';
+import { createAttackService } from './services/attacks';
 import { createApiKeyService } from './services/api-keys';
 import { createAuthenticationService } from './services/authentication';
 import { createJournalService } from './services/journal';
@@ -41,6 +42,7 @@ import { currentViewer, type Viewer } from './auth/viewer';
 export function servicesFor(orgId: string, database: Database = db()) {
   return {
     accounts: createAccountService(database, orgId),
+    attacks: createAttackService(database, orgId),
     apiKeys: createApiKeyService(database, orgId),
     journal: createJournalService(database, orgId),
     reporting: createReportingService(database, orgId),

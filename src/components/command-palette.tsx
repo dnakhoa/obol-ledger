@@ -11,6 +11,7 @@ import {
   StockIcon,
   SearchIcon,
   SettingsIcon,
+  ShieldIcon,
   TransferIcon,
   WebhookIcon,
 } from './icons';
@@ -63,6 +64,7 @@ function pagesFor(nav: PaletteLabels['nav'], group: string): Item[] {
     { id: 'p-journal', href: '/journal', label: nav.journal, group, Icon: JournalIcon },
     { id: 'p-reports', href: '/reports', label: nav.reports, group, Icon: ReportsIcon },
     { id: 'p-transfer', href: '/transfer', label: nav.newEntry, group, Icon: TransferIcon },
+    { id: 'p-break', href: '/break', label: nav.breakIt, group, Icon: ShieldIcon },
     { id: 'p-webhooks', href: '/webhooks', label: nav.webhooks, group, Icon: WebhookIcon },
     { id: 'p-api', href: '/api-reference', label: nav.api, group, Icon: ApiIcon },
     { id: 'p-settings', href: '/settings', label: nav.settings, group, Icon: SettingsIcon },
@@ -87,6 +89,7 @@ export type PaletteLabels = {
     readonly webhooks: string;
     readonly api: string;
     readonly settings: string;
+    readonly breakIt: string;
   };
 };
 

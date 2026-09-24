@@ -55,6 +55,7 @@ export const en = {
     webhooks: 'Webhooks',
     api: 'API',
     settings: 'Settings',
+    breakIt: 'Try to break it',
     morePages: 'More pages',
   },
 
@@ -62,6 +63,9 @@ export const en = {
     title: 'Overview',
     description: 'Every figure below is derived from postings that are balanced by construction.',
     postEntry: 'Post an entry',
+    breakItPrompt:
+      'Zero is held by the database, not by this page: it refuses any entry that would move it.',
+    breakItCta: 'Try to break it',
 
     balanced: 'The books balance',
     notBalanced: 'The books do not balance',
@@ -1035,6 +1039,94 @@ export const en = {
     writtenOff: (quantity: string, unit: string) => `Wrote off ${quantity} ${unit}.`,
     writtenOffFrom: (quantity: string, unit: string, lots: string) =>
       `Wrote off ${quantity} ${unit}, costed from ${lots}.`,
+  },
+  breakIt: {
+    title: 'Try to break it',
+    description:
+      'Nine attacks on the live database, written as raw SQL that goes around the application entirely. Each runs in a transaction that is always rolled back — so fire at will. Nothing you do here can stick.',
+    runAll: 'Run all nine',
+    runAgain: 'Run them again',
+    running: 'Running…',
+    run: 'Run',
+    scoreboard: 'Scoreboard',
+    scoreIdle: 'Nothing fired yet. Pick an attack, or run all nine in a row.',
+    score: '{stopped} of {total} stopped by Postgres',
+    breachedCount: '{count} got through',
+    written: 'Rows kept: 0',
+    writtenNote: 'Every attack ends in ROLLBACK — including one that gets through.',
+    connection: 'This page connects as {role}, a role that row-level security applies to.',
+    connectionBypass:
+      'This page connects as {role}, which bypasses row-level security — so the two attacks on another company’s books will get through. That is what they are here to catch.',
+    aimedAt: 'Aimed at',
+    stoppedBy: 'Stopped by',
+    verdictRefused: 'Refused',
+    verdictHeld: 'Saw nothing',
+    verdictBreached: 'Got through',
+    verdictUnavailable: 'Nothing to aim at',
+    refusedIn: 'Refused in {ms} ms, then rolled back',
+    heldIn: 'No rows in {ms} ms, then rolled back',
+    breachedNote:
+      'Every statement went through. It was rolled back anyway, but the rule this attack tests is not being enforced.',
+    unavailableNote:
+      'This ledger has nothing for this attack to aim at yet. Post an entry and try again.',
+    skipped: 'not run — the transaction had already failed',
+    rateLimited: 'That is a lot of attacks. Try again in {seconds} s.',
+    failed: 'The attack could not be run.',
+    sqlLabel: 'The SQL, exactly as it runs',
+    howTitle: 'Why this is safe to leave on a public demo',
+    howRollback:
+      'Every attack is one transaction that ends in ROLLBACK whatever happens, so even an attack that succeeds leaves nothing behind. A test removes a guard on purpose and checks exactly that.',
+    howDeferred:
+      'The balance rule is checked at COMMIT, which never comes. SET CONSTRAINTS ALL IMMEDIATE asks Postgres to run that check now, exactly as COMMIT would.',
+    howExact:
+      'The SQL on this page is the SQL that runs. Nothing in it comes from your request: the attacks are a fixed list, aimed at rows read from the ledger a moment earlier.',
+    attacks: {
+      unbalanced: {
+        title: 'Post an entry that is off by one',
+        guard: 'Deferred constraint trigger, checked at COMMIT',
+        why: 'Debits 1,000 and credits 999. The application would never write this. psql would — so the rule lives in the database.',
+      },
+      rewrite: {
+        title: 'Rewrite history',
+        guard: 'BEFORE UPDATE trigger on postings',
+        why: 'Multiplies the newest posting by ten. Postings are append-only: a mistake is corrected with a reversing entry, never by editing the past.',
+      },
+      erase: {
+        title: 'Delete an entry',
+        guard: 'BEFORE DELETE trigger on transactions',
+        why: 'Removes the newest posted entry outright. A record that can forget is not a record.',
+      },
+      overdraw: {
+        title: 'Spend money that is not there',
+        guard: 'CHECK constraint on the trigger-maintained balance',
+        why: 'Withdraws one more than the account holds. The balance is kept by a trigger, so the check sees every writer, not only the application.',
+      },
+      wrongCurrency: {
+        title: 'Post in a currency the account does not hold',
+        guard: 'Composite foreign key on (account, currency)',
+        why: 'A posting that contradicts its account has no row to point at. The mistake is unrepresentable, not merely rejected.',
+      },
+      reverseTwice: {
+        title: 'Reverse the same entry twice',
+        guard: 'Partial unique index',
+        why: 'Two reversals would cancel one entry twice. The first is legitimate; the second meets an index, which — unlike a check in code — cannot lose a race.',
+      },
+      backdate: {
+        title: 'Back-date into a closed month',
+        guard: 'BEFORE INSERT trigger on transactions',
+        why: 'A signed-off month has to reproduce tomorrow. If none is closed yet, the attack closes one first, inside the same doomed transaction.',
+      },
+      plant: {
+        title: 'Write into another company’s books',
+        guard: 'Row-level security, WITH CHECK',
+        why: 'Inserts an account under a tenant this connection is not acting as. The policy refuses the row itself.',
+      },
+      peek: {
+        title: 'Read another company’s books',
+        guard: 'Row-level security, FORCEd',
+        why: 'Asks for every account that is not this tenant’s. The right answer is not an error but nothing at all.',
+      },
+    },
   },
 } as const;
 
