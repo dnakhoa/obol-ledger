@@ -57,6 +57,13 @@ Read the table downward for helpfulness and upward for authority. The database
 is the floor; the layers above exist to turn its refusals into something a
 caller can act on.
 
+The floor is also the one layer a reader can test from the outside.
+[`/break`](https://obol-ledger.vercel.app/break) skips the top two rows
+entirely and fires raw SQL at the live tables, inside a transaction that is
+always rolled back, so the bottom row's refusals can be watched rather than
+taken on trust — nine of them, one per rule. See
+[ADR 20](adr/0020-attacks-on-the-live-demo.md).
+
 ## Errors
 
 Domain failures are values, not exceptions. `postEntry` returns

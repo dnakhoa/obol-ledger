@@ -1,16 +1,33 @@
-# Obol Ledger
+<p align="center">
+  <a href="https://obol-ledger.vercel.app/break">
+    <img src="docs/assets/banner.svg" alt="Obol Ledger — balanced by construction, refused by Postgres. A psql session tries to rewrite history, post an unbalanced entry and write into another tenant's books; Postgres refuses each one, and nothing is kept." width="100%">
+  </a>
+</p>
 
-[![CI](https://github.com/dnakhoa/obol-ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/dnakhoa/obol-ledger/actions/workflows/ci.yml)
-[![Live](https://img.shields.io/badge/live-obol--ledger.vercel.app-0f172a)](https://obol-ledger.vercel.app)
-[![Licence](https://img.shields.io/badge/licence-MIT-0f172a)](LICENSE)
+<p align="center">
+  <a href="https://github.com/dnakhoa/obol-ledger/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/dnakhoa/obol-ledger/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://obol-ledger.vercel.app"><img alt="Live demo" src="https://img.shields.io/badge/live-obol--ledger.vercel.app-0f172a"></a>
+  <img alt="Tests" src="https://img.shields.io/badge/tests-1%2C100%2B%20on%20real%20Postgres-0f172a">
+  <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-0f172a?logo=typescript&logoColor=white">
+  <img alt="Postgres 15+" src="https://img.shields.io/badge/Postgres-15%2B-0f172a?logo=postgresql&logoColor=white">
+  <a href="LICENSE"><img alt="Licence: MIT" src="https://img.shields.io/badge/licence-MIT-0f172a"></a>
+</p>
 
-**[Live demo →](https://obol-ledger.vercel.app)** · seeded with a quarter's
-trading for a Vietnamese stone exporter — FIFO lots, export invoices in three
-currencies, landed cost and VAT returns — kept in dong under Thông tư 200.
+<p align="center">
+  <a href="https://obol-ledger.vercel.app"><b>Live demo</b></a> ·
+  <a href="https://obol-ledger.vercel.app/break"><b>Try to break it</b></a> ·
+  <a href="docs/design-rationale.md">Design rationale</a> ·
+  <a href="docs/architecture.md">Architecture</a> ·
+  <a href="#documentation">20 ADRs</a>
+</p>
 
 A double-entry ledger with a typed HTTP API and a server-rendered dashboard.
 Entries are balanced by construction, history is append-only, and the rules are
 enforced by Postgres as well as by the application.
+
+The [live demo](https://obol-ledger.vercel.app) is seeded with a quarter's
+trading for a Vietnamese stone exporter — FIFO lots, export invoices in three
+currencies, landed cost and VAT returns — kept in dong under Thông tư 200.
 
 Built as a demonstration of production-shaped engineering: the interesting parts
 are the invariants and where they live, not the CRUD.
@@ -33,7 +50,68 @@ pagination · optimistic concurrency · **row-level tenant isolation** ·
 with a GIN index · CSV export · Prometheus metrics · generated OpenAPI ·
 English, Tiếng Việt and 日本語 · ⌘K
 
-![The overview, in dark mode: a trial-balance banner reading "The books balance", headline figures, a 30-day posting-volume chart, and the accounting equation by account class](docs/screenshots/overview-dark.png)
+![The overview, in dark mode: a trial-balance banner reading "The books balance" with an invitation to try to break it, headline figures, a 30-day posting-volume chart, and the accounting equation by account class](docs/screenshots/overview-dark.png)
+
+## Try to break it
+
+Saying the database enforces the rules is cheap. **[`/break`](https://obol-ledger.vercel.app/break)**
+lets you check: nine attacks, written as raw SQL that goes around every
+service, fired at the live demo's tables from a button. Postgres answers each
+one in its own words — SQLSTATE, condition, constraint — and the page prints
+the statement it refused.
+
+![Try to break it: a scoreboard reading "9 of 9 stopped by Postgres" above attack cards, each with the exact SQL in a terminal and the Postgres error that refused it](docs/screenshots/break-dark.png)
+
+| Attack                               | What stops it                                     | Postgres says                                 |
+| ------------------------------------ | ------------------------------------------------- | --------------------------------------------- |
+| Post an entry that is off by one     | deferred constraint trigger, checked at `COMMIT`  | `23514` … is unbalanced by 1 minor units      |
+| Rewrite history                      | `BEFORE UPDATE` trigger on `postings`             | `23001` postings is append-only               |
+| Delete an entry                      | `BEFORE DELETE` trigger on `transactions`         | `23001` transactions is append-only           |
+| Spend money that is not there        | `CHECK` on the trigger-maintained balance         | `23514` `accounts_overdraft_check`            |
+| Post in a currency the account lacks | composite foreign key on `(account_id, currency)` | `23503` `postings_account_currency_fk`        |
+| Reverse the same entry twice         | partial unique index                              | `23505` `transactions_one_reversal_per_entry` |
+| Back-date into a closed month        | `BEFORE INSERT` trigger on `transactions`         | `23001` period … is closed                    |
+| Write into another company's books   | row-level security, `WITH CHECK`                  | `42501` new row violates row-level security   |
+| Read another company's books         | row-level security, `FORCE`d                      | `(0 rows)`                                    |
+
+It is safe to leave on a public demo because **every attack is one
+transaction that ends in `ROLLBACK` whatever happens** — including one that
+gets through, which is the case the page exists to detect. The balance rule
+normally speaks only at `COMMIT`, which never comes, so the attack ends with
+`SET CONSTRAINTS ALL IMMEDIATE`: Postgres runs the deferred check then,
+exactly as `COMMIT` would. The SQL shown is the SQL executed; nothing in it
+comes from the request. See [ADR 20](docs/adr/0020-attacks-on-the-live-demo.md).
+
+[`tests/integration/attacks.test.ts`](tests/integration/attacks.test.ts) holds
+the page to both promises: each attack is refused by the guard it names, not
+by some other error that happens to fire first, and when a guard is removed on
+purpose the page reports a breach — and still leaves every row and balance
+exactly as it found them.
+
+### Where each rule lives
+
+Every rule is checked twice: once in the domain layer, to return an error a
+person can act on, and once in Postgres, as the floor beneath it for every
+writer the application never sees.
+
+```mermaid
+flowchart TB
+  UI["Dashboard · Server Actions"] --> APP
+  API["HTTP API · /api/v1"] --> APP
+  PSQL["psql · a migration · a second service"]
+
+  APP["<b>Application — the helpful refusal</b><br/>zod schemas → domain rules → services,<br/>one transaction per tenant"]
+
+  subgraph pg["Postgres — the refusal nobody can skip"]
+    direction LR
+    RLS["Row-level security<br/>FORCEd, WITH CHECK"] --> TRIG["Row triggers<br/>append-only · closed months"]
+    TRIG --> KEYS["Constraints · indexes<br/>overdraft · currency FK ·<br/>one reversal per entry"]
+    KEYS --> DEFER["Deferred trigger<br/>balanced at COMMIT"]
+  end
+
+  APP --> RLS
+  PSQL -. "goes around the application" .-> RLS
+```
 
 <details>
 <summary>More screens</summary>
@@ -74,6 +152,13 @@ pages in one list, because the person typing does not know which of the three
 their reference lives in.
 
 ![The command palette open over the chart of accounts, showing a matching account with its balance and six matching entries with their dates and statuses](docs/screenshots/palette-dark.png)
+
+**Try to break it, in light mode.** The terminal stays dark in both themes:
+it is a psql session, and reads as one against either surface. Its colours are
+its own rather than borrowed from the status palette, so a highlighted keyword
+can never be mistaken for "the books balance".
+
+![The attack page in light mode: the scoreboard reading 9 of 9 stopped, and the first attacks with their SQL and refusals](docs/screenshots/break-light.png)
 
 **Light mode.** Not an inversion — the dark steps were chosen against the dark
 surface, which is why neither theme has the washed-out greys an algorithmic
@@ -261,7 +346,7 @@ in the test process. The migrations are applied verbatim, so the plpgsql trigger
 and the deferred constraint are exercised as they will be in production.
 
 ```
-1,097 tests · 61 files · no external services
+1,132 tests · 64 files · no external services
 ```
 
 ### Foreign exchange, for the businesses that actually feel it
@@ -492,6 +577,7 @@ including the metadata filter and every problem type, are in the
 - [ADR 17](docs/adr/0017-tax-returns.md) — a tax return is a journal entry
 - [ADR 18](docs/adr/0018-sales-and-margin.md) — a sale is the invoice and the stock that left, in one entry
 - [ADR 19](docs/adr/0019-ageing-by-due-date.md) — what is owed ages from when it falls due
+- [ADR 20](docs/adr/0020-attacks-on-the-live-demo.md) — let a stranger attack the live demo
 
 ## Licence
 

@@ -190,3 +190,23 @@ export const TagIcon = (props: IconProps) => (
     <circle cx="7.5" cy="7.5" r="1.5" />
   </Icon>
 );
+
+/** A shield: the page where you try, and fail, to corrupt the books. */
+export const ShieldIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 3 4.5 6v5.5c0 4.6 3.1 8.2 7.5 9.5 4.4-1.3 7.5-4.9 7.5-9.5V6Z" />
+    <path d="m9 12 2 2 4-4" />
+  </Icon>
+);
+
+export const PlayIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M7 4.5v15l12-7.5Z" />
+  </Icon>
+);
+
+export const CrossIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </Icon>
+);

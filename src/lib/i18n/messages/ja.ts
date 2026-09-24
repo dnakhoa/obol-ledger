@@ -62,6 +62,7 @@ export const ja: Messages = {
     webhooks: 'Webhook',
     api: 'API',
     settings: '設定',
+    breakIt: '壊してみる',
     morePages: 'その他のページ',
   },
 
@@ -69,6 +70,9 @@ export const ja: Messages = {
     title: '概要',
     description: '以下の数値はすべて、貸借が一致した仕訳から計算されています。',
     postEntry: '仕訳を入力',
+    breakItPrompt:
+      'このゼロを守っているのはページではなくデータベースです。ずれを生む仕訳はすべて拒否されます。',
+    breakItCta: '壊してみる',
 
     balanced: '帳簿は一致しています',
     notBalanced: '帳簿が一致していません',
@@ -1017,5 +1021,93 @@ export const ja: Messages = {
     writtenOff: (quantity, unit) => `${quantity} ${unit} を廃棄しました。`,
     writtenOffFrom: (quantity, unit, lots) =>
       `${quantity} ${unit} を廃棄しました。原価は ${lots} から計算しました。`,
+  },
+  breakIt: {
+    title: '壊してみる',
+    description:
+      '本番のデータベースに対する9つの攻撃です。アプリケーションを完全に迂回する生の SQL で書かれています。どの攻撃も必ずロールバックされるトランザクションの中で実行されるので、遠慮なく試してください。ここで何をしても残りません。',
+    runAll: '9つすべて実行',
+    runAgain: 'もう一度実行',
+    running: '実行中…',
+    run: '実行',
+    scoreboard: '結果',
+    scoreIdle: 'まだ何も実行していません。攻撃を選ぶか、9つを続けて実行してください。',
+    score: 'Postgres が {total} 件中 {stopped} 件を阻止',
+    breachedCount: '{count} 件が通過',
+    written: '残った行: 0',
+    writtenNote: 'すべての攻撃は ROLLBACK で終わります。通過してしまった攻撃も同じです。',
+    connection:
+      'このページは {role} として接続しています。行レベルセキュリティが適用されるロールです。',
+    connectionBypass:
+      'このページは {role} として接続しており、行レベルセキュリティを迂回します。そのため他社の帳簿に対する2つの攻撃は通過します。それを検出するための攻撃です。',
+    aimedAt: '標的',
+    stoppedBy: '阻止するもの',
+    verdictRefused: '拒否',
+    verdictHeld: '何も見えない',
+    verdictBreached: '通過',
+    verdictUnavailable: '標的なし',
+    refusedIn: '{ms} ms で拒否され、ロールバック',
+    heldIn: '{ms} ms で 0 行、ロールバック',
+    breachedNote:
+      'すべての文が実行されました。ロールバックはされましたが、この攻撃が確かめるルールは守られていません。',
+    unavailableNote: 'この帳簿にはまだ標的がありません。仕訳を記帳してから再度お試しください。',
+    skipped: '未実行 — トランザクションはすでに失敗しています',
+    rateLimited: '攻撃が多すぎます。{seconds} 秒後にもう一度お試しください。',
+    failed: '攻撃を実行できませんでした。',
+    sqlLabel: '実行される SQL そのもの',
+    howTitle: '公開デモに置いておいても安全な理由',
+    howRollback:
+      'どの攻撃も、結果にかかわらず ROLLBACK で終わる1つのトランザクションです。成功した攻撃でさえ何も残しません。テストでは防御をわざと外し、まさにそのことを確かめています。',
+    howDeferred:
+      '貸借一致のルールは COMMIT 時に検査されますが、COMMIT は決して来ません。SET CONSTRAINTS ALL IMMEDIATE は、COMMIT と同じ検査を今すぐ実行するよう Postgres に求めます。',
+    howExact:
+      'このページの SQL は実際に実行される SQL です。リクエストから来るものは何もありません。攻撃は固定の一覧で、直前に帳簿から読んだ行を標的にします。',
+    attacks: {
+      unbalanced: {
+        title: '1だけずれた仕訳を記帳する',
+        guard: 'COMMIT 時に検査される遅延制約トリガー',
+        why: '借方 1,000、貸方 999。アプリケーションはこれを書きませんが、psql なら書けます。だからルールはデータベースにあります。',
+      },
+      rewrite: {
+        title: '過去を書き換える',
+        guard: 'postings の BEFORE UPDATE トリガー',
+        why: '最新の明細を10倍にします。明細は追記のみ。誤りは反対仕訳で訂正し、過去を編集することはありません。',
+      },
+      erase: {
+        title: '仕訳を削除する',
+        guard: 'transactions の BEFORE DELETE トリガー',
+        why: '最新の記帳済み仕訳をそのまま消します。忘れることのできる記録は記録ではありません。',
+      },
+      overdraw: {
+        title: 'ないお金を使う',
+        guard: 'トリガーが維持する残高への CHECK 制約',
+        why: '残高より1だけ多く引き出します。残高はトリガーが更新するので、制約はアプリケーションだけでなくすべての書き込みを見ています。',
+      },
+      wrongCurrency: {
+        title: '勘定科目が扱わない通貨で記帳する',
+        guard: '(勘定科目, 通貨) の複合外部キー',
+        why: '勘定科目と矛盾する明細には参照先の行がありません。この誤りは拒否されるのではなく、そもそも表現できません。',
+      },
+      reverseTwice: {
+        title: '同じ仕訳を2回取り消す',
+        guard: '部分一意インデックス',
+        why: '2つの反対仕訳は1つの仕訳を2回打ち消してしまいます。1回目は正当で、2回目はインデックスに阻まれます。コード上のチェックと違い、インデックスは競合に負けません。',
+      },
+      backdate: {
+        title: '締めた月に遡って記帳する',
+        guard: 'transactions の BEFORE INSERT トリガー',
+        why: '締めた月の数字は明日も同じでなければなりません。締めた月がまだなければ、攻撃は同じトランザクションの中でまず1か月を締めます。',
+      },
+      plant: {
+        title: '他社の帳簿に書き込む',
+        guard: '行レベルセキュリティ（WITH CHECK）',
+        why: 'この接続が代理していないテナントの勘定科目を挿入します。ポリシーがその行自体を拒否します。',
+      },
+      peek: {
+        title: '他社の帳簿を読む',
+        guard: '行レベルセキュリティ（FORCE）',
+        why: 'このテナント以外の勘定科目をすべて要求します。正しい答えはエラーではなく、何もないことです。',
+      },
+    },
   },
 };

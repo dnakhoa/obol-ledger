@@ -216,10 +216,17 @@ export default async function JournalPage({ searchParams }: PageProps) {
                           Who wrote it. Shown on the row rather than only on
                           the entry's own page, because "who posted this" is
                           asked while scanning a list, not after opening one.
+                          Left out when it was never recorded — a row older
+                          than the audit columns, or one a script wrote without
+                          saying: "Not recorded" under every one of those is
+                          noise the eye learns to skip, and it then skips the
+                          rows that do have something to say.
                         */}
-                        <span className="text-ink-muted block text-[11px] font-normal">
-                          {viaLabel(entry.createdVia, t)}
-                        </span>
+                        {entry.createdVia === 'unknown' ? null : (
+                          <span className="text-ink-muted block text-[11px] font-normal">
+                            {viaLabel(entry.createdVia, t)}
+                          </span>
+                        )}
                       </Td>
                       <Td colSpan={2} align="right">
                         {entry.reversedByTransactionId ? (

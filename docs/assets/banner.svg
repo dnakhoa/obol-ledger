@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="440" viewBox="0 0 1280 440" role="img" aria-labelledby="t d">
+<title id="t">Obol Ledger</title>
+<desc id="d">A double-entry ledger whose invariants live in Postgres. A psql session tries to rewrite history, post an unbalanced entry, delete an entry and write into another tenant; Postgres refuses each one and nothing is kept.</desc>
+<style>
+.bg{fill:#0d1017}
+.panel{fill:#131722;stroke:#262c3b}
+.bar{fill:#1a1f2d}
+.dot{fill:#2e3547}
+.title{font:700 46px ui-sans-serif,-apple-system,'Segoe UI',Inter,Helvetica,Arial,sans-serif;fill:#f3f5f9;letter-spacing:-1px}
+.lede{font:400 19px ui-sans-serif,-apple-system,'Segoe UI',Inter,Helvetica,Arial,sans-serif;fill:#9aa3b5}
+.tag{font:500 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#c7cede}
+.chip{fill:#171c28;stroke:#2a3142}
+.mono{font:400 13.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.prompt{fill:#d7dcea}
+.error{fill:#ff7b72;font-weight:700}
+.detail{fill:#f0a8a2}
+.ok{fill:#56d8a4;font-weight:700}
+.cap{font:500 12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#6f7890}
+.score{font:600 15px ui-sans-serif,-apple-system,'Segoe UI',Inter,Helvetica,Arial,sans-serif;fill:#e9edf5}
+.seg{fill:#232a39}
+.cursor{fill:#8ea8ff;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;opacity:1!important}}
+
+@keyframes l0{0%,3.75%{opacity:0;transform:translateY(4px)}5.31%,94%{opacity:1;transform:none}100%{opacity:0}}
+.l0{opacity:0;animation:l0 16.0s ease-out infinite}
+@keyframes l1{0%,10.00%{opacity:0;transform:translateY(4px)}11.56%,94%{opacity:1;transform:none}100%{opacity:0}}
+.l1{opacity:0;animation:l1 16.0s ease-out infinite}
+@keyframes l2{0%,10.62%{opacity:0;transform:translateY(4px)}12.19%,94%{opacity:1;transform:none}100%{opacity:0}}
+.l2{opacity:0;animation:l2 16.0s ease-out infinite}
+@keyframes l3{0%,21.25%{opacity:0;transform:translateY(4px)}22.81%,94%{opacity:1;transform:none}100%{opacity:0}}
+.l3{opacity:0;animation:l3 16.0s ease-out infinite}
+@keyframes l4{0%,27.50%{opacity:0;transform:translateY(4px)}29.06%,94%{opacity:1;transform:none}100%{opacity:0}}
+.l4{opacity:0;animation:l4 16.0s ease-out infinite}
+@keyframes l5{0%,28.12%{opacity:0;transform:translateY(4px)}29.69%,94%{opacity:1;transform:none}100%{opacity:0}}
+.l5{opacity:0;animation:l5 16.0s ease-out infinite}
+@keyframes l6{0%,40.00%{opacity:0;transform:translateY(4px)}41.56%,94%{opacity:1;transform:none}100%{opacity:0}}
+.l6{opacity:0;animation:l6 16.0s ease-out infinite}
+@keyframes l7{0%,46.25%{opacity:0;transform:translateY(4px)}47.81%,94%{opacity:1;transform:none}100%{opacity:0}}
+.l7{opacity:0;animation:l7 16.0s ease-out infinite}
+@keyframes l8{0%,46.88%{opacity:0;transform:translateY(4px)}48.44%,94%{opacity:1;transform:none}100%{opacity:0}}
+.l8{opacity:0;animation:l8 16.0s ease-out infinite}
+@keyframes l9{0%,58.75%{opacity:0;transform:translateY(4px)}60.31%,94%{opacity:1;transform:none}100%{opacity:0}}
+.l9{opacity:0;animation:l9 16.0s ease-out infinite}
+@keyframes l10{0%,62.50%{opacity:0;transform:translateY(4px)}64.06%,94%{opacity:1;transform:none}100%{opacity:0}}
+.l10{opacity:0;animation:l10 16.0s ease-out infinite}
+@keyframes s0{0%,10.00%{fill:#232a39}11.25%,94%{fill:#3fbf8a}100%{fill:#232a39}}
+.s0{animation:s0 16.0s ease-out infinite}
+@keyframes s1{0%,15.00%{fill:#232a39}16.25%,94%{fill:#3fbf8a}100%{fill:#232a39}}
+.s1{animation:s1 16.0s ease-out infinite}
+@keyframes s2{0%,20.00%{fill:#232a39}21.25%,94%{fill:#3fbf8a}100%{fill:#232a39}}
+.s2{animation:s2 16.0s ease-out infinite}
+@keyframes s3{0%,27.50%{fill:#232a39}28.75%,94%{fill:#3fbf8a}100%{fill:#232a39}}
+.s3{animation:s3 16.0s ease-out infinite}
+@keyframes s4{0%,32.50%{fill:#232a39}33.75%,94%{fill:#3fbf8a}100%{fill:#232a39}}
+.s4{animation:s4 16.0s ease-out infinite}
+@keyframes s5{0%,37.50%{fill:#232a39}38.75%,94%{fill:#3fbf8a}100%{fill:#232a39}}
+.s5{animation:s5 16.0s ease-out infinite}
+@keyframes s6{0%,46.25%{fill:#232a39}47.50%,94%{fill:#3fbf8a}100%{fill:#232a39}}
+.s6{animation:s6 16.0s ease-out infinite}
+@keyframes s7{0%,51.25%{fill:#232a39}52.50%,94%{fill:#3fbf8a}100%{fill:#232a39}}
+.s7{animation:s7 16.0s ease-out infinite}
+@keyframes s8{0%,56.25%{fill:#232a39}57.50%,94%{fill:#3fbf8a}100%{fill:#232a39}}
+.s8{animation:s8 16.0s ease-out infinite}</style>
+<rect class="bg" width="1280" height="440" rx="18"/>
+<defs><pattern id="g" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#161b26" stroke-width="1"/></pattern><radialGradient id="glow" cx="0.2" cy="0.1" r="0.9"><stop offset="0" stop-color="#3b4cff" stop-opacity="0.18"/><stop offset="1" stop-color="#3b4cff" stop-opacity="0"/></radialGradient></defs>
+<rect width="1280" height="440" rx="18" fill="url(#g)"/>
+<rect width="1280" height="440" rx="18" fill="url(#glow)"/>
+<g transform="translate(56,64)"><rect width="44" height="44" rx="11" fill="#f3f5f9"/><g transform="translate(10,10)" fill="none" stroke="#131722" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M7 20h10M5 8h14M5 8l-3 6h6ZM19 8l-3 6h6Z"/></g><text x="60" y="31" style="font:600 22px ui-sans-serif,-apple-system,'Segoe UI',Inter,sans-serif;fill:#f3f5f9">Obol Ledger</text></g>
+<text class="title" x="56" y="178">Balanced by construction.</text>
+<text class="title" x="56" y="232" style="fill:#8ea8ff">Refused by Postgres.</text>
+<text class="lede" x="56" y="278">A double-entry ledger whose every invariant lives in the</text>
+<text class="lede" x="56" y="304">database — and a live page that dares you to break it.</text>
+<rect class="chip" x="56" y="340" width="114" height="30" rx="15"/>
+<text class="tag" x="66" y="360">Postgres 15+</text>
+<rect class="chip" x="180.2" y="340" width="98" height="30" rx="15"/>
+<text class="tag" x="190" y="360">Next.js 16</text>
+<rect class="chip" x="288.7" y="340" width="153" height="30" rx="15"/>
+<text class="tag" x="299" y="360">TypeScript strict</text>
+<rect class="chip" x="452.15" y="340" width="44" height="30" rx="15"/>
+<text class="tag" x="462" y="360">RLS</text>
+<rect class="chip" x="505.7" y="340" width="114" height="30" rx="15"/>
+<text class="tag" x="516" y="360">1,100+ tests</text>
+<rect class="panel" x="640" y="40" width="596" height="360" rx="12"/>
+<path class="bar" d="M641 74V52a11 11 0 0 1 11-11h572a11 11 0 0 1 11 11V74Z"/>
+<circle class="dot" cx="660" cy="58" r="5"/>
+<circle class="dot" cx="676" cy="58" r="5"/>
+<circle class="dot" cx="692" cy="58" r="5"/>
+<text class="cap" x="716" y="62">psql — obol_app · NOSUPERUSER NOBYPASSRLS</text>
+<text class="mono prompt l0" x="658" y="102" xml:space="preserve">obol=&gt; UPDATE postings SET amount_minor = amount_minor * 10 …;</text>
+<text class="mono error l1" x="658" y="123" xml:space="preserve">ERROR:  23001 restrict_violation</text>
+<text class="mono detail l2" x="722" y="144" xml:space="preserve">postings is append-only; UPDATE is not permitted.</text>
+<text class="mono prompt l3" x="658" y="175" xml:space="preserve">obol=&gt; SET CONSTRAINTS ALL IMMEDIATE;  -- as COMMIT would</text>
+<text class="mono error l4" x="658" y="196" xml:space="preserve">ERROR:  23514 check_violation</text>
+<text class="mono detail l5" x="722" y="217" xml:space="preserve">transaction txn_01M3… is unbalanced by 1 minor units</text>
+<text class="mono prompt l6" x="658" y="248" xml:space="preserve">obol=&gt; INSERT INTO accounts … 'org_SOMEONE_ELSE' …;</text>
+<text class="mono error l7" x="658" y="269" xml:space="preserve">ERROR:  42501 insufficient_privilege</text>
+<text class="mono detail l8" x="722" y="290" xml:space="preserve">new row violates row-level security policy</text>
+<text class="mono prompt l9" x="658" y="321" xml:space="preserve">obol=&gt; ROLLBACK;</text>
+<text class="mono ok l10" x="658" y="342" xml:space="preserve">Rows kept: 0</text>
+<rect class="cursor" x="658" y="355" width="8" height="15"/>
+<text class="score" x="658" y="374">9 of 9 attacks refused</text>
+<rect class="seg s0" x="848" y="364" width="36" height="8" rx="4"/>
+<rect class="seg s1" x="890" y="364" width="36" height="8" rx="4"/>
+<rect class="seg s2" x="932" y="364" width="36" height="8" rx="4"/>
+<rect class="seg s3" x="974" y="364" width="36" height="8" rx="4"/>
+<rect class="seg s4" x="1016" y="364" width="36" height="8" rx="4"/>
+<rect class="seg s5" x="1058" y="364" width="36" height="8" rx="4"/>
+<rect class="seg s6" x="1100" y="364" width="36" height="8" rx="4"/>
+<rect class="seg s7" x="1142" y="364" width="36" height="8" rx="4"/>
+<rect class="seg s8" x="1184" y="364" width="36" height="8" rx="4"/>
+</svg>

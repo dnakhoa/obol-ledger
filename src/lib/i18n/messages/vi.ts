@@ -65,6 +65,7 @@ export const vi: Messages = {
     webhooks: 'Webhook',
     api: 'API',
     settings: 'Cài đặt',
+    breakIt: 'Thử phá sổ cái',
     morePages: 'Các trang khác',
   },
 
@@ -72,6 +73,9 @@ export const vi: Messages = {
     title: 'Tổng quan',
     description: 'Mọi con số dưới đây đều được tính từ các bút toán vốn đã cân bằng sẵn.',
     postEntry: 'Ghi bút toán',
+    breakItPrompt:
+      'Số 0 này do cơ sở dữ liệu giữ, không phải trang này: nó từ chối mọi bút toán làm lệch số dư.',
+    breakItCta: 'Thử phá sổ cái',
 
     balanced: 'Sổ sách cân đối',
     notBalanced: 'Sổ sách chưa cân đối',
@@ -1041,5 +1045,93 @@ export const vi: Messages = {
     writtenOff: (quantity, unit) => `Đã xuất hủy ${quantity} ${unit}.`,
     writtenOffFrom: (quantity, unit, lots) =>
       `Đã xuất hủy ${quantity} ${unit}, giá vốn tính từ ${lots}.`,
+  },
+  breakIt: {
+    title: 'Thử phá sổ cái',
+    description:
+      'Chín cuộc tấn công vào cơ sở dữ liệu thật, viết bằng SQL thô và đi vòng qua ứng dụng hoàn toàn. Mỗi cuộc chạy trong một giao dịch luôn bị hoàn tác — cứ thoải mái thử. Không gì bạn làm ở đây được giữ lại.',
+    runAll: 'Chạy cả chín',
+    runAgain: 'Chạy lại',
+    running: 'Đang chạy…',
+    run: 'Chạy',
+    scoreboard: 'Bảng kết quả',
+    scoreIdle: 'Chưa chạy cuộc nào. Chọn một cuộc tấn công, hoặc chạy lần lượt cả chín.',
+    score: 'Postgres chặn {stopped}/{total}',
+    breachedCount: '{count} lọt qua',
+    written: 'Số dòng được giữ: 0',
+    writtenNote: 'Mọi cuộc tấn công đều kết thúc bằng ROLLBACK — kể cả cuộc lọt qua.',
+    connection: 'Trang này kết nối bằng vai trò {role}, chịu sự ràng buộc của bảo mật cấp dòng.',
+    connectionBypass:
+      'Trang này kết nối bằng vai trò {role}, vốn bỏ qua bảo mật cấp dòng — nên hai cuộc tấn công vào sổ sách của công ty khác sẽ lọt qua. Đó chính là điều chúng được viết ra để phát hiện.',
+    aimedAt: 'Nhắm vào',
+    stoppedBy: 'Bị chặn bởi',
+    verdictRefused: 'Bị từ chối',
+    verdictHeld: 'Không thấy gì',
+    verdictBreached: 'Lọt qua',
+    verdictUnavailable: 'Không có gì để nhắm',
+    refusedIn: 'Bị từ chối sau {ms} ms, rồi hoàn tác',
+    heldIn: 'Không có dòng nào sau {ms} ms, rồi hoàn tác',
+    breachedNote:
+      'Mọi câu lệnh đều chạy được. Giao dịch vẫn bị hoàn tác, nhưng quy tắc mà cuộc tấn công này kiểm tra đang không được thực thi.',
+    unavailableNote:
+      'Sổ cái này chưa có gì để cuộc tấn công nhắm vào. Hãy ghi một bút toán rồi thử lại.',
+    skipped: 'không chạy — giao dịch đã thất bại trước đó',
+    rateLimited: 'Bạn đã tấn công khá nhiều rồi. Thử lại sau {seconds} giây.',
+    failed: 'Không chạy được cuộc tấn công.',
+    sqlLabel: 'SQL, đúng như khi chạy',
+    howTitle: 'Vì sao để trang này trên bản demo công khai vẫn an toàn',
+    howRollback:
+      'Mỗi cuộc tấn công là một giao dịch luôn kết thúc bằng ROLLBACK, nên kể cả khi thành công cũng không để lại gì. Có một bài kiểm thử cố ý gỡ một lớp bảo vệ và kiểm tra đúng điều đó.',
+    howDeferred:
+      'Quy tắc cân đối được kiểm tra lúc COMMIT, mà COMMIT không bao giờ đến. SET CONSTRAINTS ALL IMMEDIATE yêu cầu Postgres kiểm tra ngay, đúng như COMMIT sẽ làm.',
+    howExact:
+      'SQL trên trang này chính là SQL được chạy. Không phần nào đến từ yêu cầu của bạn: các cuộc tấn công là một danh sách cố định, nhắm vào những dòng vừa đọc từ sổ cái.',
+    attacks: {
+      unbalanced: {
+        title: 'Ghi một bút toán lệch một đơn vị',
+        guard: 'Constraint trigger hoãn lại, kiểm tra lúc COMMIT',
+        why: 'Ghi Nợ 1.000 và ghi Có 999. Ứng dụng sẽ không bao giờ ghi như vậy, nhưng psql thì có — nên quy tắc phải nằm trong cơ sở dữ liệu.',
+      },
+      rewrite: {
+        title: 'Sửa lại lịch sử',
+        guard: 'Trigger BEFORE UPDATE trên bảng postings',
+        why: 'Nhân dòng bút toán mới nhất lên mười lần. Bút toán chỉ được ghi thêm: sai sót được sửa bằng bút toán đảo, không bao giờ bằng cách sửa quá khứ.',
+      },
+      erase: {
+        title: 'Xoá một bút toán',
+        guard: 'Trigger BEFORE DELETE trên bảng transactions',
+        why: 'Xoá hẳn bút toán đã ghi sổ mới nhất. Một sổ sách có thể quên thì không còn là sổ sách.',
+      },
+      overdraw: {
+        title: 'Tiêu số tiền không có',
+        guard: 'Ràng buộc CHECK trên số dư do trigger duy trì',
+        why: 'Rút nhiều hơn số dư tài khoản đúng một đơn vị. Số dư do trigger cập nhật, nên ràng buộc thấy mọi nguồn ghi, không chỉ ứng dụng.',
+      },
+      wrongCurrency: {
+        title: 'Ghi sổ bằng loại tiền tài khoản không giữ',
+        guard: 'Khoá ngoại kép trên (tài khoản, loại tiền)',
+        why: 'Một dòng bút toán mâu thuẫn với tài khoản của nó không có dòng nào để tham chiếu. Sai sót này không thể biểu diễn, chứ không chỉ bị từ chối.',
+      },
+      reverseTwice: {
+        title: 'Đảo cùng một bút toán hai lần',
+        guard: 'Chỉ mục duy nhất một phần',
+        why: 'Hai bút toán đảo sẽ huỷ một bút toán hai lần. Lần đầu hợp lệ; lần thứ hai gặp chỉ mục — thứ mà, khác với kiểm tra trong mã, không thể thua một cuộc chạy đua.',
+      },
+      backdate: {
+        title: 'Ghi lùi ngày vào tháng đã khoá sổ',
+        guard: 'Trigger BEFORE INSERT trên bảng transactions',
+        why: 'Một tháng đã ký duyệt phải cho ra cùng số liệu vào ngày mai. Nếu chưa có tháng nào khoá sổ, cuộc tấn công sẽ khoá một tháng trước, trong cùng giao dịch sắp bị huỷ.',
+      },
+      plant: {
+        title: 'Ghi vào sổ sách của công ty khác',
+        guard: 'Bảo mật cấp dòng, WITH CHECK',
+        why: 'Thêm một tài khoản thuộc về một tenant mà kết nối này không đại diện. Chính sách từ chối ngay dòng đó.',
+      },
+      peek: {
+        title: 'Đọc sổ sách của công ty khác',
+        guard: 'Bảo mật cấp dòng, có FORCE',
+        why: 'Truy vấn mọi tài khoản không thuộc tenant này. Câu trả lời đúng không phải là lỗi, mà là không có gì cả.',
+      },
+    },
   },
 };
