@@ -15,7 +15,8 @@ import { viewerServices } from '@/server/container';
 import { translations } from '@/server/i18n';
 import { toQuantityString, unitLabel } from '@/lib/quantity';
 import { minorUnits, toDecimalString, type CurrencyCode } from '@/lib/money';
-import type { ItemSummary } from '@/server/services/inventory';
+import type { ItemSummary, StockReconciliation } from '@/server/services/inventory';
+import { StockReconciliationCard } from '@/components/stock-reconciliation';
 import type { AccountDto } from '@/server/services/dto';
 import type { Messages } from '@/lib/i18n';
 
@@ -61,9 +62,14 @@ export default async function StockPage() {
   const { t } = await translations();
   let items: readonly ItemSummary[];
   let accounts: AccountDto[];
+  let reconciliation: StockReconciliation;
   try {
     const { services } = await viewerServices();
-    [items, accounts] = await Promise.all([services.inventory.list(), services.accounts.list()]);
+    [items, accounts, reconciliation] = await Promise.all([
+      services.inventory.list(),
+      services.accounts.list(),
+      services.inventory.reconcile(),
+    ]);
   } catch (error) {
     if (error instanceof SetupRequiredError) return <SetupNotice detail={error.message} />;
     throw error;
@@ -90,6 +96,7 @@ export default async function StockPage() {
         actions={
           <>
             <ButtonLink href="/stock/shipments">{t.shipments.title}</ButtonLink>
+            <ButtonLink href="/sales">{t.stock.sellButton}</ButtonLink>
             <ButtonLink href="/stock/import" variant="primary">
               {t.stock.importButton}
               <ArrowRightIcon />
@@ -175,6 +182,10 @@ export default async function StockPage() {
           <EmptyState title={t.stock.emptyTitle} description={t.stock.emptyBody} />
         </Card>
       )}
+
+      {reconciliation.accounts.length > 0 ? (
+        <StockReconciliationCard reconciliation={reconciliation} />
+      ) : null}
 
       <Card>
         <CardHeader>

@@ -4,6 +4,8 @@ import { Card, CardBody, CardDescription, CardHeader, CardTitle } from '@/compon
 import { PageHeader } from '@/components/page-header';
 import { ActionButton, RateForm, Step } from '@/components/month-end-steps';
 import { SetupNotice } from '@/components/setup-notice';
+import { StockReconciliationCard } from '@/components/stock-reconciliation';
+import type { StockReconciliation } from '@/server/services/inventory';
 import { SetupRequiredError } from '@/server/setup-error';
 import { viewerServices } from '@/server/container';
 import { translations } from '@/server/i18n';
@@ -31,13 +33,19 @@ export default async function MonthEndPage() {
   let preview: Awaited<
     ReturnType<Awaited<ReturnType<typeof viewerServices>>['services']['revaluation']['preview']>
   > | null = null;
+  let stock: StockReconciliation;
 
   try {
     const { services } = await viewerServices();
-    [periods, accounts, rates] = await Promise.all([
+    [periods, accounts, rates, stock] = await Promise.all([
       services.periods.list(),
       services.accounts.list(),
       services.rates.list(40),
+      // Not a step, because nothing here can fix it — the entries it names
+      // are corrected in the journal. But a balance sheet signed off with
+      // the stock accounts out of step with the lots is signed off wrong, so
+      // it is on the screen where the signing happens.
+      services.inventory.reconcile(),
     ]);
 
     const openMonth = periods.find((period) => period.status === 'open' && period.entryCount > 0);
@@ -191,6 +199,8 @@ export default async function MonthEndPage() {
               />
             </Step>
           </ol>
+
+          {stock.accounts.length > 0 ? <StockReconciliationCard reconciliation={stock} /> : null}
         </>
       )}
 

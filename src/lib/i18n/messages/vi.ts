@@ -52,6 +52,7 @@ export const vi: Messages = {
     overview: 'Tổng quan',
     accounts: 'Tài khoản',
     stock: 'Kho hàng',
+    sales: 'Bán hàng',
     journal: 'Sổ nhật ký',
     reports: 'Báo cáo',
     monthEnd: 'Khóa sổ',
@@ -156,6 +157,7 @@ export const vi: Messages = {
     description:
       'Mỗi lần nhập hàng được giữ thành một lô riêng với giá riêng. Khi xuất hàng, hệ thống tự tính giá vốn từ chính những lô đã xuất — và cho bạn biết đó là những lô nào.',
     importButton: 'Nhập từ bảng tính',
+    sellButton: 'Lập hóa đơn bán hàng',
 
     inTheYard: 'Hàng đang có trong kho',
     inTheYardHint: 'Giá trị ở đây là giá vốn, không phải giá bán.',
@@ -270,6 +272,24 @@ export const vi: Messages = {
     shippedOut: 'Xuất kho',
     nothingMoved: 'Chưa có phát sinh nào',
     nothingMovedBody: 'Các lần nhập kho và xuất kho sẽ được liệt kê ở đây.',
+    writeOffTitle: 'Xuất hủy hàng hóa',
+    writeOffHint:
+      'Hàng hỏng, vỡ, hết hạn, mất mát hoặc thiếu khi kiểm kê. Giá vốn được tính từ các lô giống hệt như khi bán, và ghi vào tài khoản chi phí bạn chọn — để hao hụt không lẫn vào giá vốn hàng bán.',
+    writeOffButton: 'Xuất hủy',
+    howMuchWrittenOff: (unit) => `Số lượng (${unit})`,
+    reason: 'Lý do',
+    reasonDamaged: 'Hàng hỏng, vỡ',
+    reasonExpired: 'Hết hạn sử dụng',
+    reasonLost: 'Mất mát',
+    reasonCountShortfall: 'Thiếu khi kiểm kê',
+    reasonOther: 'Lý do khác',
+    lossAccount: 'Tài khoản ghi nhận tổn thất',
+    lossAccountHint: 'Một tài khoản chi phí: hao hụt, mất mát, hàng hỏng.',
+    writeOffReferenceHint: 'Số biên bản kiểm kê hoặc biên bản hàng hỏng.',
+    needLossAccount: 'Hãy mở một tài khoản chi phí cho hao hụt hàng tồn kho ở',
+    writtenOff: 'Xuất hủy',
+    sold: 'Bán',
+    soldFor: 'Doanh thu',
   },
 
   journal: {
@@ -454,6 +474,21 @@ export const vi: Messages = {
     sumsToZero: 'Cộng lại bằng 0, được kiểm tra tại thời điểm COMMIT',
     metadata: 'Dữ liệu kèm theo',
     account: 'Tài khoản',
+    ownedByStockTitle: 'Bút toán do sổ kho ghi',
+    ownedByStock:
+      'Bút toán này vừa ghi tiền vừa ghi hàng, nên không thể đảo ở đây — làm vậy sẽ thay đổi tài khoản mà không thay đổi các lô hàng đứng sau nó. Hãy điều chỉnh từ trang kho: xuất hủy, hoặc bổ sung chi phí cho lô hàng.',
+    openSale: 'Mở hóa đơn',
+    cancelledByReversal:
+      'Bút toán này đã bị hủy bởi một bút toán đảo sau đó. Nó vẫn được lưu trên sổ; tác động ròng bằng không.',
+    cancelsEarlier:
+      'Bút toán này được lập để hủy một bút toán trước đó. Cả hai đều được lưu trên sổ.',
+    viewOriginal: 'Xem bút toán gốc',
+    reservedNotMoved: 'Đã giữ chỗ, chưa ghi nhận',
+    cancelledNeverMoved: 'Đã hủy; chưa từng ghi nhận',
+    debitSideMatches: 'Bên Nợ; bên Có khớp đúng',
+    metadataHintBefore:
+      'Mã tham chiếu riêng của bên gọi. Sổ cái không diễn giải, nhưng tìm kiếm được —',
+    metadataHintAfter: 'trên sổ nhật ký.',
   },
 
   statement: {
@@ -742,5 +777,151 @@ export const vi: Messages = {
     fixFirst:
       'Hãy sửa những dòng được đánh dấu ở trên rồi kiểm tra lại. Nhập dữ liệu theo nguyên tắc toàn bộ hoặc không gì cả — hệ thống sẽ không nhập riêng các dòng đúng và bỏ lại phần còn lại.',
     rowProblem: (line, problem) => `Dòng ${line}: ${problem}`,
+  },
+  sales: {
+    title: 'Bán hàng',
+    description:
+      'Mỗi hóa đơn vừa xuất kho vừa ghi giá vốn trong cùng một bút toán, nên hóa đơn nào cũng biết mình lãi bao nhiêu.',
+    marginsButton: 'Lãi gộp',
+
+    recentTitle: 'Hóa đơn gần đây',
+    recentHint:
+      'Tổng tiền hóa đơn tính theo loại tiền ghi trên hóa đơn. Doanh thu, giá vốn và lãi gộp tính theo đồng tiền hạch toán: doanh thu theo tỷ giá ngày lập hóa đơn, giá vốn theo tỷ giá ngày nhập từng lô.',
+    tableCaption: 'Hóa đơn, mới nhất trước, kèm lãi gộp',
+    invoice: 'Số hóa đơn',
+    customer: 'Khách hàng',
+    date: 'Ngày',
+    due: 'Hạn thanh toán',
+    onReceipt: 'Khi nhận hàng',
+    invoiced: 'Tổng tiền',
+    revenue: 'Doanh thu',
+    cost: 'Giá vốn',
+    margin: 'Lãi gộp',
+    emptyTitle: 'Chưa có hóa đơn nào',
+    emptyBody:
+      'Hãy lập hóa đơn ở bên dưới. Hệ thống sẽ xuất kho, ghi nhận công nợ phải thu và doanh thu, đồng thời tính giá vốn từ chính các lô đã xuất — tất cả trong một bút toán.',
+
+    newTitle: 'Lập hóa đơn bán hàng',
+    newHint:
+      'Cả hóa đơn là một bút toán, nên công nợ, doanh thu, thuế và giá vốn không thể lệch nhau. Nếu có dòng nào không đủ hàng, sẽ không có gì được ghi.',
+    needSetup:
+      'Bạn cần một mặt hàng còn tồn kho, một tài khoản khách hàng (tài sản — mỗi khách một tài khoản chi tiết 131 để theo dõi công nợ riêng) và một tài khoản doanh thu. Hãy thiết lập ở',
+    stockLink: 'trang kho hàng',
+    andThe: 'và',
+    invoiceNumber: 'Số hóa đơn',
+    invoiceNumberHint: 'Mỗi số chỉ dùng một lần. Khách hàng thanh toán theo số này.',
+    customerAccount: 'Khách hàng',
+    customerAccountHint: 'Tài khoản phải thu của khách, hoặc tài khoản tiền nếu bán thu tiền ngay.',
+    revenueAccount: 'Tài khoản doanh thu',
+    currency: 'Loại tiền trên hóa đơn',
+    currencyHint:
+      'Hàng xuất khẩu lập hóa đơn bằng tiền của người mua; hệ thống dùng tỷ giá ngày lập hóa đơn.',
+    taxCode: 'Thuế',
+    noTax: 'Không chịu thuế',
+    invoiceDate: 'Ngày hóa đơn',
+    dueDate: 'Hạn thanh toán',
+    dueDateHint: 'Để trống nếu thanh toán ngay khi nhận hàng. Báo cáo tuổi nợ tính từ ngày này.',
+    linesLegend: 'Các dòng hàng',
+    product: 'Mặt hàng',
+    quantity: (unit) => `Số lượng (${unit})`,
+    lineTotal: 'Thành tiền chưa thuế',
+    lot: 'Lô hàng',
+    byMethod: 'Theo phương pháp tính giá',
+    addLine: 'Thêm dòng',
+    removeLine: (line) => `Xóa dòng ${line}`,
+    lineLabel: (line) => `Dòng ${line}`,
+    submit: 'Lập hóa đơn',
+
+    allSales: 'Tất cả hóa đơn',
+    linesTitle: 'Các dòng hàng',
+    linesHint:
+      'Giá bán của từng dòng, giá vốn tính từ các lô, và dòng đó được xuất từ những lô nào.',
+    linesCaption: 'Các dòng hóa đơn kèm doanh thu, giá vốn và lãi gộp',
+    shippedFrom: 'Xuất từ lô',
+    net: 'Cộng tiền hàng',
+    tax: 'Tiền thuế GTGT',
+    gross: 'Tổng cộng thanh toán',
+    viewEntry: 'Bút toán trên sổ nhật ký',
+    marginOf: (percent) => `lãi gộp ${percent}`,
+
+    checkForm: 'Hãy điền số hóa đơn, khách hàng, tài khoản doanh thu và ít nhất một dòng hàng.',
+    checkLine: (line) => `Dòng ${line}: hãy chọn mặt hàng, nhập số lượng và thành tiền.`,
+    tooManyDecimals: (line, places) =>
+      places === 0
+        ? `Dòng ${line}: mặt hàng này tính theo đơn vị nguyên.`
+        : `Dòng ${line}: mặt hàng này chỉ tính đến ${places} chữ số thập phân.`,
+    amountNotRepresentable: (line, currency) =>
+      `Dòng ${line}: thành tiền có nhiều chữ số thập phân hơn ${currency} cho phép.`,
+    raised: (reference, margin) =>
+      `Đã lập hóa đơn ${reference}. Hàng đã xuất kho, lãi gộp của hóa đơn là ${margin}.`,
+  },
+
+  margins: {
+    title: 'Lãi gộp',
+    description:
+      'Lãi từ hàng đã bán, theo mặt hàng và theo khách hàng. Doanh thu theo tỷ giá ngày lập từng hóa đơn, giá vốn theo tỷ giá ngày nhập từng lô — hai con số duy nhất cộng được với nhau qua nhiều loại tiền.',
+    month: 'Tháng',
+    previous: 'Tháng trước',
+    next: 'Tháng sau',
+    revenue: 'Doanh thu',
+    cost: 'Giá vốn hàng bán',
+    margin: 'Lãi gộp',
+    marginPercent: 'Tỷ suất',
+    invoices: 'Số hóa đơn',
+    byProduct: 'Theo mặt hàng',
+    byProductHint:
+      'Cước vận chuyển và thuế nhập khẩu về sau khi hàng đã bán được ghi thẳng vào giá vốn. Chúng được tách riêng và tính vào giá vốn: chúng thuộc về mặt hàng, không thuộc riêng hóa đơn nào.',
+    byProductCaption: 'Lãi gộp theo mặt hàng, đóng góp lớn nhất trước',
+    byCustomer: 'Theo khách hàng',
+    byCustomerHint:
+      'Cước và thuế về muộn không có trong các số liệu này, vì không phân bổ được cho khách hàng nào — nên giá vốn của hai bảng chênh nhau đúng bằng khoản đó.',
+    byCustomerCaption: 'Lãi gộp theo khách hàng, đóng góp lớn nhất trước',
+    product: 'Mặt hàng',
+    customer: 'Khách hàng',
+    sold: 'Đã bán',
+    lateCharges: 'Cước, thuế về muộn',
+    total: 'Cộng',
+    emptyTitle: 'Tháng này chưa bán gì',
+    emptyBody: 'Hóa đơn lập ở trang Bán hàng sẽ hiện ở đây, với giá vốn tính từ các lô đã xuất.',
+  },
+
+  reconcile: {
+    title: 'Đối chiếu kho với sổ cái',
+    agrees: 'Sổ kho khớp với sổ cái',
+    agreesBody:
+      'Mỗi tài khoản hàng tồn kho có số dư đúng bằng giá trị các lô còn hàng. Không có gì được ghi vào tài khoản kho mà không đi kèm nhập hoặc xuất hàng.',
+    disagrees: 'Sổ kho và sổ cái đang lệch nhau',
+    disagreesBody:
+      'Có bút toán ghi thẳng vào tài khoản hàng tồn kho mà không nhập hay xuất hàng nào, nên mọi giá vốn tính từ các lô đều lệch đúng bằng khoản chênh. Các bút toán gây lệch được liệt kê bên dưới; hãy đảo chúng, hoặc ghi nhận nghiệp vụ nhập xuất mà chúng đại diện.',
+    caption: 'Tài khoản hàng tồn kho đối chiếu với các lô hàng',
+    account: 'Tài khoản',
+    products: 'Số mặt hàng',
+    ledger: 'Theo sổ cái',
+    lots: 'Theo các lô',
+    difference: 'Chênh lệch',
+    unexplained: 'Ghi sổ mà không nhập xuất hàng',
+  },
+
+  stockOutcome: {
+    checkProduct: 'Hãy điền mã hàng, tên hàng và đơn vị tính.',
+    added: (name) => `Đã thêm ${name}. Bây giờ bạn có thể nhập kho cho mặt hàng này.`,
+    plainNumber: 'Hãy nhập một số thông thường, ví dụ 1250 hoặc 24.687.',
+    checkQuantityAndAmount: 'Hãy kiểm tra lại số lượng và số tiền.',
+    checkQuantity: 'Hãy kiểm tra lại số lượng.',
+    tooManyDecimals: (places) =>
+      places === 0
+        ? 'Mặt hàng này tính theo đơn vị nguyên.'
+        : `Mặt hàng này chỉ tính đến ${places} chữ số thập phân. Hãy làm tròn số lượng, hoặc đổi độ chính xác của mặt hàng.`,
+    quantityPlain: 'Hãy nhập số lượng dưới dạng một số thông thường.',
+    amountPlain: 'Hãy nhập số tiền đã trả dưới dạng một số thông thường.',
+    bookedIn: (quantity, unit) =>
+      `Đã nhập kho ${quantity} ${unit}. Nghiệp vụ mua hàng cũng đã được ghi sổ.`,
+    lotsJoiner: ' rồi ',
+    shippedFrom: (lots) => `Đã xuất kho, giá vốn tính từ ${lots}. Giá vốn hàng bán đã được ghi sổ.`,
+    shipped: 'Đã xuất kho, và giá vốn hàng bán đã được ghi sổ.',
+    chooseReason: 'Hãy chọn lý do xuất hủy.',
+    writtenOff: (quantity, unit) => `Đã xuất hủy ${quantity} ${unit}.`,
+    writtenOffFrom: (quantity, unit, lots) =>
+      `Đã xuất hủy ${quantity} ${unit}, giá vốn tính từ ${lots}.`,
   },
 };

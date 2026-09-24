@@ -182,3 +182,11 @@ export const CalendarIcon = (props: IconProps) => (
     <path d="M3 10h18M8 3v4M16 3v4" />
   </Icon>
 );
+
+/** A price tag: selling, as distinct from the receipt that is tax. */
+export const TagIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9Z" />
+    <circle cx="7.5" cy="7.5" r="1.5" />
+  </Icon>
+);

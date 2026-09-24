@@ -42,6 +42,7 @@ export const en = {
     overview: 'Overview',
     accounts: 'Accounts',
     stock: 'Stock',
+    sales: 'Sales',
     journal: 'Journal',
     reports: 'Reports',
     monthEnd: 'Month end',
@@ -148,6 +149,7 @@ export const en = {
     description:
       'Every delivery is kept as its own lot with its own price. When something ships, the ledger works out what it cost from the lots it came from — and tells you which ones.',
     importButton: 'Import from a spreadsheet',
+    sellButton: 'Raise an invoice',
 
     inTheYard: 'What is in the yard',
     inTheYardHint: 'Values are what you paid, not what you will sell it for.',
@@ -264,6 +266,24 @@ export const en = {
     shippedOut: 'Shipped out',
     nothingMoved: 'Nothing has moved yet',
     nothingMovedBody: 'Deliveries and shipments will be listed here.',
+    writeOffTitle: 'Write stock off',
+    writeOffHint:
+      'Broken, past its date, lost, or short at a stocktake. Costed from the lots exactly as a sale would be, and posted to the expense you choose — so shrinkage does not hide inside cost of sales.',
+    writeOffButton: 'Write it off',
+    howMuchWrittenOff: (unit: string) => `How much (${unit})`,
+    reason: 'Why',
+    reasonDamaged: 'Damaged or broken',
+    reasonExpired: 'Past its date',
+    reasonLost: 'Lost',
+    reasonCountShortfall: 'Short at stocktake',
+    reasonOther: 'Other',
+    lossAccount: 'Loss account',
+    lossAccountHint: 'An expense: stock losses, breakage, obsolescence.',
+    writeOffReferenceHint: 'The stocktake sheet or damage report.',
+    needLossAccount: 'Open an expense account for stock losses on the',
+    writtenOff: 'Written off',
+    sold: 'Sold',
+    soldFor: 'Sold for',
   },
 
   journal: {
@@ -449,6 +469,19 @@ export const en = {
     sumsToZero: 'Summing to zero, verified at COMMIT',
     metadata: 'Metadata',
     account: 'Account',
+    ownedByStockTitle: 'Written by the stock records',
+    ownedByStock:
+      'This entry moved stock as well as money, so it cannot be reversed here — that would move the account without moving the lots behind it. Correct it from the stock pages: a write-off, or a further charge on the shipment.',
+    openSale: 'Open the invoice',
+    cancelledByReversal:
+      'This entry was cancelled by a later reversing entry. It stays on the record; its net effect is zero.',
+    cancelsEarlier: 'This entry exists to cancel an earlier one. Both stay on the record.',
+    viewOriginal: 'View the original',
+    reservedNotMoved: 'Reserved, not yet moved',
+    cancelledNeverMoved: 'Cancelled; never moved',
+    debitSideMatches: 'Debit side; credits match exactly',
+    metadataHintBefore: 'The caller’s own references. Opaque to the ledger, and searchable —',
+    metadataHintAfter: 'on the journal.',
   },
 
   statement: {
@@ -739,6 +772,154 @@ export const en = {
     fixFirst:
       'Fix the rows marked above and check again. The import is all or nothing — it will not bring in the good rows and leave the rest.',
     rowProblem: (line: number, problem: string) => `Row ${line}: ${problem}`,
+  },
+  sales: {
+    title: 'Sales',
+    description:
+      'Every invoice ships its stock and posts what it cost in the same entry, so each one knows what it made.',
+    marginsButton: 'Gross margin',
+
+    recentTitle: 'Recent invoices',
+    recentHint:
+      'The invoice total is in the currency it was raised in. Revenue, cost and margin are in the books’ own currency: revenue at the rate on the invoice date, cost at the rate each lot arrived at.',
+    tableCaption: 'Invoices, most recent first, with their margin',
+    invoice: 'Invoice',
+    customer: 'Customer',
+    date: 'Date',
+    due: 'Due',
+    onReceipt: 'On receipt',
+    invoiced: 'Invoiced',
+    revenue: 'Revenue',
+    cost: 'Cost',
+    margin: 'Margin',
+    emptyTitle: 'No invoices yet',
+    emptyBody:
+      'Raise one below. It ships the stock, posts the receivable and the revenue, and costs the goods from the lots they came out of — in one entry.',
+
+    newTitle: 'Raise an invoice',
+    newHint:
+      'The whole invoice is one entry, so the receivable, the revenue, the tax and the cost of the goods cannot disagree. If any line is short of stock, nothing is written.',
+    needSetup:
+      'You need a product with stock on hand, a customer account (an asset — one per customer is how aged receivables tell them apart) and a revenue account. Set them up on the',
+    stockLink: 'stock page',
+    andThe: 'and the',
+    invoiceNumber: 'Invoice number',
+    invoiceNumberHint: 'Issued once. Customers pay against it.',
+    customerAccount: 'Customer',
+    customerAccountHint: 'Their receivable account, or a bank account for a cash sale.',
+    revenueAccount: 'Revenue account',
+    currency: 'Invoiced in',
+    currencyHint:
+      'An export is invoiced in the buyer’s currency; the rate on the invoice date is used.',
+    taxCode: 'Tax',
+    noTax: 'No tax',
+    invoiceDate: 'Invoice date',
+    dueDate: 'Payment due',
+    dueDateHint: 'Leave blank for payment on receipt. Aged receivables count from this date.',
+    linesLegend: 'Lines',
+    product: 'Product',
+    quantity: (unit: string) => `Quantity (${unit})`,
+    lineTotal: 'Line total before tax',
+    lot: 'Lot',
+    byMethod: 'By costing method',
+    addLine: 'Add a line',
+    removeLine: (line: number) => `Remove line ${line}`,
+    lineLabel: (line: number) => `Line ${line}`,
+    submit: 'Raise invoice',
+
+    allSales: 'All sales',
+    linesTitle: 'Lines',
+    linesHint:
+      'What each line was sold for, what it cost from the lots, and which lots it shipped from.',
+    linesCaption: 'Invoice lines with revenue, cost and margin',
+    shippedFrom: 'Shipped from',
+    net: 'Net',
+    tax: 'Tax',
+    gross: 'Total',
+    viewEntry: 'The journal entry',
+    marginOf: (percent: string) => `${percent} margin`,
+
+    // Outcomes of the form.
+    checkForm: 'Fill in an invoice number, a customer, a revenue account and at least one line.',
+    checkLine: (line: number) => `Line ${line}: choose a product and enter a quantity and a total.`,
+    tooManyDecimals: (line: number, places: number) =>
+      places === 0
+        ? `Line ${line}: this product is counted in whole units.`
+        : `Line ${line}: this product is measured to ${places} decimal place${places === 1 ? '' : 's'}.`,
+    amountNotRepresentable: (line: number, currency: string) =>
+      `Line ${line}: that total has more decimal places than ${currency} allows.`,
+    raised: (reference: string, margin: string) =>
+      `Raised ${reference}. The stock has shipped, and the invoice made ${margin}.`,
+  },
+
+  margins: {
+    title: 'Gross margin',
+    description:
+      'What was made on what was sold, by product and by customer. Revenue at the rate on each invoice’s date, cost at the rate each lot arrived at — the only two figures that add up across currencies.',
+    month: 'Month',
+    previous: 'Previous month',
+    next: 'Next month',
+    revenue: 'Revenue',
+    cost: 'Cost of sales',
+    margin: 'Gross margin',
+    marginPercent: 'Margin %',
+    invoices: 'Invoices',
+    byProduct: 'By product',
+    byProductHint:
+      'Freight and duty that arrived after the goods had gone went straight to cost of sales. They are shown separately and included in cost: they belong to the product, not to any one invoice.',
+    byProductCaption: 'Gross margin by product, largest contribution first',
+    byCustomer: 'By customer',
+    byCustomerHint:
+      'Late freight and duty are not in these figures, because they cannot be attributed to a customer — which is why the two tables’ costs differ by exactly that amount.',
+    byCustomerCaption: 'Gross margin by customer, largest contribution first',
+    product: 'Product',
+    customer: 'Customer',
+    sold: 'Sold',
+    lateCharges: 'Late freight & duty',
+    total: 'Total',
+    emptyTitle: 'Nothing sold this month',
+    emptyBody: 'Invoices raised on the Sales page appear here, costed from the lots they shipped.',
+  },
+
+  reconcile: {
+    title: 'Stock against the accounts',
+    agrees: 'The stock records agree with the accounts',
+    agreesBody:
+      'Every inventory account holds exactly what its open lots are worth. Nothing has been posted to stock except by moving stock.',
+    disagrees: 'The stock records and the accounts disagree',
+    disagreesBody:
+      'Something was posted straight to an inventory account without moving any stock, so every margin costed from the lots is out by the difference. The entries responsible are listed; reverse them, or record the stock movement they stood for.',
+    caption: 'Inventory accounts against the lots behind them',
+    account: 'Account',
+    products: 'Products',
+    ledger: 'In the accounts',
+    lots: 'In the lots',
+    difference: 'Difference',
+    unexplained: 'Posted without moving stock',
+  },
+
+  stockOutcome: {
+    checkProduct: 'Fill in a code, a name and a unit of measure.',
+    added: (name: string) => `Added ${name}. You can book a delivery against it now.`,
+    plainNumber: 'Enter a plain number, for example 1250 or 24.687.',
+    checkQuantityAndAmount: 'Check the quantity and the amount.',
+    checkQuantity: 'Check the quantity.',
+    tooManyDecimals: (places: number) =>
+      places === 0
+        ? 'This product is counted in whole units.'
+        : `This product is measured to ${places} decimal place${places === 1 ? '' : 's'}. Round the quantity, or change the product’s precision.`,
+    quantityPlain: 'Enter the quantity as a plain number.',
+    amountPlain: 'Enter the amount paid as a plain number.',
+    bookedIn: (quantity: string, unit: string) =>
+      `Booked in ${quantity} ${unit}. The purchase has been posted to the ledger as well.`,
+    lotsJoiner: ' then ',
+    shippedFrom: (lots: string) =>
+      `Shipped, costed from ${lots}. The cost of goods sold has been posted.`,
+    shipped: 'Shipped, and the cost of goods sold has been posted.',
+    chooseReason: 'Say why the stock is being written off.',
+    writtenOff: (quantity: string, unit: string) => `Wrote off ${quantity} ${unit}.`,
+    writtenOffFrom: (quantity: string, unit: string, lots: string) =>
+      `Wrote off ${quantity} ${unit}, costed from ${lots}.`,
   },
 } as const;
 

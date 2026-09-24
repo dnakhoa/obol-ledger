@@ -49,6 +49,18 @@ export default async function EntryPage({ params }: PageProps) {
   const isPending = entry.status === 'pending';
   const isArchived = entry.status === 'archived';
 
+  // Entries the stock records wrote cannot be reversed here: the journal would
+  // move the account and leave the lots behind. The service and a trigger
+  // both refuse it, so the page says so up front and points to where the
+  // correction belongs instead of offering a button that can only fail.
+  const stockOwner = entry.metadata['sale']
+    ? { href: `/sales/${entry.metadata['sale']}`, label: t.entry.openSale }
+    : entry.metadata['landedCostCharge'] && entry.metadata['shipment']
+      ? { href: `/stock/shipments/${entry.metadata['shipment']}`, label: t.shipments.title }
+      : entry.metadata['inventoryMovement']
+        ? { href: '/stock', label: t.stock.title }
+        : null;
+
   return (
     <>
       <div className="space-y-1">
@@ -88,16 +100,12 @@ export default async function EntryPage({ params }: PageProps) {
       {reversed || isReversal ? (
         <Card className="border-caution">
           <CardBody className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <p>
-              {reversed
-                ? 'This entry was cancelled by a later reversing entry. It stays on the record; its net effect is zero.'
-                : 'This entry exists to cancel an earlier one. Both stay on the record.'}
-            </p>
+            <p>{reversed ? t.entry.cancelledByReversal : t.entry.cancelsEarlier}</p>
             <Link
               href={`/journal/${entry.reversedByTransactionId ?? entry.reversesTransactionId}`}
               className="font-medium underline"
             >
-              {reversed ? 'View the reversal' : 'View the original'}
+              {reversed ? t.misc.viewReversal : t.entry.viewOriginal}
             </Link>
           </CardBody>
         </Card>
@@ -113,10 +121,10 @@ export default async function EntryPage({ params }: PageProps) {
           </p>
           <p className="text-ink-muted mt-1 text-xs">
             {isPending
-              ? 'Reserved, not yet moved'
+              ? t.entry.reservedNotMoved
               : isArchived
-                ? 'Cancelled; never moved'
-                : 'Debit side; credits match exactly'}
+                ? t.entry.cancelledNeverMoved
+                : t.entry.debitSideMatches}
           </p>
         </div>
         <div className="rounded-card border-line bg-surface border px-4 py-3.5">
@@ -143,9 +151,9 @@ export default async function EntryPage({ params }: PageProps) {
             <div className="space-y-0.5">
               <CardTitle>{t.entry.metadata}</CardTitle>
               <CardDescription>
-                The caller&rsquo;s own references. Opaque to the ledger, and searchable —{' '}
-                <code className="font-mono text-[11px]">?metadataKey=&amp;metadataValue=</code> on
-                the journal.
+                {t.entry.metadataHintBefore}{' '}
+                <code className="font-mono text-[11px]">?metadataKey=&amp;metadataValue=</code>{' '}
+                {t.entry.metadataHintAfter}
               </CardDescription>
             </div>
           </CardHeader>
@@ -227,6 +235,14 @@ export default async function EntryPage({ params }: PageProps) {
             <p className="text-ink-muted text-xs">{t.misc.cancelledNote}</p>
           ) : reversed ? (
             <p className="text-ink-muted text-xs">{t.misc.alreadyReversedNote}</p>
+          ) : stockOwner ? (
+            <div className="space-y-2 text-sm">
+              <p className="font-medium">{t.entry.ownedByStockTitle}</p>
+              <p className="text-ink-secondary text-xs">{t.entry.ownedByStock}</p>
+              <Link href={stockOwner.href} className="text-xs font-medium underline">
+                {stockOwner.label}
+              </Link>
+            </div>
           ) : (
             <ReverseEntry
               transactionId={entry.id}

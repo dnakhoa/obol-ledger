@@ -49,6 +49,7 @@ export const ja: Messages = {
     overview: '概要',
     accounts: '勘定科目',
     stock: '在庫',
+    sales: '販売',
     journal: '仕訳帳',
     reports: '帳票',
     monthEnd: '月次決算',
@@ -153,6 +154,7 @@ export const ja: Messages = {
     description:
       '入荷のたびに、その単価のまま別ロットとして記録します。出庫すると、実際に引き当てたロットから売上原価を計算し、どのロットから引き当てたかも表示します。',
     importButton: '表計算から取り込む',
+    sellButton: '請求書を発行',
 
     inTheYard: '現在の在庫',
     inTheYardHint: '金額は取得原価です。販売価格ではありません。',
@@ -265,6 +267,24 @@ export const ja: Messages = {
     shippedOut: '出庫',
     nothingMoved: '入出庫の記録がありません',
     nothingMovedBody: '入庫と出庫がここに一覧で表示されます。',
+    writeOffTitle: '在庫の廃棄・減耗',
+    writeOffHint:
+      '破損、期限切れ、紛失、棚卸での不足。販売と同じくロットから原価を計算し、選んだ費用科目に計上します。減耗が売上原価に紛れ込むことはありません。',
+    writeOffButton: '廃棄を計上',
+    howMuchWrittenOff: (unit) => `数量（${unit}）`,
+    reason: '理由',
+    reasonDamaged: '破損',
+    reasonExpired: '期限切れ',
+    reasonLost: '紛失',
+    reasonCountShortfall: '棚卸減耗',
+    reasonOther: 'その他',
+    lossAccount: '損失の計上科目',
+    lossAccountHint: '費用科目：棚卸減耗損、商品廃棄損など。',
+    writeOffReferenceHint: '棚卸表または破損報告書の番号。',
+    needLossAccount: '在庫損失用の費用科目を',
+    writtenOff: '廃棄',
+    sold: '販売',
+    soldFor: '売上',
   },
 
   journal: {
@@ -446,6 +466,19 @@ export const ja: Messages = {
     sumsToZero: '合計 0、COMMIT 時に検証済み',
     metadata: '付帯情報',
     account: '勘定科目',
+    ownedByStockTitle: '在庫記録が作成した仕訳',
+    ownedByStock:
+      'この仕訳は金額と同時に在庫も動かしたため、ここでは取り消せません。取り消すと勘定だけが動き、その裏付けとなるロットは動きません。在庫画面から修正してください（廃棄の計上、または入荷への追加諸掛）。',
+    openSale: '請求書を開く',
+    cancelledByReversal:
+      'この仕訳は後の反対仕訳によって取り消されました。記録には残り、正味の影響はゼロです。',
+    cancelsEarlier: 'この仕訳は以前の仕訳を取り消すためのものです。どちらも記録に残ります。',
+    viewOriginal: '元の仕訳を見る',
+    reservedNotMoved: '引当済み、未移動',
+    cancelledNeverMoved: '取消済み、移動なし',
+    debitSideMatches: '借方合計（貸方と一致）',
+    metadataHintBefore: '呼び出し側の参照情報です。台帳は解釈しませんが、検索できます —',
+    metadataHintAfter: '（仕訳帳）。',
   },
 
   statement: {
@@ -729,5 +762,148 @@ export const ja: Messages = {
     fixFirst:
       '上で印の付いた行を修正し、もう一度確認してください。取込は全件か 0 件かのいずれかで、正しい行だけを取り込むことはしません。',
     rowProblem: (line, problem) => `${line} 行目：${problem}`,
+  },
+  sales: {
+    title: '販売',
+    description:
+      '請求書ごとに出庫と売上原価の計上を同じ仕訳で行うため、どの請求書もその利益がわかります。',
+    marginsButton: '売上総利益',
+
+    recentTitle: '最近の請求書',
+    recentHint:
+      '請求額は請求書の通貨で表示します。売上・原価・粗利は記帳通貨で、売上は請求日のレート、原価は各ロットの入庫日のレートによります。',
+    tableCaption: '請求書（新しい順）と粗利',
+    invoice: '請求書番号',
+    customer: '得意先',
+    date: '日付',
+    due: '支払期日',
+    onReceipt: '受領時',
+    invoiced: '請求額',
+    revenue: '売上',
+    cost: '原価',
+    margin: '粗利',
+    emptyTitle: '請求書はまだありません',
+    emptyBody:
+      '下のフォームから発行してください。出庫、売掛金と売上の計上、出庫したロットからの原価計算を、ひとつの仕訳で行います。',
+
+    newTitle: '請求書を発行',
+    newHint:
+      '請求書全体がひとつの仕訳なので、売掛金・売上・消費税・売上原価が食い違うことはありません。在庫が足りない行がひとつでもあれば、何も記帳しません。',
+    needSetup:
+      '在庫のある品目、得意先の勘定（資産。得意先ごとに勘定を分けると年齢表で区別できます）、売上勘定が必要です。設定は',
+    stockLink: '在庫画面',
+    andThe: 'と',
+    invoiceNumber: '請求書番号',
+    invoiceNumberHint: '一度だけ使えます。得意先はこの番号で支払います。',
+    customerAccount: '得意先',
+    customerAccountHint: '得意先の売掛金勘定。現金販売なら預金勘定。',
+    revenueAccount: '売上勘定',
+    currency: '請求通貨',
+    currencyHint: '輸出は買い手の通貨で請求します。請求日のレートを使います。',
+    taxCode: '消費税',
+    noTax: '税なし',
+    invoiceDate: '請求日',
+    dueDate: '支払期日',
+    dueDateHint: '受領時払いなら空欄。売掛金の年齢はこの日から数えます。',
+    linesLegend: '明細',
+    product: '品目',
+    quantity: (unit) => `数量（${unit}）`,
+    lineTotal: '税抜金額',
+    lot: 'ロット',
+    byMethod: '評価方法どおり',
+    addLine: '行を追加',
+    removeLine: (line) => `${line} 行目を削除`,
+    lineLabel: (line) => `${line} 行目`,
+    submit: '請求書を発行',
+
+    allSales: 'すべての販売',
+    linesTitle: '明細',
+    linesHint: '各行の販売額、ロットから計算した原価、出庫元のロット。',
+    linesCaption: '請求明細（売上・原価・粗利）',
+    shippedFrom: '出庫元',
+    net: '税抜合計',
+    tax: '消費税',
+    gross: '請求合計',
+    viewEntry: '仕訳を見る',
+    marginOf: (percent) => `粗利率 ${percent}`,
+
+    checkForm: '請求書番号、得意先、売上勘定、明細を 1 行以上入力してください。',
+    checkLine: (line) => `${line} 行目：品目を選び、数量と金額を入力してください。`,
+    tooManyDecimals: (line, places) =>
+      places === 0
+        ? `${line} 行目：この品目は整数単位で数えます。`
+        : `${line} 行目：この品目の数量は小数点以下 ${places} 桁までです。`,
+    amountNotRepresentable: (line, currency) =>
+      `${line} 行目：${currency} で表せる桁数を超えています。`,
+    raised: (reference, margin) =>
+      `${reference} を発行しました。出庫済みで、この請求書の粗利は ${margin} です。`,
+  },
+
+  margins: {
+    title: '売上総利益',
+    description:
+      '販売したものの利益を品目別・得意先別に。売上は各請求日のレート、原価は各ロットの入庫日のレートによります。通貨をまたいで合計できるのはこの二つだけです。',
+    month: '月',
+    previous: '前月',
+    next: '翌月',
+    revenue: '売上高',
+    cost: '売上原価',
+    margin: '売上総利益',
+    marginPercent: '粗利率',
+    invoices: '請求書数',
+    byProduct: '品目別',
+    byProductHint:
+      '商品の出荷後に届いた運賃・関税は売上原価に直接計上されています。別掲したうえで原価に含めます。特定の請求書ではなく品目に属する費用だからです。',
+    byProductCaption: '品目別の売上総利益（貢献の大きい順）',
+    byCustomer: '得意先別',
+    byCustomerHint:
+      '遅れて届いた運賃・関税は得意先に配分できないため、ここには含みません。二つの表の原価はちょうどその額だけ異なります。',
+    byCustomerCaption: '得意先別の売上総利益（貢献の大きい順）',
+    product: '品目',
+    customer: '得意先',
+    sold: '販売数量',
+    lateCharges: '後着の運賃・関税',
+    total: '合計',
+    emptyTitle: '今月の販売はありません',
+    emptyBody: '販売画面で発行した請求書が、出庫したロットの原価とともにここに表示されます。',
+  },
+
+  reconcile: {
+    title: '在庫と帳簿の照合',
+    agrees: '在庫記録と帳簿は一致しています',
+    agreesBody:
+      'どの棚卸資産勘定も、残っているロットの金額とちょうど同じです。在庫を動かさずに在庫勘定へ記帳されたものはありません。',
+    disagrees: '在庫記録と帳簿が一致していません',
+    disagreesBody:
+      '在庫を動かさずに棚卸資産勘定へ直接記帳された仕訳があり、ロットから計算した原価がすべてその差額だけずれています。原因の仕訳を下に示します。取り消すか、それが表す入出庫を登録してください。',
+    caption: '棚卸資産勘定とロットの照合',
+    account: '勘定科目',
+    products: '品目数',
+    ledger: '帳簿残高',
+    lots: 'ロット残高',
+    difference: '差額',
+    unexplained: '在庫を動かさない記帳',
+  },
+
+  stockOutcome: {
+    checkProduct: '品目コード、名称、単位を入力してください。',
+    added: (name) => `${name} を追加しました。これで入庫を登録できます。`,
+    plainNumber: '1250 や 24.687 のような数値を入力してください。',
+    checkQuantityAndAmount: '数量と金額を確認してください。',
+    checkQuantity: '数量を確認してください。',
+    tooManyDecimals: (places) =>
+      places === 0
+        ? 'この品目は整数単位で数えます。'
+        : `この品目の数量は小数点以下 ${places} 桁までです。数量を丸めるか、品目の桁数を変更してください。`,
+    quantityPlain: '数量を数値で入力してください。',
+    amountPlain: '支払額を数値で入力してください。',
+    bookedIn: (quantity, unit) => `${quantity} ${unit} を入庫しました。仕入の仕訳も記帳済みです。`,
+    lotsJoiner: '、次に ',
+    shippedFrom: (lots) => `出庫しました。原価は ${lots} から計算し、売上原価を記帳しました。`,
+    shipped: '出庫し、売上原価を記帳しました。',
+    chooseReason: '廃棄の理由を選んでください。',
+    writtenOff: (quantity, unit) => `${quantity} ${unit} を廃棄しました。`,
+    writtenOffFrom: (quantity, unit, lots) =>
+      `${quantity} ${unit} を廃棄しました。原価は ${lots} から計算しました。`,
   },
 };

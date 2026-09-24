@@ -11,10 +11,12 @@ import { Money } from '@/components/money';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
 import { ArrowLeftIcon } from '@/components/icons';
-import { IssueForm, ReceiveForm, type AccountOption } from '@/components/stock-forms';
+import { IssueForm, ReceiveForm, WriteOffForm, type AccountOption } from '@/components/stock-forms';
 import { viewerServices } from '@/server/container';
 import { translations } from '@/server/i18n';
-import { dateFormats } from '@/lib/i18n';
+import { dateFormats, type Messages } from '@/lib/i18n';
+import type { WriteOffReason } from '@/server/domain/costing';
+import type { MovementSummary } from '@/server/services/inventory';
 import { SUPPORTED_CURRENCIES } from '@/lib/money';
 import { toQuantityString, unitLabel } from '@/lib/quantity';
 
@@ -97,6 +99,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       label: account.code ? `${account.code} — ${account.name}` : account.name,
     }));
 
+  // Where a loss can go: any open expense except the cost of sales, which is
+  // exactly where shrinkage must not hide.
+  const expenseAccounts: AccountOption[] = accounts
+    .filter(
+      (account) =>
+        account.status === 'open' &&
+        account.type === 'expense' &&
+        account.balance.currency === functional &&
+        account.id !== item.cogsAccountId,
+    )
+    .map((account) => ({
+      id: account.id,
+      label: account.code ? `${account.code} — ${account.name}` : account.name,
+    }));
+
   const lotOptions = lots.map((lot) => ({
     id: lot.id,
     label: t.product.lotOption(
@@ -135,6 +152,25 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       : t.product.whichDeliveryOptionalHint,
     lotPlaceholder: requiresLot ? t.product.chooseDelivery : t.product.oldestFirst,
     submit: t.product.issueButton,
+    working: t.common.working,
+  };
+
+  const writeOffLabels = {
+    quantity: t.product.howMuchWrittenOff(unitName),
+    reason: t.product.reason,
+    reasons: (['damaged', 'expired', 'lost', 'count_shortfall', 'other'] as const).map((value) => ({
+      value,
+      label: reasonLabel(value, t),
+    })),
+    lossAccount: t.product.lossAccount,
+    lossAccountHint: t.product.lossAccountHint,
+    date: t.product.date,
+    reference: t.product.reference,
+    referenceHint: t.product.writeOffReferenceHint,
+    lot: issueLabels.lot,
+    lotHint: issueLabels.lotHint,
+    lotPlaceholder: issueLabels.lotPlaceholder,
+    submit: t.product.writeOffButton,
     working: t.common.working,
   };
 
@@ -288,6 +324,37 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
       <Card>
         <CardHeader>
+          <CardTitle>{t.product.writeOffTitle}</CardTitle>
+          <CardDescription>{t.product.writeOffHint}</CardDescription>
+        </CardHeader>
+        <CardBody>
+          {lots.length === 0 ? (
+            <p className="text-ink-secondary text-sm">{t.product.nothingToShip}</p>
+          ) : expenseAccounts.length === 0 ? (
+            <p className="text-ink-secondary text-sm">
+              {t.product.needLossAccount}{' '}
+              <Link href="/accounts" className="underline underline-offset-4">
+                {t.stock.chartOfAccountsLink}
+              </Link>{' '}
+              {t.stock.firstSuffix}
+            </p>
+          ) : (
+            <WriteOffForm
+              itemId={item.id}
+              unit={item.unit}
+              precision={item.quantityPrecision}
+              today={today}
+              lots={lotOptions}
+              requiresLot={requiresLot}
+              expenseAccounts={expenseAccounts}
+              labels={writeOffLabels}
+            />
+          )}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>{t.product.movementsTitle}</CardTitle>
           <CardDescription>{t.product.movementsHint}</CardDescription>
         </CardHeader>
@@ -303,6 +370,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   <Th align="right">{t.product.quantity}</Th>
                   <Th>{t.product.costedFrom}</Th>
                   <Th align="right">{t.product.cost}</Th>
+                  <Th align="right">{t.product.soldFor}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -311,10 +379,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     <Td>{DATE.day(movement.occurredAt)}</Td>
                     <Td>
                       <Link
-                        href={`/journal/${movement.transactionId}`}
+                        href={
+                          movement.saleId
+                            ? `/sales/${movement.saleId}`
+                            : `/journal/${movement.transactionId}`
+                        }
                         className="hover:text-action font-medium underline-offset-4 hover:underline"
                       >
-                        {movement.kind === 'receipt' ? t.product.deliveryIn : t.product.shippedOut}
+                        {movementLabel(movement, t)}
                       </Link>
                       {movement.reference ? (
                         <span className="text-ink-muted ml-2 text-xs">{movement.reference}</span>
@@ -341,6 +413,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                     <Td align="right" numeric>
                       <Money value={movement.cost} />
                     </Td>
+                    <Td align="right" numeric>
+                      {movement.revenue ? (
+                        <Money value={movement.revenue} />
+                      ) : (
+                        <span className="text-ink-muted text-xs">—</span>
+                      )}
+                    </Td>
                   </Tr>
                 ))}
               </tbody>
@@ -350,4 +429,30 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </Card>
     </div>
   );
+}
+
+function reasonLabel(reason: WriteOffReason, t: Messages): string {
+  switch (reason) {
+    case 'damaged':
+      return t.product.reasonDamaged;
+    case 'expired':
+      return t.product.reasonExpired;
+    case 'lost':
+      return t.product.reasonLost;
+    case 'count_shortfall':
+      return t.product.reasonCountShortfall;
+    case 'other':
+      return t.product.reasonOther;
+  }
+}
+
+/** What happened, in the words the yard uses: in, sold, shipped, or written off and why. */
+function movementLabel(movement: MovementSummary, t: Messages): string {
+  if (movement.kind === 'receipt') return t.product.deliveryIn;
+  if (movement.kind === 'writeoff') {
+    return movement.reason
+      ? `${t.product.writtenOff} · ${reasonLabel(movement.reason, t)}`
+      : t.product.writtenOff;
+  }
+  return movement.saleId ? t.product.sold : t.product.shippedOut;
 }

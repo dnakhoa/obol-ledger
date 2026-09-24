@@ -28,7 +28,6 @@ import { err, ok, type Result } from '@/lib/result';
 export const COSTING_METHODS = ['fifo', 'weighted_average', 'specific', 'lifo'] as const;
 export type CostingMethod = (typeof COSTING_METHODS)[number];
 
-/** Permitted under US GAAP, prohibited under IFRS and Vietnamese VAS. */
 /**
  * Why stock left without being sold.
  *
@@ -45,6 +44,7 @@ export const WRITE_OFF_REASONS = [
 ] as const;
 export type WriteOffReason = (typeof WRITE_OFF_REASONS)[number];
 
+/** Permitted under US GAAP, prohibited under IFRS and Vietnamese VAS. */
 export const US_ONLY_COSTING_METHODS: readonly CostingMethod[] = ['lifo'];
 
 export type CostLayer = {

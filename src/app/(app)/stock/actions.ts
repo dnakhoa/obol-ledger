@@ -4,9 +4,17 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { describe as describeError } from '@/server/domain/errors';
-import { COSTING_METHODS } from '@/server/domain/costing';
+import { COSTING_METHODS, WRITE_OFF_REASONS } from '@/server/domain/costing';
+import { translations } from '@/server/i18n';
 import { SUPPORTED_CURRENCIES, parseDecimal } from '@/lib/money';
-import { SUPPORTED_UNITS, defaultPrecision, parseQuantity, type Unit } from '@/lib/quantity';
+import {
+  SUPPORTED_UNITS,
+  defaultPrecision,
+  parseQuantity,
+  toQuantityString,
+  unitLabel,
+  type Unit,
+} from '@/lib/quantity';
 
 export type StockState = {
   readonly status: 'idle' | 'error' | 'done';
@@ -27,7 +35,7 @@ export type StockState = {
 const quantityField = z
   .string()
   .trim()
-  .regex(/^\d+(\.\d+)?$/u, 'Enter a plain number, for example 1250 or 24.687');
+  .regex(/^\d+(\.\d+)?$/u);
 
 export async function createItemAction(
   _previous: StockState,
@@ -54,9 +62,8 @@ export async function createItemAction(
       costingMethod: formData.get('costingMethod') ?? '',
     });
 
-  if (!parsed.success) {
-    return { status: 'error', message: 'Fill in a code, a name and a unit of measure.' };
-  }
+  const { t } = await translations();
+  if (!parsed.success) return { status: 'error', message: t.stockOutcome.checkProduct };
 
   const method = parsed.data.costingMethod;
   const result = await writer.services.inventory.createItem({
@@ -70,10 +77,7 @@ export async function createItemAction(
 
   revalidatePath('/stock');
   return result.ok
-    ? {
-        status: 'done',
-        message: `Added ${parsed.data.name}. You can book a delivery against it now.`,
-      }
+    ? { status: 'done', message: t.stockOutcome.added(parsed.data.name) }
     : { status: 'error', message: describeError(result.error) };
 }
 
@@ -106,10 +110,13 @@ export async function receiveAction(
       reference: formData.get('reference') ?? '',
     });
 
+  const { t } = await translations();
   if (!parsed.success) {
     return {
       status: 'error',
-      message: parsed.error.issues[0]?.message ?? 'Check the quantity and the amount.',
+      message: plainNumberIssue(parsed.error.issues)
+        ? t.stockOutcome.plainNumber
+        : t.stockOutcome.checkQuantityAndAmount,
     };
   }
 
@@ -120,13 +127,13 @@ export async function receiveAction(
       status: 'error',
       message:
         quantity.error === 'too_many_decimals'
-          ? `This product is measured to ${precision} decimal place${precision === 1 ? '' : 's'}. Round the quantity, or change the product's precision.`
-          : 'Enter the quantity as a plain number.',
+          ? t.stockOutcome.tooManyDecimals(precision)
+          : t.stockOutcome.quantityPlain,
     };
   }
 
   const cost = parseDecimal(parsed.data.cost, parsed.data.currency);
-  if (!cost.ok) return { status: 'error', message: 'Enter the amount paid as a plain number.' };
+  if (!cost.ok) return { status: 'error', message: t.stockOutcome.amountPlain };
 
   const result = await writer.services.inventory.receive({
     itemId: parsed.data.itemId,
@@ -143,7 +150,7 @@ export async function receiveAction(
   return result.ok
     ? {
         status: 'done',
-        message: `Booked in ${parsed.data.quantity} ${parsed.data.unit}. The purchase has been posted to the ledger as well.`,
+        message: t.stockOutcome.bookedIn(parsed.data.quantity, unitLabel(parsed.data.unit)),
       }
     : { status: 'error', message: describeError(result.error) };
 }
@@ -170,17 +177,26 @@ export async function issueAction(_previous: StockState, formData: FormData): Pr
       layerId: formData.get('layerId') ?? '',
     });
 
+  const { t } = await translations();
   if (!parsed.success) {
     return {
       status: 'error',
-      message: parsed.error.issues[0]?.message ?? 'Check the quantity.',
+      message: plainNumberIssue(parsed.error.issues)
+        ? t.stockOutcome.plainNumber
+        : t.stockOutcome.checkQuantity,
     };
   }
 
   const precision = precisionFor(parsed.data.unit, formData.get('precision'));
   const quantity = parseQuantity(parsed.data.quantity, precision);
   if (!quantity.ok) {
-    return { status: 'error', message: 'Enter the quantity as a plain number.' };
+    return {
+      status: 'error',
+      message:
+        quantity.error === 'too_many_decimals'
+          ? t.stockOutcome.tooManyDecimals(precision)
+          : t.stockOutcome.quantityPlain,
+    };
   }
 
   const result = await writer.services.inventory.issue({
@@ -205,9 +221,103 @@ export async function issueAction(_previous: StockState, formData: FormData): Pr
   return {
     status: 'done',
     message: lots.length
-      ? `Shipped, costed from ${lots.join(' then ')}. The cost of goods sold has been posted.`
-      : 'Shipped, and the cost of goods sold has been posted.',
+      ? t.stockOutcome.shippedFrom(lots.join(t.stockOutcome.lotsJoiner))
+      : t.stockOutcome.shipped,
   };
+}
+
+/**
+ * Stock leaving without a sale.
+ *
+ * The reason is required here as it is in the database: a write-off nobody
+ * can filter by cause is a shrinkage figure nobody can act on.
+ */
+export async function writeOffAction(
+  _previous: StockState,
+  formData: FormData,
+): Promise<StockState> {
+  const writer = await requireWriter();
+  if (!writer.allowed) return { status: 'error', message: refusalMessage(writer.reason) };
+
+  const { t } = await translations();
+  const parsed = z
+    .object({
+      itemId: z.string().trim().min(1),
+      unit: z.enum(SUPPORTED_UNITS),
+      quantity: quantityField,
+      reason: z.enum(WRITE_OFF_REASONS),
+      expenseAccountId: z.string().trim().min(1),
+      occurredAt: z.iso.date(),
+      reference: z.string().trim().max(60).optional(),
+      layerId: z.string().trim().optional(),
+    })
+    .safeParse({
+      itemId: formData.get('itemId'),
+      unit: formData.get('unit'),
+      quantity: formData.get('quantity'),
+      reason: formData.get('reason'),
+      expenseAccountId: formData.get('expenseAccountId'),
+      occurredAt: formData.get('occurredAt'),
+      reference: formData.get('reference') ?? '',
+      layerId: formData.get('layerId') ?? '',
+    });
+
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path[0];
+    return {
+      status: 'error',
+      message:
+        field === 'reason'
+          ? t.stockOutcome.chooseReason
+          : plainNumberIssue(parsed.error.issues)
+            ? t.stockOutcome.plainNumber
+            : t.stockOutcome.checkQuantity,
+    };
+  }
+
+  const precision = precisionFor(parsed.data.unit, formData.get('precision'));
+  const quantity = parseQuantity(parsed.data.quantity, precision);
+  if (!quantity.ok) {
+    return {
+      status: 'error',
+      message:
+        quantity.error === 'too_many_decimals'
+          ? t.stockOutcome.tooManyDecimals(precision)
+          : t.stockOutcome.quantityPlain,
+    };
+  }
+
+  const result = await writer.services.inventory.writeOff({
+    itemId: parsed.data.itemId,
+    quantity: quantity.value,
+    reason: parsed.data.reason,
+    expenseAccountId: parsed.data.expenseAccountId,
+    occurredAt: atNoon(parsed.data.occurredAt),
+    ...(parsed.data.reference ? { reference: parsed.data.reference } : {}),
+    ...(parsed.data.layerId ? { layerId: parsed.data.layerId } : {}),
+  });
+
+  revalidatePath('/stock');
+  revalidatePath(`/stock/${parsed.data.itemId}`);
+  if (!result.ok) return { status: 'error', message: describeError(result.error) };
+
+  const lots = result.value.movement.drawnFrom
+    .map((draw) => draw.layerReference)
+    .filter((reference): reference is string => Boolean(reference));
+  const written = toQuantityString(quantity.value, precision);
+  const unit = unitLabel(parsed.data.unit);
+  return {
+    status: 'done',
+    message: lots.length
+      ? t.stockOutcome.writtenOffFrom(written, unit, lots.join(t.stockOutcome.lotsJoiner))
+      : t.stockOutcome.writtenOff(written, unit),
+  };
+}
+
+/** True when the first problem is a number that is not a plain decimal. */
+function plainNumberIssue(issues: readonly { path: readonly PropertyKey[] }[]): boolean {
+  const field = issues[0]?.path[0];
+  return field === 'quantity' || field === 'cost';
 }
 
 /** Midday UTC, so a date typed anywhere lands on the day the person meant. */

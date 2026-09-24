@@ -67,7 +67,12 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       <PageHeader
         title={t.reports.title}
         description={t.reports.description}
-        actions={<ButtonLink href="/reports/aging">{t.aging.title}</ButtonLink>}
+        actions={
+          <>
+            <ButtonLink href="/reports/margins">{t.margins.title}</ButtonLink>
+            <ButtonLink href="/reports/aging">{t.aging.title}</ButtonLink>
+          </>
+        }
       />
 
       {/*
