@@ -80,17 +80,42 @@ function isPlainXml(bytes: Uint8Array): boolean {
   if (!text.startsWith('<?xml')) return false;
   if (/<!(DOCTYPE|ENTITY)/iu.test(text)) return false;
   if (/<\?xml-stylesheet/iu.test(text)) return false;
-  // Namespace names are compared as text, not as URLs: XML matches them
-  // exactly, so these are the only spellings that make an element SVG or
-  // XHTML to a browser.
-  const lower = text.toLowerCase();
-  if (lower.includes('http://www.w3.org/1999/xhtml')) return false;
-  if (lower.includes('http://www.w3.org/2000/svg')) return false;
+  if (declaresExecutableNamespace(text)) return false;
 
   const root = rootElement(text);
   if (!root) return false;
   const local = (root.split(':').pop() ?? '').toLowerCase();
   return local !== 'svg' && local !== 'html' && local !== 'xhtml';
+}
+
+/**
+ * The namespaces a browser executes. An element is SVG or XHTML only when a
+ * namespace declaration names one of these exactly — XML compares namespace
+ * names as strings — so each declaration's value is compared whole.
+ */
+const EXECUTABLE_NAMESPACES = new Set([
+  'http://www.w3.org/1999/xhtml',
+  'http://www.w3.org/2000/svg',
+]);
+
+function declaresExecutableNamespace(text: string): boolean {
+  for (const match of text.matchAll(/\bxmlns(?::[\w.-]+)?\s*=\s*(["'])(.*?)\1/gsu)) {
+    if (EXECUTABLE_NAMESPACES.has(decodeAttribute(match[2] ?? '').trim())) return true;
+  }
+  return false;
+}
+
+/**
+ * An attribute value as a parser reads it: `xh&#116;ml` is `xhtml` by the
+ * time the namespace is compared, so it is here too.
+ */
+function decodeAttribute(value: string): string {
+  const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+  return value.replace(/&(?:#x([0-9a-f]+)|#(\d+)|(\w+));/giu, (whole, hex, decimal, name) => {
+    const code = hex ? Number.parseInt(String(hex), 16) : decimal ? Number(decimal) : undefined;
+    if (code !== undefined) return code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+    return named[String(name)] ?? whole;
+  });
 }
 
 /**

@@ -41,6 +41,18 @@ describe('sniffContentType', () => {
     expect(
       sniffContentType(text(`<?xml version="1.0"?><!--${'x'.repeat(5000)}--><!DOCTYPE a><a/>`)),
     ).toBeNull();
+    // The namespace spelled with a character reference, which a parser decodes.
+    expect(
+      sniffContentType(
+        text('<?xml version="1.0"?><HDon xmlns:h="http://www.w3.org/1999/xh&#116;ml"/>'),
+      ),
+    ).toBeNull();
+    // A namespace that merely mentions the address is not the namespace.
+    expect(
+      sniffContentType(
+        text('<?xml version="1.0"?><HDon><Note>see www.w3.org/2000/svg</Note></HDon>'),
+      ),
+    ).toBe('application/xml');
     // A comment nested so that stripping the inner one leaves a new opener.
     expect(sniffContentType(text('<?xml version="1.0"?><!<!---->-- <a> --><svg/>'))).toBeNull();
     // A stylesheet, which a browser applies to turn XML into a page.
