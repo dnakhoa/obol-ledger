@@ -41,6 +41,8 @@ describe('sniffContentType', () => {
     expect(
       sniffContentType(text(`<?xml version="1.0"?><!--${'x'.repeat(5000)}--><!DOCTYPE a><a/>`)),
     ).toBeNull();
+    // A comment nested so that stripping the inner one leaves a new opener.
+    expect(sniffContentType(text('<?xml version="1.0"?><!<!---->-- <a> --><svg/>'))).toBeNull();
     // A stylesheet, which a browser applies to turn XML into a page.
     expect(
       sniffContentType(text('<?xml version="1.0"?><?xml-stylesheet href="x.xsl"?><HDon/>')),

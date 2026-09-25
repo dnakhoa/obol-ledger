@@ -63,8 +63,8 @@ export function sniffContentType(bytes: Uint8Array): DocumentContentType | null 
  * SVG or XHTML, the two XML vocabularies a browser will execute, whether as
  * the root or as an element further down; and it may not ask for a
  * stylesheet, which is how XSLT turns XML into a page. The root is found
- * after comments, processing instructions and CDATA are set aside, so a tag
- * written inside a comment cannot stand in for the real one.
+ * by walking past comments and processing instructions, so a tag written
+ * inside a comment cannot stand in for the real one.
  *
  * The whole file is read, not its first few kilobytes: a declaration placed
  * after a long comment is still a declaration.
@@ -80,16 +80,45 @@ function isPlainXml(bytes: Uint8Array): boolean {
   if (!text.startsWith('<?xml')) return false;
   if (/<!(DOCTYPE|ENTITY)/iu.test(text)) return false;
   if (/<\?xml-stylesheet/iu.test(text)) return false;
-  if (/www\.w3\.org\/(1999\/xhtml|2000\/svg)/iu.test(text)) return false;
+  // Namespace names are compared as text, not as URLs: XML matches them
+  // exactly, so these are the only spellings that make an element SVG or
+  // XHTML to a browser.
+  const lower = text.toLowerCase();
+  if (lower.includes('http://www.w3.org/1999/xhtml')) return false;
+  if (lower.includes('http://www.w3.org/2000/svg')) return false;
 
-  const body = text
-    .replace(/<!--[\s\S]*?-->/gu, '')
-    .replace(/<!\[CDATA\[[\s\S]*?\]\]>/gu, '')
-    .replace(/<\?[\s\S]*?\?>/gu, '');
-  const root = /<(?![?!])([A-Za-z_][\w.:-]*)/u.exec(body)?.[1];
+  const root = rootElement(text);
   if (!root) return false;
   const local = (root.split(':').pop() ?? '').toLowerCase();
   return local !== 'svg' && local !== 'html' && local !== 'xhtml';
+}
+
+/**
+ * The name of the first element, found the way a parser finds it: by walking
+ * past each comment and processing instruction in turn. Stripping them with a
+ * pattern instead can be defeated by one nested in another, which leaves a new
+ * `<!--` behind once the inner one is removed.
+ */
+function rootElement(text: string): string | null {
+  let at = 0;
+  for (;;) {
+    const open = text.indexOf('<', at);
+    if (open === -1) return null;
+    if (text.startsWith('<!--', open)) {
+      const end = text.indexOf('-->', open + 4);
+      if (end === -1) return null;
+      at = end + 3;
+    } else if (text.startsWith('<?', open)) {
+      const end = text.indexOf('?>', open + 2);
+      if (end === -1) return null;
+      at = end + 2;
+    } else if (text.startsWith('<!', open)) {
+      // A DOCTYPE was refused above; nothing else may precede the root.
+      return null;
+    } else {
+      return /^<([A-Za-z_][\w.:-]*)/u.exec(text.slice(open, open + 256))?.[1] ?? null;
+    }
+  }
 }
 
 const EXTENSION: Record<DocumentContentType, string> = {
