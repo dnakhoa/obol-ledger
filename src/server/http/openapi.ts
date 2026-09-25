@@ -5,6 +5,7 @@ import {
   createApiKeySchema,
   createItemSchema,
   createSaleSchema,
+  createCreditNoteSchema,
   recordRateSchema,
   createEndpointSchema,
   createEntrySchema,
@@ -211,7 +212,7 @@ const movementSchema = {
   type: 'object',
   properties: {
     id: { type: 'string', examples: ['move_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'] },
-    kind: { enum: ['receipt', 'issue', 'writeoff'] },
+    kind: { enum: ['receipt', 'issue', 'writeoff', 'return'] },
     ...quantityPair('quantity', 'How much moved'),
     cost: { allOf: [money], description: 'In the functional currency.' },
     occurredAt: { type: 'string', format: 'date-time' },
@@ -275,6 +276,11 @@ const saleSchema = {
           quantityPrecision: { type: 'integer' },
           ...quantityPair('quantity', 'How much was sold'),
           ...marginFields,
+          amount: { allOf: [money], description: 'The line’s net total as invoiced.' },
+          ...quantityPair('creditedQuantity', 'How much has come back on credit notes'),
+          creditedAmount: money,
+          creditedRevenue: money,
+          returnedCost: money,
           drawnFrom: {
             type: 'array',
             items: {
@@ -290,7 +296,48 @@ const saleSchema = {
     },
   },
   description:
-    'Revenue, cost and margin are in the functional currency; net, tax and gross are as invoiced.',
+    'Revenue, cost and margin are in the functional currency; net, tax and gross are as invoiced. The invoiced figures never change; credited says what credit notes took back, and netRevenue, netCost and netMargin are what the sale is worth after them.',
+} as const;
+
+const creditNoteSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string', examples: ['cn_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'] },
+    reference: { type: 'string', description: 'The credit note number.' },
+    saleId: { type: 'string' },
+    saleReference: { type: 'string', description: 'The invoice it corrects.' },
+    customerAccountId: { type: 'string' },
+    customerName: { type: 'string' },
+    occurredAt: { type: 'string', format: 'date-time' },
+    reason: { type: ['string', 'null'] },
+    currency: { type: 'string', description: 'Always the invoice’s currency.' },
+    net: money,
+    tax: money,
+    gross: money,
+    revenue: { allOf: [money], description: 'Net credited, in the functional currency.' },
+    cost: { allOf: [money], description: 'What the returned goods cost, put back into stock.' },
+    revenueAccountId: { type: 'string' },
+    transactionId: { type: 'string' },
+    lines: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          line: { type: 'integer' },
+          saleMovementId: { type: 'string' },
+          itemId: { type: 'string' },
+          sku: { type: 'string' },
+          itemName: { type: 'string' },
+          unit: { type: 'string' },
+          quantityPrecision: { type: 'integer' },
+          ...quantityPair('quantity', 'How much came back; zero for a price allowance'),
+          amount: money,
+          revenue: money,
+          cost: money,
+        },
+      },
+    },
+  },
 } as const;
 
 function envelope(schema: unknown, withCursor = false): Record<string, unknown> {
@@ -420,6 +467,8 @@ export function openApiDocument(): Record<string, unknown> {
         Layer: layerSchema,
         Movement: movementSchema,
         Sale: saleSchema,
+        CreditNote: creditNoteSchema,
+        CreateCreditNote: jsonSchema(createCreditNoteSchema),
         CreateItem: jsonSchema(createItemSchema),
         ReceiveStock: jsonSchema(receiveStockSchema),
         IssueStock: jsonSchema(issueStockSchema),
@@ -1274,6 +1323,111 @@ export function openApiDocument(): Record<string, unknown> {
               description: 'The invoice',
               content: {
                 'application/json': { schema: envelope({ $ref: '#/components/schemas/Sale' }) },
+              },
+            },
+            ...problemResponses(404, 429),
+          },
+        },
+      },
+      '/sales/{saleId}/credit-notes': {
+        get: {
+          tags: ['Sales'],
+          summary: 'The credit notes issued against one invoice',
+          parameters: [{ name: 'saleId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': {
+              description: 'Oldest first',
+              content: {
+                'application/json': {
+                  schema: envelope({
+                    type: 'array',
+                    items: { $ref: '#/components/schemas/CreditNote' },
+                  }),
+                },
+              },
+            },
+            ...problemResponses(404, 429),
+          },
+        },
+        post: {
+          tags: ['Sales'],
+          summary: 'Take back part of a sale: returned goods, a price allowance, or both',
+          description:
+            'Each line names an invoice line by its movementId. Returned goods go back into the lots they left from, at the cost they left at. Revenue, output tax and the receivable are credited at the invoice’s own rate, and the tax lands on the return for the month the credit note is dated. Returning more than a line shipped, or crediting more than it charged, is a 409 credit_exceeds_sale with what is left; nothing is written. The final credit against an invoice takes exactly what is left, so a sale credited in instalments ends at zero.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'saleId', in: 'path', required: true, schema: { type: 'string' } },
+            idempotencyHeader,
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/CreateCreditNote' } },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'The credit note and the entry it posted',
+              content: {
+                'application/json': {
+                  schema: envelope({
+                    type: 'object',
+                    required: ['creditNote', 'entry'],
+                    properties: {
+                      creditNote: { $ref: '#/components/schemas/CreditNote' },
+                      entry: { $ref: '#/components/schemas/Transaction' },
+                    },
+                  }),
+                },
+              },
+            },
+            '200': { description: 'Idempotent replay of an earlier request' },
+            ...problemResponses(400, 401, 404, 409, 422, 429),
+          },
+        },
+      },
+      '/credit-notes': {
+        get: {
+          tags: ['Sales'],
+          summary: 'Recent credit notes, newest first',
+          parameters: [
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Credit notes, with their lines',
+              content: {
+                'application/json': {
+                  schema: envelope({
+                    type: 'array',
+                    items: { $ref: '#/components/schemas/CreditNote' },
+                  }),
+                },
+              },
+            },
+            ...problemResponses(400, 429),
+          },
+        },
+      },
+      '/credit-notes/{creditNoteId}': {
+        get: {
+          tags: ['Sales'],
+          summary: 'Fetch one credit note',
+          parameters: [
+            { name: 'creditNoteId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': {
+              description: 'The credit note',
+              content: {
+                'application/json': {
+                  schema: envelope({ $ref: '#/components/schemas/CreditNote' }),
+                },
               },
             },
             ...problemResponses(404, 429),

@@ -1,6 +1,7 @@
 'use client';
 
 import { createAuthClient } from 'better-auth/react';
+import { anonymousClient } from 'better-auth/client/plugins';
 
 /**
  * The browser half of authentication.
@@ -10,4 +11,4 @@ import { createAuthClient } from 'better-auth/react';
  * row-level security policy can be consulted. A client that could decide its
  * own permissions would be a client that could lie about them.
  */
-export const authClient = createAuthClient();
+export const authClient = createAuthClient({ plugins: [anonymousClient()] });

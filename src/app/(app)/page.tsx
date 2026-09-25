@@ -10,7 +10,7 @@ import { Money } from '@/components/money';
 import { marginText } from '@/components/margin';
 import { VolumeChart } from '@/components/volume-chart';
 import { SetupNotice } from '@/components/setup-notice';
-import { CheckIcon, AlertIcon, ArrowRightIcon, ShieldIcon } from '@/components/icons';
+import { CheckIcon, AlertIcon, ArrowRightIcon } from '@/components/icons';
 import { buildPosition, loadDashboard } from '@/server/queries';
 import { translations } from '@/server/i18n';
 import { classLabel, dateFormats } from '@/lib/i18n';
@@ -50,98 +50,89 @@ export default async function OverviewPage() {
           <h1 className="text-xl font-semibold tracking-tight">{t.overview.title}</h1>
           <p className="text-ink-muted text-sm">{t.overview.description}</p>
         </div>
-        <ButtonLink href="/transfer" variant="primary">
-          {t.overview.postEntry}
-          <ArrowRightIcon />
-        </ButtonLink>
+        <div className="flex flex-wrap items-center gap-2">
+          {/*
+            A check that passes is a footnote; one that fails is the headline.
+            While the books balance, a chip says so and the page leads with
+            the business. If they ever stop, the full banner below takes the
+            top of the page, because then nothing else on it can be trusted.
+          */}
+          {allBalanced && books ? (
+            <Badge tone="positive" className="h-7 px-2.5">
+              <CheckIcon width={12} height={12} />
+              {t.overview.balanced}
+            </Badge>
+          ) : null}
+          <ButtonLink href="/sales" variant="primary">
+            {t.stock.sellButton}
+            <ArrowRightIcon />
+          </ButtonLink>
+        </div>
       </header>
 
       {/*
-        The trial balance leads the page rather than hiding in a report. It is
-        the ledger's own proof of consistency, and the one number that would
-        make every other number here untrustworthy if it moved off zero.
+        Out of balance: the one state in which this leads the page. Every
+        other figure here is derived from the same postings, so none of them
+        can be trusted until it is resolved.
       */}
-      <Card className={allBalanced ? '' : 'border-negative'}>
-        <CardBody className="flex flex-wrap items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <span
-              className={`flex size-11 shrink-0 items-center justify-center rounded-full ${
-                allBalanced ? 'bg-positive-soft text-positive' : 'bg-negative-soft text-negative'
-              }`}
-            >
-              {allBalanced ? (
-                <CheckIcon width={20} height={20} />
-              ) : (
-                <AlertIcon width={20} height={20} />
-              )}
-            </span>
-            <div>
-              <p className="text-sm font-semibold">
-                {allBalanced ? t.overview.balanced : t.overview.notBalanced}
-              </p>
-              <p className="text-ink-muted text-xs">
-                {allBalanced ? t.overview.balancedBody : t.overview.notBalancedBody}
-              </p>
+      {allBalanced ? null : (
+        <Card className={allBalanced ? '' : 'border-negative'}>
+          <CardBody className="flex flex-wrap items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <span
+                className={`flex size-11 shrink-0 items-center justify-center rounded-full ${
+                  allBalanced ? 'bg-positive-soft text-positive' : 'bg-negative-soft text-negative'
+                }`}
+              >
+                {allBalanced ? (
+                  <CheckIcon width={20} height={20} />
+                ) : (
+                  <AlertIcon width={20} height={20} />
+                )}
+              </span>
+              <div>
+                <p className="text-sm font-semibold">
+                  {allBalanced ? t.overview.balanced : t.overview.notBalanced}
+                </p>
+                <p className="text-ink-muted text-xs">
+                  {allBalanced ? t.overview.balancedBody : t.overview.notBalancedBody}
+                </p>
+              </div>
             </div>
-          </div>
 
-          <dl className="flex flex-wrap items-center gap-x-8 gap-y-3">
-            {books ? (
-              <>
-                <div>
-                  <dt className="text-ink-muted text-[11px] tracking-wide uppercase">
-                    {t.overview.debits}
-                  </dt>
-                  <dd className="numeric text-sm font-medium">
-                    <Money value={books.debits} showCurrency />
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-ink-muted text-[11px] tracking-wide uppercase">
-                    {t.overview.credits}
-                  </dt>
-                  <dd className="numeric text-sm font-medium">
-                    <Money value={books.credits} showCurrency />
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-ink-muted text-[11px] tracking-wide uppercase">
-                    {t.overview.residual}
-                  </dt>
-                  <dd className="numeric text-sm font-medium">
-                    <Money value={books.residual} />
-                  </dd>
-                </div>
-              </>
-            ) : null}
-          </dl>
-        </CardBody>
-        {/*
-          The claim above is the easiest one on the page to wave away — every
-          screenshot of a ledger says it balances. So the banner carries the
-          invitation to test it, against this same database. Only while it
-          is true: a banner reporting a residual has no business daring anyone.
-        */}
-        {allBalanced ? (
-          <Link
-            href="/break"
-            className="group border-line text-ink-secondary hover:bg-surface-hover hover:text-ink flex items-center justify-between gap-3 rounded-b-[var(--radius)] border-t px-4 py-2.5 text-xs transition-colors duration-150 sm:px-5"
-          >
-            <span className="flex items-center gap-2">
-              <ShieldIcon className="text-positive shrink-0" width={14} height={14} />
-              {t.overview.breakItPrompt}
-            </span>
-            <span className="text-ink flex shrink-0 items-center gap-1 font-medium">
-              {t.overview.breakItCta}
-              <ArrowRightIcon
-                width={13}
-                height={13}
-                className="transition-transform duration-150 group-hover:translate-x-0.5"
-              />
-            </span>
-          </Link>
-        ) : null}
-      </Card>
+            <dl className="flex flex-wrap items-center gap-x-8 gap-y-3">
+              {books ? (
+                <>
+                  <div>
+                    <dt className="text-ink-muted text-[11px] tracking-wide uppercase">
+                      {t.overview.debits}
+                    </dt>
+                    <dd className="numeric text-sm font-medium">
+                      <Money value={books.debits} showCurrency />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-ink-muted text-[11px] tracking-wide uppercase">
+                      {t.overview.credits}
+                    </dt>
+                    <dd className="numeric text-sm font-medium">
+                      <Money value={books.credits} showCurrency />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-ink-muted text-[11px] tracking-wide uppercase">
+                      {t.overview.residual}
+                    </dt>
+                    <dd className="numeric text-sm font-medium">
+                      <Money value={books.residual} />
+                    </dd>
+                  </div>
+                </>
+              ) : null}
+            </dl>
+          </CardBody>
+        </Card>
+      )}
 
       {/*
         The business before the books. The ledger tiles below prove the

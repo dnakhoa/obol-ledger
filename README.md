@@ -15,10 +15,11 @@
 
 <p align="center">
   <a href="https://obol-ledger.vercel.app"><b>Live demo</b></a> ·
+  <a href="https://obol-ledger.vercel.app/sign-in"><b>Try it with your own copy</b></a> ·
   <a href="https://obol-ledger.vercel.app/break"><b>Try to break it</b></a> ·
   <a href="docs/design-rationale.md">Design rationale</a> ·
   <a href="docs/architecture.md">Architecture</a> ·
-  <a href="#documentation">20 ADRs</a>
+  <a href="#documentation">22 ADRs</a>
 </p>
 
 A double-entry ledger with a typed HTTP API and a server-rendered dashboard.
@@ -28,6 +29,8 @@ enforced by Postgres as well as by the application.
 The [live demo](https://obol-ledger.vercel.app) is seeded with a quarter's
 trading for a Vietnamese stone exporter — FIFO lots, export invoices in three
 currencies, landed cost and VAT returns — kept in dong under Thông tư 200.
+**[Try it with sample data](https://obol-ledger.vercel.app/sign-in)** gives you
+your own writable copy in one click, with no sign-up.
 
 Built as a demonstration of production-shaped engineering: the interesting parts
 are the invariants and where they live, not the CRUD.
@@ -41,7 +44,7 @@ posting inserts and Postgres reports `40P01 deadlock detected`. Remove
 **Double-entry core** · **multi-currency** balanced in the functional currency ·
 **FIFO inventory costing** · **landed cost** spread across the lots it arrived
 with · **sales that know their margin** — invoice and cost of goods sold in one
-entry, by product and by customer · **write-offs** with a reason · stock
+entry, by product and by customer · **credit notes** that put returned goods back into the lot they left from · **write-offs** with a reason · stock
 **reconciled** to the inventory accounts · **consumption-tax returns** that carry an unused credit forward as a
 balance rather than a number on a form · receivables and payables aged by **due date and payment terms** ·
 pending/posted/archived with three balances · reversals · idempotency · keyset
@@ -50,7 +53,7 @@ pagination · optimistic concurrency · **row-level tenant isolation** ·
 with a GIN index · CSV export · Prometheus metrics · generated OpenAPI ·
 English, Tiếng Việt and 日本語 · ⌘K
 
-![The overview, in dark mode: a trial-balance banner reading "The books balance" with an invitation to try to break it, headline figures, a 30-day posting-volume chart, and the accounting equation by account class](docs/screenshots/overview-dark.png)
+![The overview, in dark mode: what the business holds, is owed and owes, and this month's margin, with a chip confirming the books balance, a 30-day activity chart and the position by account class](docs/screenshots/overview-dark.png)
 
 ## Try to break it
 
@@ -115,6 +118,13 @@ flowchart TB
 
 <details>
 <summary>More screens</summary>
+
+**Trying it.** One click gives a visitor their own writable copy of the sample
+company — no sign-up, no provider to configure. It is an ordinary organisation
+under the same row-level security as a customer's, filled by the same code as
+the demo. See [ADR 22](docs/adr/0022-sample-ledgers.md).
+
+![The sign-in page leading with "Try it with sample data" and a single button to open a sample ledger](docs/screenshots/try-sample-light.png)
 
 Every shot is the live deployment, not a mockup.
 
@@ -578,6 +588,8 @@ including the metadata filter and every problem type, are in the
 - [ADR 18](docs/adr/0018-sales-and-margin.md) — a sale is the invoice and the stock that left, in one entry
 - [ADR 19](docs/adr/0019-ageing-by-due-date.md) — what is owed ages from when it falls due
 - [ADR 20](docs/adr/0020-attacks-on-the-live-demo.md) — let a stranger attack the live demo
+- [ADR 21](docs/adr/0021-credit-notes.md) — a sale is corrected by a credit note, never by an edit
+- [ADR 22](docs/adr/0022-sample-ledgers.md) — a prospect gets a writable copy of the sample books
 
 ## Licence
 

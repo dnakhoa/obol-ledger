@@ -1,5 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { anonymous } from 'better-auth/plugins';
+import { eq } from 'drizzle-orm';
 import { db } from '@/server/db/client';
 import * as schema from '@/server/db/schema';
 
@@ -71,6 +73,35 @@ function build() {
     advanced: {
       database: { generateId: () => crypto.randomUUID() },
     },
+    plugins: [
+      /*
+       * "Try it with sample data": a session with no identity behind it, so a
+       * prospect can have a writable ledger of their own in one click, with
+       * no provider to configure and nothing to sign up for.
+       *
+       * When they then sign in properly, the sample ledger comes with them —
+       * unless the account they signed in to already has books, in which
+       * case those are kept and the sample is left behind. Nobody's real
+       * ledger is ever replaced by a demo.
+       */
+      anonymous({
+        emailDomainName: 'sample.obol-ledger.invalid',
+        generateName: () => 'Guest',
+        onLinkAccount: async ({ anonymousUser, newUser }) => {
+          const database = db();
+          const [existing] = await database
+            .select({ id: schema.memberships.id })
+            .from(schema.memberships)
+            .where(eq(schema.memberships.userId, newUser.user.id))
+            .limit(1);
+          if (existing) return;
+          await database
+            .update(schema.memberships)
+            .set({ userId: newUser.user.id })
+            .where(eq(schema.memberships.userId, anonymousUser.user.id));
+        },
+      }),
+    ],
   });
 }
 

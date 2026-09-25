@@ -5,18 +5,15 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import {
   AccountsIcon,
-  ApiIcon,
   GaugeIcon,
   JournalIcon,
   ReportsIcon,
   CalendarIcon,
   ReceiptIcon,
   SettingsIcon,
-  ShieldIcon,
   StockIcon,
   TagIcon,
   TransferIcon,
-  WebhookIcon,
 } from './icons';
 
 /**
@@ -47,55 +44,90 @@ export type NavLabels = {
   readonly webhooks: string;
   readonly api: string;
   readonly settings: string;
-  readonly breakIt: string;
   readonly morePages: string;
+  readonly sectionTrading: string;
+  readonly sectionAccounting: string;
 };
 
+/**
+ * Where things are, in the order a distributor's day uses them.
+ *
+ * Grouped because thirteen flat links read as a feature list rather than a
+ * place to work. Selling and stock come first — they are what the business
+ * does — and the accountant's pages sit together below them. The API and
+ * webhooks are for whoever integrates the ledger, not whoever runs the
+ * business, so they live under Settings and in search rather than here.
+ *
+ * `sidebar: false` keeps a page off the sidebar while it still has a slot on
+ * a phone: posting a journal entry is reached from the journal on a desk, and
+ * is the one quick action worth a thumb's reach on the move.
+ */
 const LINKS = [
-  { href: '/', key: 'overview', Icon: GaugeIcon, exact: true },
-  { href: '/accounts', key: 'accounts', Icon: AccountsIcon, exact: false },
-  { href: '/stock', key: 'stock', Icon: StockIcon, exact: false },
-  { href: '/sales', key: 'sales', Icon: TagIcon, exact: false },
-  { href: '/journal', key: 'journal', Icon: JournalIcon, exact: false },
-  { href: '/reports', key: 'reports', Icon: ReportsIcon, exact: false },
-  { href: '/month-end', key: 'monthEnd', Icon: CalendarIcon, exact: false },
-  { href: '/tax', key: 'tax', Icon: ReceiptIcon, exact: false },
-  { href: '/transfer', key: 'newEntry', Icon: TransferIcon, exact: false },
-  { href: '/webhooks', key: 'webhooks', Icon: WebhookIcon, exact: false },
-  { href: '/break', key: 'breakIt', Icon: ShieldIcon, exact: false },
-  { href: '/api-reference', key: 'api', Icon: ApiIcon, exact: false },
-  { href: '/settings', key: 'settings', Icon: SettingsIcon, exact: false },
+  { href: '/', key: 'overview', Icon: GaugeIcon, exact: true, section: null },
+  { href: '/sales', key: 'sales', Icon: TagIcon, exact: false, section: 'sectionTrading' },
+  { href: '/stock', key: 'stock', Icon: StockIcon, exact: false, section: 'sectionTrading' },
+  {
+    href: '/journal',
+    key: 'journal',
+    Icon: JournalIcon,
+    exact: false,
+    section: 'sectionAccounting',
+  },
+  {
+    href: '/accounts',
+    key: 'accounts',
+    Icon: AccountsIcon,
+    exact: false,
+    section: 'sectionAccounting',
+  },
+  {
+    href: '/reports',
+    key: 'reports',
+    Icon: ReportsIcon,
+    exact: false,
+    section: 'sectionAccounting',
+  },
+  { href: '/tax', key: 'tax', Icon: ReceiptIcon, exact: false, section: 'sectionAccounting' },
+  {
+    href: '/month-end',
+    key: 'monthEnd',
+    Icon: CalendarIcon,
+    exact: false,
+    section: 'sectionAccounting',
+  },
+  {
+    href: '/transfer',
+    key: 'newEntry',
+    Icon: TransferIcon,
+    exact: false,
+    section: 'sectionAccounting',
+    sidebar: false,
+  },
+  { href: '/settings', key: 'settings', Icon: SettingsIcon, exact: false, section: 'settings' },
 ] as const satisfies readonly {
   href: string;
   key: keyof NavLabels;
   Icon: unknown;
   exact: boolean;
+  section: 'sectionTrading' | 'sectionAccounting' | 'settings' | null;
+  sidebar?: boolean;
 }[];
+
+/** Settings owns the developer pages, so it stays highlighted on them. */
+const ALSO_ACTIVE_ON: Record<string, readonly string[]> = {
+  '/settings': ['/webhooks', '/api-reference'],
+};
 
 /**
  * The bottom bar caps at five, which is the practical ceiling before targets
  * drop below a comfortable 44px. The ones that give up their slots are those
- * nobody does on a phone: reading an API reference, wiring up a webhook,
- * copying a freshly issued key into a config file, reading a report that wants
- * a wide table, or closing a month — which is a desk job done once, carefully.
+ * nobody does on a phone: reading a report that wants a wide table, closing a
+ * month — a desk job done once, carefully — or changing settings.
  *
- * Stock takes a slot because it is the opposite: it is the thing somebody
- * checks standing in the yard. Sales takes one for the same reason — an
- * invoice is raised wherever the customer is — and the chart of accounts gives
- * it up, because it is set up once, at a desk, and rarely visited after.
+ * Stock takes a slot because it is the thing somebody checks standing in the
+ * yard, and Sales because an invoice is raised wherever the customer is.
  */
-const DESKTOP_ONLY = new Set([
-  '/accounts',
-  // Not a desk job, but not a daily one either: it is listed at the foot of
-  // every page on a phone, and the overview links to it for a first visit.
-  '/break',
-  '/api-reference',
-  '/tax',
-  '/webhooks',
-  '/settings',
-  '/month-end',
-  '/reports',
-]);
+const DESKTOP_ONLY = new Set(['/accounts', '/tax', '/settings', '/month-end', '/reports']);
 
 const MOBILE_LINKS = LINKS.filter((link) => !DESKTOP_ONLY.has(link.href));
 const OVERFLOW_LINKS = LINKS.filter((link) => DESKTOP_ONLY.has(link.href));
@@ -133,31 +165,47 @@ export function OverflowNav({ labels }: { labels: NavLabels }) {
 }
 
 function isActive(pathname: string, href: string, exact: boolean): boolean {
-  return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  const under = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
+  if (exact) return pathname === href;
+  return under(href) || (ALSO_ACTIVE_ON[href] ?? []).some(under);
 }
 
 export function SidebarNav({ labels }: { labels: NavLabels }) {
   const pathname = usePathname();
+  const visible = LINKS.filter((link) => !('sidebar' in link) || link.sidebar !== false);
 
   return (
     <nav aria-label={labels.primary} className="flex flex-col gap-0.5">
-      {LINKS.map(({ href, key, Icon, exact }) => {
+      {visible.map(({ href, key, Icon, exact, section }, index) => {
         const active = isActive(pathname, href, exact);
+        const previous = visible[index - 1];
+        // A heading where a named section begins; Settings is set apart by
+        // space alone, since a heading that repeats the link says nothing.
+        const heading =
+          section && section !== 'settings' && previous?.section !== section
+            ? labels[section]
+            : null;
         return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active ? 'page' : undefined}
-            className={cn(
-              'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors duration-150',
-              active
-                ? 'bg-surface-hover text-ink font-medium'
-                : 'text-ink-secondary hover:bg-surface-hover hover:text-ink',
-            )}
-          >
-            <Icon className="text-ink-muted shrink-0" />
-            {labels[key]}
-          </Link>
+          <div key={href} className={section === 'settings' ? 'mt-4' : undefined}>
+            {heading ? (
+              <p className="text-ink-muted mt-4 mb-1 px-3 text-[11px] font-medium tracking-wide uppercase">
+                {heading}
+              </p>
+            ) : null}
+            <Link
+              href={href}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors duration-150',
+                active
+                  ? 'bg-surface-hover text-ink font-medium'
+                  : 'text-ink-secondary hover:bg-surface-hover hover:text-ink',
+              )}
+            >
+              <Icon className="text-ink-muted shrink-0" />
+              {labels[key]}
+            </Link>
+          </div>
         );
       })}
     </nav>

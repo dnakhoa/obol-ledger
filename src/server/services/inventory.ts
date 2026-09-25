@@ -155,7 +155,7 @@ export type LayerSummary = {
 
 export type MovementSummary = {
   readonly id: string;
-  readonly kind: 'receipt' | 'issue' | 'writeoff';
+  readonly kind: 'receipt' | 'issue' | 'writeoff' | 'return';
   readonly quantityMinor: string;
   readonly baseCostMinor: string;
   readonly cost: MoneyDto;

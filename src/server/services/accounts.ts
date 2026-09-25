@@ -6,7 +6,7 @@ import type { CurrencyCode } from '@/lib/money';
 import type { AccountType } from '@/server/domain/account';
 import type { LedgerError } from '@/server/domain/errors';
 import { accounts, organizations } from '@/server/db/schema';
-import { agreesWithTt200, type ChartTemplate } from '@/server/domain/chart';
+import { agreesWithTt200, isStatutory, type ChartTemplate } from '@/server/domain/chart';
 import { withTenant } from '@/server/db/tenancy';
 import type { Database, Transactional } from '@/server/db/types';
 import { toAccountDto } from './serialize';
@@ -129,7 +129,7 @@ export function createAccountService(database: Database, orgId: string) {
           .limit(1);
         const chartTemplate = org?.chartTemplate ?? 'generic';
 
-        if (chartTemplate === 'vn_tt200') {
+        if (isStatutory(chartTemplate as ChartTemplate)) {
           if (!input.code) return { code: 'account_code_required', chartTemplate };
           if (!agreesWithTt200(input.code, input.type)) {
             return { code: 'account_code_disagrees', accountCode: input.code, type: input.type };

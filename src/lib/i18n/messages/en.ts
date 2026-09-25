@@ -36,7 +36,7 @@ export const en = {
     keepYourOwnBooks: 'Keep your own books',
     working: 'Working…',
     refusalSignIn:
-      'Sign in to keep your own books. This is the published demo, which anyone can read and nobody can change.',
+      'This demo is read-only. Open your own sample ledger (Sign in → Try it with sample data) to make changes.',
     refusalNoLedger: 'This account has no ledger yet. Create one to start posting entries.',
     refusalReadOnly: 'Your role on this ledger is read-only.',
   },
@@ -55,17 +55,15 @@ export const en = {
     webhooks: 'Webhooks',
     api: 'API',
     settings: 'Settings',
-    breakIt: 'Try to break it',
     morePages: 'More pages',
+    sectionTrading: 'Sales & stock',
+    sectionAccounting: 'Accounting',
   },
 
   overview: {
     title: 'Overview',
-    description: 'Every figure below is derived from postings that are balanced by construction.',
+    description: 'How the business stands today.',
     postEntry: 'Post an entry',
-    breakItPrompt:
-      'Zero is held by the database, not by this page: it refuses any entry that would move it.',
-    breakItCta: 'Try to break it',
 
     balanced: 'The books balance',
     notBalanced: 'The books do not balance',
@@ -77,16 +75,16 @@ export const en = {
     residual: 'Residual',
 
     cashAndAssets: 'Cash & assets',
-    debitNormalBalances: 'Debit-normal balances',
+    debitNormalBalances: 'Across all accounts of this type',
     revenue: 'Revenue',
-    revenueDetail: 'Credit-normal, shown positive',
+    revenueDetail: 'Across all revenue accounts',
     expenses: 'Expenses',
     entriesPosted: 'Entries posted',
     entriesDetail: (postings: string, accounts: number) =>
       `${postings} postings across ${accounts} accounts`,
 
-    volumeTitle: 'Daily posting volume',
-    volumeHint: 'Debit side only, last 30 days — every entry has an equal credit.',
+    volumeTitle: 'Activity',
+    volumeHint: 'Value posted each day, last 30 days.',
 
     positionTitle: 'Position by class',
     positionHint: 'Assets + Expenses = Liabilities + Equity + Revenue',
@@ -130,8 +128,7 @@ export const en = {
 
   accounts: {
     title: 'Chart of accounts',
-    description:
-      'Grouped by class. Balances are shown the way an accountant reads them — positive means healthy, whichever side the account normally sits on.',
+    description: 'Your accounts, grouped by type, with their current balances.',
     postEntry: 'Post an entry',
 
     emptyTitle: 'No accounts yet',
@@ -170,8 +167,7 @@ export const en = {
 
   stock: {
     title: 'Stock',
-    description:
-      'Every delivery is kept as its own lot with its own price. When something ships, the ledger works out what it cost from the lots it came from — and tells you which ones.',
+    description: 'What you hold, what it cost, and which delivery each item came from.',
     importButton: 'Import from a spreadsheet',
     sellButton: 'Raise an invoice',
 
@@ -223,6 +219,7 @@ export const en = {
   },
 
   product: {
+    returnedByCustomer: 'Returned by customer',
     allStock: 'All stock',
     measuredInSuffix: (unit: string) => `measured in ${unit}`,
     onHand: 'On hand',
@@ -313,7 +310,7 @@ export const en = {
   journal: {
     title: 'Journal',
     description:
-      'Every entry, newest first, with its postings. Entries are append-only: a mistake is corrected by posting a reversing entry, never by editing history.',
+      'Every entry, newest first. To fix a mistake, reverse the entry — history is never edited.',
     entries: 'Entries',
     noMatches: 'No entries match those filters',
     noMatchesBody:
@@ -342,8 +339,7 @@ export const en = {
 
   transfer: {
     title: 'Post an entry',
-    description:
-      'Record a journal entry. The balance is checked as you type, again in the domain layer, and a third time by Postgres at COMMIT.',
+    description: 'Record a journal entry. It must balance before it can be posted.',
     tooMany: (seconds: number) => `Too many entries posted. Try again in ${seconds} seconds.`,
     checkFields: 'The entry could not be posted. Check the highlighted fields.',
     notAnAmount: (line: number, amount: string, currency: string) =>
@@ -354,8 +350,7 @@ export const en = {
 
   reports: {
     title: 'Reports',
-    description:
-      'The two statements a ledger exists to produce. Both are derived from the same postings as everything else — no separate reporting store to fall out of step.',
+    description: 'Balance sheet and profit and loss.',
     sheetBalances: 'The balance sheet balances',
     sheetDoesNot: 'The balance sheet does not balance',
     assets: 'Assets',
@@ -381,8 +376,7 @@ export const en = {
 
   monthEnd: {
     title: 'Month end',
-    description:
-      'Three things, in order, once a month. You can press any of them early — if it is not time yet, the ledger says why instead of doing something wrong.',
+    description: 'Close the month in three steps. If a step isn’t ready yet, you’ll see why.',
     open: 'Open',
     closed: 'Closed',
     entriesInMonth: (count: number) =>
@@ -514,7 +508,6 @@ export const en = {
       'To switch it on, set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, or the Google pair.',
     justLooking: 'Just looking?',
     noAccountNeeded: 'No account needed.',
-    readOnlyDemo: 'Read-only demo',
   },
 
   entry: {
@@ -655,8 +648,7 @@ export const en = {
 
   aging: {
     title: 'Who owes what',
-    description:
-      'How long the money has been outstanding. Built from the same postings as everything else — there is no separate receivables ledger to fall out of step.',
+    description: 'Unpaid invoices and bills, by how late they are.',
     receivables: 'Owed to you',
     payables: 'Owed by you',
     caption: (account: string) => `${account}, oldest first`,
@@ -687,8 +679,7 @@ export const en = {
 
   tax: {
     title: 'Tax returns',
-    description:
-      'What you charged, what you paid, and what that leaves owing. Filing posts the entry that clears both tax accounts, so the credit you have not used stays in the books instead of on a form.',
+    description: 'Tax charged, tax paid, and what you owe for each period.',
     codes: 'Tax rates',
     codesDescription:
       'The rates you charge and reclaim. Each one names the accounts its tax lands in, so an entry never has to be told where to put it.',
@@ -751,7 +742,7 @@ export const en = {
   shipments: {
     title: 'Shipments',
     description:
-      'What each container actually cost to land. Freight, duty and handling belong in the value of the stock, not in this month\u2019s expenses — and the difference is usually not small.',
+      'What each container cost to land. Freight, duty and handling are added to the stock value.',
     caption: 'Shipments, most recent first',
     reference: 'Reference',
     arrived: 'Arrived',
@@ -818,8 +809,7 @@ export const en = {
 
   stockImport: {
     title: 'Import deliveries',
-    description:
-      'Paste the purchase history you already keep. Each row becomes a delivery with its own price, and the purchase is posted to the ledger at the same time.',
+    description: 'Paste your purchase history from a spreadsheet. Each row becomes a delivery.',
 
     requirementsTitle: 'What the file needs',
     requirementsHint:
@@ -892,8 +882,7 @@ export const en = {
   },
   sales: {
     title: 'Sales',
-    description:
-      'Every invoice ships its stock and posts what it cost in the same entry, so each one knows what it made.',
+    description: 'Your invoices, with what each one cost and made.',
     marginsButton: 'Gross margin',
 
     recentTitle: 'Recent invoices',
@@ -973,8 +962,7 @@ export const en = {
 
   margins: {
     title: 'Gross margin',
-    description:
-      'What was made on what was sold, by product and by customer. Revenue at the rate on each invoice’s date, cost at the rate each lot arrived at — the only two figures that add up across currencies.',
+    description: 'Profit on what you sold, by product and by customer.',
     month: 'Month',
     previous: 'Previous month',
     next: 'Next month',
@@ -1126,6 +1114,71 @@ export const en = {
         guard: 'Row-level security, FORCEd',
         why: 'Asks for every account that is not this tenant’s. The right answer is not an error but nothing at all.',
       },
+    },
+  },
+  creditNotes: {
+    title: 'Credit notes',
+    description: 'Corrections to this invoice. The invoice itself never changes.',
+    open: 'Issue a credit note',
+    intro:
+      'For goods sent back, or money taken off the invoice. Returned goods go back into stock at the cost they left at.',
+    reference: 'Credit note number',
+    date: 'Date',
+    account: 'Revenue account',
+    accountHint: 'Often a sales returns or discounts account.',
+    reason: 'Reason',
+    reasonPlaceholder: 'e.g. Cracked in transit',
+    product: 'Product',
+    canReturn: 'Still on the invoice',
+    quantityBack: 'Quantity back',
+    credit: 'Credit before tax',
+    total: 'Credit before tax',
+    taxNote: 'Tax is added at the invoice’s rate.',
+    submit: 'Issue credit note',
+    working: 'Issuing…',
+    cancel: 'Cancel',
+    number: 'Number',
+    reasonColumn: 'Reason',
+    creditedColumn: 'Credited',
+    stockBack: 'Stock back',
+    credited: 'Credited',
+    afterCredits: 'After credit notes',
+    returned: (quantity: string) => `${quantity} returned`,
+    checkForm: 'Check the credit note number, date and account.',
+    checkLine: (sku: string) =>
+      `Check the quantity and amount for ${sku}. Use plain numbers, like 12.5.`,
+    tooManyDecimals: (sku: string, places: number) =>
+      `${sku} is counted to ${places} decimal place${places === 1 ? '' : 's'}.`,
+    amountNotRepresentable: (sku: string, currency: string) =>
+      `The amount for ${sku} has more decimals than ${currency} allows.`,
+    nothingEntered: 'Enter a quantity or an amount on at least one line.',
+    issued: (reference: string, amount: string) => `Credit note ${reference} issued for ${amount}.`,
+  },
+  sample: {
+    title: 'Try it with sample data',
+    pitch:
+      'Your own copy of a stone exporter’s books: a quarter of sales, stock, exports in three currencies and VAT. Change anything. No sign-up.',
+    start: 'Open my sample ledger',
+    working: 'Setting up your sample company…',
+    failed: 'The sample ledger could not be created. Try again in a moment.',
+    tooMany: (seconds: number) =>
+      `Too many sample ledgers from this network. Try again in ${seconds} s.`,
+    companyName: 'Bình Minh Stone (sample)',
+    badge: 'Sample ledger',
+    keepIt: 'Sign in to keep it',
+    haveAccount: 'Already have an account?',
+    orReadOnly: 'Or just look around the read-only demo',
+  },
+  onboarding: {
+    statutory: 'statutory',
+    charts: {
+      generic: 'A simple numbered chart. Rename and add accounts as you like.',
+      au_nz: 'Includes GST, PAYG and super accounts. Not mandated, so you can change anything.',
+      vn_tt200: 'For larger enterprises. Account codes are set by the circular.',
+      vn_tt133:
+        'For small and medium enterprises, including most importers and distributors. Account codes are set by the circular.',
+      us_gaap: 'Four-digit US convention, with sales tax collected and remitted.',
+      jp: 'Japanese account titles, with consumption tax paid and collected.',
     },
   },
 } as const;

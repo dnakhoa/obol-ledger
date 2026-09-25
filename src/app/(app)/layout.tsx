@@ -41,7 +41,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // pages send it to onboarding; the shell still needs a name for the header.
   const ledgerName = viewer.kind === 'unenrolled' ? 'Your ledger' : await orgName(viewer.orgId);
   const identity =
-    viewer.kind === 'guest' ? {} : { name: viewer.name, email: viewer.email, image: viewer.image };
+    viewer.kind === 'guest'
+      ? {}
+      : { name: viewer.name, email: viewer.email, image: viewer.image, sample: viewer.sample };
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
@@ -86,7 +88,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               signIn: t.common.signIn,
               signOut: t.common.signOut,
               signingOut: t.misc.signingOut,
-              readOnlyDemo: t.misc.readOnlyDemo,
+              trySample: t.sample.title,
+              sampleBadge: t.sample.badge,
+              keepIt: t.sample.keepIt,
             }}
           />
           <LanguageToggle current={locale} label={t.common.language} />

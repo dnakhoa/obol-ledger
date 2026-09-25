@@ -18,6 +18,7 @@ import {
   accounts,
   idempotencyKeys,
   inventoryMovements,
+  creditNotes,
   landedCostCharges,
   postings,
   transactions,
@@ -1091,7 +1092,7 @@ function isUniqueViolation(error: unknown, constraint: string): boolean {
 async function stockOwnerOf(
   tx: Transactional,
   transactionId: string,
-): Promise<'inventory' | 'landed_cost' | null> {
+): Promise<'inventory' | 'landed_cost' | 'credit_note' | null> {
   const [movement] = await tx
     .select({ id: inventoryMovements.id })
     .from(inventoryMovements)
@@ -1104,5 +1105,14 @@ async function stockOwnerOf(
     .from(landedCostCharges)
     .where(eq(landedCostCharges.transactionId, transactionId))
     .limit(1);
-  return charge ? 'landed_cost' : null;
+  if (charge) return 'landed_cost';
+
+  // A credit note with no goods coming back has no movement, and is still
+  // one half of a record: the note says the revenue came out.
+  const [note] = await tx
+    .select({ id: creditNotes.id })
+    .from(creditNotes)
+    .where(eq(creditNotes.transactionId, transactionId))
+    .limit(1);
+  return note ? 'credit_note' : null;
 }

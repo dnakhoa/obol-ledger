@@ -7,6 +7,7 @@ import type {
   MovementSummary,
 } from '@/server/services/inventory';
 import type { MarginReport, SaleResult, SaleSummary } from '@/server/services/sales';
+import type { CreditNoteResult, CreditNoteSummary } from '@/server/services/credit-notes';
 import type { Services } from '@/server/container';
 import { problem, problemFor, problemResponse } from './problem';
 import { unprocessable } from './route';
@@ -48,9 +49,13 @@ export function quantityFor(
   input: string,
   field: string,
   requestId: string,
+  /** A credit note line that returns nothing is a price allowance, not a mistake. */
+  options: { readonly allowZero?: boolean } = {},
 ): Parsed<bigint> {
   const parsed = parseQuantity(input, item.quantityPrecision);
-  if (parsed.ok && parsed.value > 0n) return { ok: true, value: parsed.value };
+  if (parsed.ok && (parsed.value > 0n || (options.allowZero && parsed.value === 0n))) {
+    return { ok: true, value: parsed.value };
+  }
 
   const places = `${item.quantityPrecision} decimal place${item.quantityPrecision === 1 ? '' : 's'}`;
   const detail = !parsed.ok
@@ -129,12 +134,27 @@ export function presentSale(sale: SaleSummary) {
     lines: sale.lines.map((line) => ({
       ...line,
       quantity: decimal(line.quantityMinor, line.quantityPrecision),
+      creditedQuantity: decimal(line.creditedQuantityMinor, line.quantityPrecision),
       drawnFrom: line.drawnFrom.map((draw) => ({
         ...draw,
         quantity: decimal(draw.quantityMinor, line.quantityPrecision),
       })),
     })),
   };
+}
+
+export function presentCreditNote(note: CreditNoteSummary) {
+  return {
+    ...note,
+    lines: note.lines.map((line) => ({
+      ...line,
+      quantity: decimal(line.quantityMinor, line.quantityPrecision),
+    })),
+  };
+}
+
+export function presentCreditNoteResult(result: CreditNoteResult) {
+  return { creditNote: presentCreditNote(result.creditNote), entry: result.entry };
 }
 
 export function presentSaleResult(result: SaleResult) {

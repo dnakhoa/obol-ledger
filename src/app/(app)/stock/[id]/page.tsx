@@ -390,7 +390,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                       ) : null}
                     </Td>
                     <Td align="right" numeric>
-                      {movement.kind === 'receipt' ? '+' : '−'}
+                      {movement.kind === 'receipt' || movement.kind === 'return' ? '+' : '−'}
                       {quantity(movement.quantityMinor)}
                     </Td>
                     <Td hideBelow="md">
@@ -446,6 +446,7 @@ function reasonLabel(reason: WriteOffReason, t: Messages): string {
 /** What happened, in the words the yard uses: in, sold, shipped, or written off and why. */
 function movementLabel(movement: MovementSummary, t: Messages): string {
   if (movement.kind === 'receipt') return t.product.deliveryIn;
+  if (movement.kind === 'return') return t.product.returnedByCustomer;
   if (movement.kind === 'writeoff') {
     return movement.reason
       ? `${t.product.writtenOff} · ${reasonLabel(movement.reason, t)}`

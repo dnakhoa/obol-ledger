@@ -383,6 +383,30 @@ export const createSaleSchema = z.object({
 
 export type CreateSaleBody = z.infer<typeof createSaleSchema>;
 
+export const createCreditNoteSchema = z.object({
+  /** The credit note's own number. Unique, like an invoice number. */
+  reference: stockReferenceSchema,
+  /** Where the revenue comes back out. The sale's revenue account when absent. */
+  revenueAccountId: accountIdSchema.optional(),
+  /** Printed on the credit note. */
+  reason: z.string().trim().min(1).max(280).optional(),
+  occurredAt: z.iso.datetime({ offset: true }).optional(),
+  lines: z
+    .array(
+      z.object({
+        /** The invoice line being corrected: its `movementId` on the sale. */
+        saleMovementId: idOf('inventoryMovement'),
+        /** Goods coming back, in the item's unit. "0" for a price allowance. */
+        quantity: quantitySchema.default('0'),
+        /** Net credited, in the invoice currency. A total, not a unit price. */
+        amount: decimalAmountSchema.default('0'),
+      }),
+    )
+    .min(1)
+    .max(100),
+  metadata: metadataSchema,
+});
+
 export const salesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });

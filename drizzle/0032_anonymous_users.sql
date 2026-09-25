@@ -1,0 +1,12 @@
+-- A person trying the product before deciding to sign up.
+--
+-- "Try it with sample data" signs the visitor in with a session and no
+-- identity — no email, no provider — and gives them a ledger of their own,
+-- filled with the sample company's quarter, that they can post to, credit,
+-- close and break. The read-only demo shows what the product does; this lets
+-- someone do it. If they then sign in with a provider, the ledger moves to
+-- that account; see `src/server/auth/config.ts`.
+--
+-- The column is the one better-auth's anonymous plugin reads, camel-cased
+-- like the rest of its table.
+ALTER TABLE "user" ADD COLUMN "isAnonymous" boolean DEFAULT false;

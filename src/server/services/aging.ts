@@ -125,6 +125,7 @@ export function createAgingService(database: Database, orgId: string) {
             description: row.description,
             reference: row.metadata['invoice'] ?? row.metadata['reference'] ?? null,
             dueOn: dueDateOf(row.metadata['dueDate']),
+            appliesTo: row.metadata['appliesTo'] ?? null,
           }));
 
           const aging = ageAccount(entries, asOf, normalBalanceOf(type), account.paymentTermsDays);
