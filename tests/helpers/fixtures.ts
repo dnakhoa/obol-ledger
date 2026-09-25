@@ -18,6 +18,7 @@ import { createSalesService } from '@/server/services/sales';
 import { createCreditNoteService } from '@/server/services/credit-notes';
 import { createSupplierReturnService } from '@/server/services/supplier-returns';
 import { createDocumentService } from '@/server/services/documents';
+import { createBankService } from '@/server/services/bank';
 import { createTaxReturnService } from '@/server/services/tax-return';
 import type { AccountRole } from '@/server/domain/period';
 import { createWebhookService } from '@/server/services/webhooks';
@@ -45,6 +46,7 @@ export function servicesFor(database: Database, orgId: string) {
     creditNotes: createCreditNoteService(database, orgId),
     supplierReturns: createSupplierReturnService(database, orgId),
     documents: createDocumentService(database, orgId),
+    bank: createBankService(database, orgId),
     taxReturns: createTaxReturnService(database, orgId),
   };
 }

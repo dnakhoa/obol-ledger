@@ -210,3 +210,11 @@ export const CrossIcon = (props: IconProps) => (
     <path d="M6 6l12 12M18 6 6 18" />
   </Icon>
 );
+
+export const BankIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 10 12 4l9 6" />
+    <path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8" />
+    <path d="M3 20h18" />
+  </Icon>
+);

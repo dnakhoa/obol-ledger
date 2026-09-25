@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { err, ok, type Result } from '@/lib/result';
+import { normaliseDate } from '@/lib/calendar';
 import { parseTable, sniffSeparator } from '@/lib/csv';
 import { isCurrencyCode, parseDecimal, type CurrencyCode } from '@/lib/money';
 import { defaultPrecision, isUnit, parseQuantity, type Unit } from '@/lib/quantity';
@@ -365,43 +366,6 @@ function check(
   if (cost.value < 0n) return 'A delivery cannot have cost less than nothing.';
 
   return undefined;
-}
-
-/**
- * `17/03/2026` and `17-03-2026` mean the same day, and neither is ISO.
- *
- * Day-first rather than month-first, deliberately: this ledger's users are in
- * Vietnam, Australia and Europe, where 03/04 is the third of April. Ambiguous
- * dates are the reason the preview prints the resolved date back — a person
- * reading "2026-04-03" next to their own row will notice if it is wrong, and
- * cannot notice anything if the import only echoes what they typed.
- */
-function normaliseDate(value: string): string {
-  const trimmed = value.trim();
-  const iso = /^(\d{4})-(\d{2})-(\d{2})/u.exec(trimmed);
-  if (iso) return calendarDay(iso[1] ?? '', iso[2] ?? '', iso[3] ?? '');
-
-  const dayFirst = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/u.exec(trimmed);
-  if (dayFirst) {
-    const [, day = '', month = '', year = ''] = dayFirst;
-    return calendarDay(year, month, day);
-  }
-
-  return '';
-}
-
-/**
- * `YYYY-MM-DD` if that day exists, or nothing.
- *
- * Round-tripped rather than parsed: `Date.parse('2026-02-30')` answers 2 March
- * instead of refusing, so a typo was booked on a different day from the one
- * the preview showed — and month 13 passed the preview only to throw on
- * import.
- */
-function calendarDay(year: string, month: string, day: string): string {
-  const padded = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === padded ? padded : '';
 }
 
 function mapColumns(headers: readonly string[]): Partial<Record<keyof typeof COLUMNS, number>> {

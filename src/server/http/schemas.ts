@@ -430,6 +430,44 @@ export const createSupplierReturnSchema = z.object({
   metadata: metadataSchema,
 });
 
+/** Money in positive, money out negative, as the account sees it. */
+const signedDecimalSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(33)
+  .regex(/^-?\d+(\.\d+)?$/u, { message: 'Expected a signed decimal amount, e.g. "-12.50"' });
+
+export const bankFeedSchema = z.object({
+  lines: z
+    .array(
+      z.object({
+        /** The bank's own id for the transaction. Sending it again adds nothing. */
+        id: z.string().trim().min(1).max(160),
+        date: z.iso.date(),
+        /** In the account's currency: money in positive, money out negative. */
+        amount: signedDecimalSchema,
+        description: z.string().trim().min(1).max(500),
+        reference: z.string().trim().max(120).optional(),
+        /** The bank's running balance after this line, when it reports one. */
+        balance: signedDecimalSchema.optional(),
+      }),
+    )
+    .min(1)
+    .max(1000),
+});
+
+export const bankMatchSchema = z.object({
+  /** A posting on the same account, from `GET /entries/{id}`. */
+  postingId: z.string().trim().min(1).max(60),
+});
+
+export const bankRecordSchema = z.object({
+  /** The other side of the entry: bank fees, interest income, a customer's receivable. */
+  counterAccountId: accountIdSchema,
+  description: z.string().trim().min(1).max(280).optional(),
+});
+
 export const salesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });

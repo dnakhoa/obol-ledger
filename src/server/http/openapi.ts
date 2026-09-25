@@ -12,6 +12,9 @@ import {
   createSaleSchema,
   createCreditNoteSchema,
   createSupplierReturnSchema,
+  bankFeedSchema,
+  bankMatchSchema,
+  bankRecordSchema,
   recordRateSchema,
   createEndpointSchema,
   createEntrySchema,
@@ -507,6 +510,7 @@ export function openApiDocument(): Record<string, unknown> {
       { name: 'Reports' },
       { name: 'Stock' },
       { name: 'Sales' },
+      { name: 'Bank' },
       { name: 'Webhooks' },
       { name: 'Periods' },
       { name: 'Credentials' },
@@ -537,6 +541,9 @@ export function openApiDocument(): Record<string, unknown> {
         CreateCreditNote: jsonSchema(createCreditNoteSchema),
         SupplierReturn: supplierReturnSchema,
         Attachment: attachmentSchema,
+        BankFeed: jsonSchema(bankFeedSchema),
+        BankMatch: jsonSchema(bankMatchSchema),
+        BankEntry: jsonSchema(bankRecordSchema),
         CreateSupplierReturn: jsonSchema(createSupplierReturnSchema),
         CreateItem: jsonSchema(createItemSchema),
         ReceiveStock: jsonSchema(receiveStockSchema),
@@ -930,6 +937,128 @@ export function openApiDocument(): Record<string, unknown> {
               },
             },
             ...problemResponses(404, 429),
+          },
+        },
+      },
+      '/bank-accounts': {
+        get: {
+          tags: ['Bank'],
+          summary: 'Accounts a bank statement can be reconciled against',
+          description:
+            'Monetary asset and liability accounts that are not customer or supplier ledgers: bank accounts, cards, loans. Each with how many statement lines it has and how many are still unmatched.',
+          responses: {
+            '200': { description: 'Reconcilable accounts' },
+            ...problemResponses(429),
+          },
+        },
+      },
+      '/bank-accounts/{accountId}/lines': {
+        get: {
+          tags: ['Bank'],
+          summary: 'The statement, newest first',
+          description:
+            'Each unmatched line carries candidates — postings on the account for the same amount within two weeks, nearest first — and suggested, set only when the line and the posting are each other’s nearest.',
+          parameters: [
+            { name: 'accountId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: { '200': { description: 'Statement lines' }, ...problemResponses(429) },
+        },
+        post: {
+          tags: ['Bank'],
+          summary: 'Push lines from a bank feed',
+          description:
+            'Each line carries the bank’s own id; a line already received is skipped, so resending a day is harmless. Amounts are signed decimals in the account’s currency, money in positive.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'accountId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/BankFeed' } } },
+          },
+          responses: {
+            '201': { description: 'How many lines were added and how many were already there' },
+            ...problemResponses(400, 401, 422, 429),
+          },
+        },
+      },
+      '/bank-accounts/{accountId}/statements': {
+        post: {
+          tags: ['Bank'],
+          summary: 'Import a statement file exported from online banking',
+          description:
+            'The CSV as the request body (comma, semicolon or tab). Column names are recognised in English, Vietnamese and Japanese; an amount may be one signed column or separate money-in and money-out columns; dates may be day-first or year-first. Every line or none: a row that cannot be read is a 422 naming it. Lines already imported are skipped.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'accountId', in: 'path', required: true, schema: { type: 'string' } },
+            { name: 'filename', in: 'query', required: false, schema: { type: 'string' } },
+          ],
+          requestBody: {
+            required: true,
+            content: { 'text/csv': { schema: { type: 'string' } } },
+          },
+          responses: {
+            '201': { description: 'How many lines were added and how many were already there' },
+            ...problemResponses(401, 422, 429),
+          },
+        },
+      },
+      '/bank-accounts/{accountId}/reconciliation': {
+        get: {
+          tags: ['Bank'],
+          summary: 'The reconciliation statement',
+          description:
+            'The books’ balance, the bank’s latest reported balance, and the two lists that explain the gap: lines on the statement not yet in the books, and postings in the books not yet on the statement. difference is zero when those explain it all.',
+          parameters: [
+            { name: 'accountId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: 'The reconciliation' },
+            ...problemResponses(404, 422, 429),
+          },
+        },
+      },
+      '/bank-lines/{lineId}/match': {
+        post: {
+          tags: ['Bank'],
+          summary: 'Match a statement line to the posting that records it',
+          description:
+            'The posting must be on the statement’s account and for the same amount to the unit; each line and each posting is matched at most once. The database enforces both.',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'lineId', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/BankMatch' } } },
+          },
+          responses: {
+            '201': { description: 'Matched' },
+            ...problemResponses(400, 401, 404, 409, 422, 429),
+          },
+        },
+        delete: {
+          tags: ['Bank'],
+          summary: 'Undo a match',
+          description: 'The match is marked undone; the record that it was made stays.',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'lineId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: { '204': { description: 'Undone' }, ...problemResponses(401, 404, 409, 429) },
+        },
+      },
+      '/bank-lines/{lineId}/entry': {
+        post: {
+          tags: ['Bank'],
+          summary: 'Book a statement line the books have nothing for, and match it',
+          description:
+            'For a fee, interest or a transfer nobody booked: posts the line’s own amount between the account and counterAccountId, dated the day the bank moved the money, and matches the line to it.',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'lineId', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/BankEntry' } } },
+          },
+          responses: {
+            '201': { description: 'The entry written and the line it matches' },
+            ...problemResponses(400, 401, 404, 409, 422, 429),
           },
         },
       },
