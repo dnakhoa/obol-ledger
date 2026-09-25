@@ -46,7 +46,7 @@ const DELIBERATELY_ENGLISH = [
  * reproduce what Postgres prints and are English in every language it runs in.
  */
 const NOT_PROSE =
-  /^(?:CONT-|GRN-|SO-|INV-|LOT-|PAV-|BLK-|MRB-|KK-|HD-|Obol$|API$|Webhook$|CSV$|Dr$|Cr$|ESC$|ERROR:$|CONSTRAINT:$)/u;
+  /^(?:CONT-|GRN-|SO-|INV-|LOT-|PAV-|BLK-|MRB-|KK-|HD-|RTV-|Obol$|API$|Webhook$|CSV$|Dr$|Cr$|ESC$|ERROR:$|CONSTRAINT:$)/u;
 
 /**
  * JSX text nodes, across line breaks.
