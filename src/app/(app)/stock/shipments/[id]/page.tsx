@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { AttachmentsCard } from '@/app/(app)/documents/attachments-card';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Card, CardBody, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -246,6 +247,11 @@ export default async function ShipmentPage({ params }: { params: Promise<{ id: s
           )}
         </CardBody>
       </Card>
+
+      <AttachmentsCard
+        target={{ shipmentId: shipment.id }}
+        path={`/stock/shipments/${shipment.id}`}
+      />
     </div>
   );
 }

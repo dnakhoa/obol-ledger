@@ -14,6 +14,8 @@ import { createTaxReturnService } from './tax-return';
 import { createSalesService } from './sales';
 import { createCreditNoteService } from './credit-notes';
 import { createSupplierReturnService } from './supplier-returns';
+import { createDocumentService } from './documents';
+import { samplePdf } from './sample-documents';
 
 /**
  * Seeds a quarter's books for a Vietnamese stone exporter.
@@ -734,6 +736,71 @@ export async function populateSampleLedger(
     });
     if (!applied.ok) throw new Error(`charge failed (${charge.kind}): ${applied.error.code}`);
     entries += 1;
+  }
+
+  // The paperwork behind the container, attached where an auditor would look
+  // for it: the supplier's invoice on the purchase entry, the customs
+  // declaration and bill of lading on the shipment.
+  const paperwork = createDocumentService(database, orgId);
+  const PAPERWORK = [
+    {
+      on: { transactionId: marbleReceipt.value.entry.id },
+      filename: 'PI-2207 Commercial invoice.pdf',
+      kind: 'invoice' as const,
+      page: {
+        title: 'COMMERCIAL INVOICE  PI-2207',
+        lines: [
+          'Seller: Marmi Apuani S.r.l., Via Aurelia 118, Carrara, Italy',
+          'Buyer: Binh Minh Stone Co., Ltd., Quy Nhon, Binh Dinh, Vietnam',
+          'Container: CONT-IT-2207   Port of loading: Genoa   Port of discharge: Cat Lai',
+          '',
+          'Bianco Carrara slab, polished, 20 mm      800.00 m2 x USD 60.00',
+          '',
+          'Total (CIF Cat Lai excluded, FOB Genoa):   USD 48,000.00',
+          'Payment: 30% deposit, balance 60 days from bill of lading',
+        ],
+      },
+    },
+    {
+      on: { shipmentId: shipment.value.id },
+      filename: 'To khai hai quan 2207.pdf',
+      kind: 'customs_declaration' as const,
+      page: {
+        title: 'TO KHAI HANG HOA NHAP KHAU  (sample)',
+        lines: [
+          'Customs declaration - imported goods',
+          'Declarant: Binh Minh Stone Co., Ltd.',
+          'Bill of lading: MSCU-GEN-2207-118   Container: CONT-IT-2207',
+          'HS 6802.91 - Marble, polished     Customs value: USD 51,400.00',
+          'Import duty 5%:  62,000,000 VND',
+          'Import VAT 8%:  104,000,000 VND (deductible)',
+        ],
+      },
+    },
+    {
+      on: { shipmentId: shipment.value.id },
+      filename: 'Bill of lading MSCU-GEN-2207-118.pdf',
+      kind: 'bill_of_lading' as const,
+      page: {
+        title: 'BILL OF LADING  MSCU-GEN-2207-118',
+        lines: [
+          'Shipper: Marmi Apuani S.r.l., Carrara',
+          'Consignee: Binh Minh Stone Co., Ltd.',
+          'Vessel: MSC Aurora  Voyage 2207E   Genoa -> Cat Lai',
+          '1 x 20ft container CONT-IT-2207, 24,600 kg, 40 crates marble slabs',
+          'Freight: prepaid',
+        ],
+      },
+    },
+  ];
+  for (const document of PAPERWORK) {
+    const attached = await paperwork.attach({
+      ...document.on,
+      filename: document.filename,
+      bytes: samplePdf(document.page),
+      kind: document.kind,
+    });
+    if (!attached.ok) throw new Error(`attachment failed: ${attached.error.code}`);
   }
 
   // The tax codes come before the first invoice, because an export is raised

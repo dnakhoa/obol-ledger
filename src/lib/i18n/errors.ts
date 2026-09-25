@@ -270,6 +270,13 @@ const vi: ErrorMessages = {
   supplier_account_required: () => 'Hãy chọn tài khoản nhà cung cấp hoặc ngân hàng nhận lại tiền.',
   supplier_return_exceeds_lot: (e) =>
     `Lô hàng này chỉ còn ${vn.quantity(e.remaining, e.precision)} ${vn.unit(e.unit)} có thể trả lại; bạn đã nhập ${vn.quantity(e.requested, e.precision)}.`,
+  document_not_found: (e) => `Không tìm thấy chứng từ ${e.documentId}.`,
+  document_link_not_found: (e) => `Không tìm thấy tệp đính kèm ${e.linkId}, hoặc tệp đã được gỡ.`,
+  document_empty: () => 'Tệp trống. Hãy chọn lại tệp.',
+  document_too_large: (e) =>
+    `Tệp có dung lượng ${(e.sizeBytes / 1048576).toFixed(1)} MB; giới hạn là ${(e.limitBytes / 1048576).toFixed(1)} MB. Hãy quét với độ phân giải thấp hơn hoặc lưu PDF nhỏ hơn.`,
+  document_type_not_allowed: (e) =>
+    `${e.filename} không phải PDF, ảnh (PNG, JPEG, WebP) hay hóa đơn điện tử XML nên không thể đính kèm.`,
 };
 
 const jp = writing('ja');
@@ -463,6 +470,13 @@ const ja: ErrorMessages = {
   supplier_account_required: () => '返金する仕入先の勘定、または銀行口座を選んでください。',
   supplier_return_exceeds_lot: (e) =>
     `この入荷で返品できる残りは ${jp.quantity(e.remaining, e.precision)} ${jp.unit(e.unit)} です（入力：${jp.quantity(e.requested, e.precision)}）。`,
+  document_not_found: (e) => `書類 ${e.documentId} が見つかりません。`,
+  document_link_not_found: (e) => `添付 ${e.linkId} が見つからないか、既に外されています。`,
+  document_empty: () => 'ファイルが空です。もう一度選んでください。',
+  document_too_large: (e) =>
+    `ファイルは ${(e.sizeBytes / 1048576).toFixed(1)} MB です。上限は ${(e.limitBytes / 1048576).toFixed(1)} MB です。解像度を下げてスキャンするか、PDF を小さく保存してください。`,
+  document_type_not_allowed: (e) =>
+    `${e.filename} は PDF、画像（PNG・JPEG・WebP）、XML 電子インボイスのいずれでもないため添付できません。`,
 };
 
 const TRANSLATIONS: Record<TranslatedLocale, ErrorMessages> = { vi, ja };

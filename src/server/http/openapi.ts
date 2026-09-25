@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { WRITE_OFF_REASONS } from '@/server/domain/costing';
 import {
+  DOCUMENT_CONTENT_TYPES,
+  DOCUMENT_KINDS,
+  MAX_DOCUMENT_BYTES,
+} from '@/server/domain/document';
+import {
   createAccountSchema,
   createApiKeySchema,
   createItemSchema,
@@ -378,6 +383,27 @@ const supplierReturnSchema = {
   },
 } as const;
 
+const attachmentSchema = {
+  type: 'object',
+  properties: {
+    id: {
+      type: 'string',
+      description: 'The attachment. Removing it takes the file off the entry.',
+      examples: ['dlink_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'],
+    },
+    documentId: { type: 'string', description: 'The file, stored once per tenant.' },
+    filename: { type: 'string' },
+    contentType: { enum: [...DOCUMENT_CONTENT_TYPES], description: 'Decided from the bytes.' },
+    sizeBytes: { type: 'integer' },
+    sha256: { type: 'string', description: 'Hex SHA-256 of the content.' },
+    kind: { enum: [...DOCUMENT_KINDS] },
+    note: { type: ['string', 'null'] },
+    transactionId: { type: ['string', 'null'] },
+    shipmentId: { type: ['string', 'null'] },
+    attachedAt: { type: 'string', format: 'date-time' },
+  },
+} as const;
+
 function envelope(schema: unknown, withCursor = false): Record<string, unknown> {
   return {
     type: 'object',
@@ -405,6 +431,8 @@ function problemResponses(...statuses: number[]): Record<string, unknown> {
     401: 'Authentication required',
     404: 'Not found',
     409: 'Conflict',
+    413: 'The file is larger than the limit',
+    415: 'That kind of file is not accepted',
     422: 'The request was understood but cannot be applied to the ledger',
     429: 'Rate limited',
     503: 'Dependency unavailable',
@@ -508,6 +536,7 @@ export function openApiDocument(): Record<string, unknown> {
         CreditNote: creditNoteSchema,
         CreateCreditNote: jsonSchema(createCreditNoteSchema),
         SupplierReturn: supplierReturnSchema,
+        Attachment: attachmentSchema,
         CreateSupplierReturn: jsonSchema(createSupplierReturnSchema),
         CreateItem: jsonSchema(createItemSchema),
         ReceiveStock: jsonSchema(receiveStockSchema),
@@ -801,6 +830,106 @@ export function openApiDocument(): Record<string, unknown> {
               },
             },
             ...problemResponses(401, 404, 409, 429),
+          },
+        },
+      },
+      '/entries/{entryId}/documents': {
+        get: {
+          tags: ['Journal'],
+          summary: 'What an entry is supported by',
+          parameters: [{ name: 'entryId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': {
+              description: 'Attachments, in the order they were attached',
+              content: {
+                'application/json': {
+                  schema: envelope({
+                    type: 'array',
+                    items: { $ref: '#/components/schemas/Attachment' },
+                  }),
+                },
+              },
+            },
+            ...problemResponses(404, 429),
+          },
+        },
+        post: {
+          tags: ['Journal'],
+          summary: 'Attach a supplier invoice, customs declaration or receipt',
+          description: `multipart/form-data with file, kind (one of ${DOCUMENT_KINDS.join(', ')}) and an optional note. The type is decided from the content: PDF, PNG, JPEG, WebP or plain XML, and nothing else — a file that is not one of those is a 415, over ${MAX_DOCUMENT_BYTES / 1048576} MiB a 413. The same file is stored once per tenant, and attaching it twice to one entry returns the attachment it already has, so a retried upload is safe.`,
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'entryId', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'multipart/form-data': {
+                schema: {
+                  type: 'object',
+                  required: ['file', 'kind'],
+                  properties: {
+                    file: { type: 'string', format: 'binary' },
+                    kind: { enum: [...DOCUMENT_KINDS] },
+                    note: { type: 'string', maxLength: 280 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'The attachment',
+              content: {
+                'application/json': {
+                  schema: envelope({ $ref: '#/components/schemas/Attachment' }),
+                },
+              },
+            },
+            ...problemResponses(400, 401, 404, 413, 415, 422, 429),
+          },
+        },
+      },
+      '/entries/{entryId}/documents/{linkId}': {
+        delete: {
+          tags: ['Journal'],
+          summary: 'Take an attachment off an entry',
+          description:
+            'The file and the record that it was attached both stay; the attachment is marked removed.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'entryId', in: 'path', required: true, schema: { type: 'string' } },
+            { name: 'linkId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '204': { description: 'Removed' },
+            ...problemResponses(401, 404, 429),
+          },
+        },
+      },
+      '/documents/{documentId}/content': {
+        get: {
+          tags: ['Journal'],
+          summary: 'Download a document exactly as it was uploaded',
+          description:
+            'Served with the type decided at upload and nosniff. XML is always sent as an attachment; ?download=1 sends anything as one.',
+          parameters: [
+            { name: 'documentId', in: 'path', required: true, schema: { type: 'string' } },
+            {
+              name: 'download',
+              in: 'query',
+              required: false,
+              schema: { enum: ['1'] },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'The file',
+              content: {
+                'application/pdf': { schema: { type: 'string', format: 'binary' } },
+                'image/*': { schema: { type: 'string', format: 'binary' } },
+                'application/xml': { schema: { type: 'string', format: 'binary' } },
+              },
+            },
+            ...problemResponses(404, 429),
           },
         },
       },

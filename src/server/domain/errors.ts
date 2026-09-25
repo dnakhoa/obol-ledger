@@ -230,6 +230,15 @@ export type LedgerError =
       readonly requested: string;
       readonly precision: number;
       readonly unit: string;
+    }
+  | { readonly code: 'document_not_found'; readonly documentId: string }
+  | { readonly code: 'document_link_not_found'; readonly linkId: string }
+  | { readonly code: 'document_empty' }
+  | { readonly code: 'document_too_large'; readonly sizeBytes: number; readonly limitBytes: number }
+  | {
+      /** Not a PDF, PNG, JPEG, WebP or plain XML file, judged by its content. */
+      readonly code: 'document_type_not_allowed';
+      readonly filename: string;
     };
 
 export type LedgerErrorCode = LedgerError['code'];
@@ -315,6 +324,11 @@ const TITLES: Record<LedgerErrorCode, string> = {
   supplier_return_tax_needs_local_currency: 'Tax can only be reversed on a local purchase',
   supplier_account_required: 'Choose who gives the money back',
   supplier_return_exceeds_lot: 'More than is left of the delivery',
+  document_not_found: 'Document not found',
+  document_link_not_found: 'Attachment not found',
+  document_empty: 'The file is empty',
+  document_too_large: 'The file is too large',
+  document_type_not_allowed: 'That kind of file cannot be attached',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -483,7 +497,22 @@ export function describe(error: LedgerError): string {
       return 'Choose the supplier account or bank that gives the money back.';
     case 'supplier_return_exceeds_lot':
       return `Only ${quantityText(error.remaining, error.precision)} ${error.unit} of this delivery is left to return; ${quantityText(error.requested, error.precision)} was entered.`;
+    case 'document_not_found':
+      return `Document ${error.documentId} was not found.`;
+    case 'document_link_not_found':
+      return `Attachment ${error.linkId} was not found, or has already been removed.`;
+    case 'document_empty':
+      return 'The file is empty. Choose the file again.';
+    case 'document_too_large':
+      return `The file is ${megabytes(error.sizeBytes)} MB; the limit is ${megabytes(error.limitBytes)} MB. Scan at a lower resolution, or save the PDF smaller.`;
+    case 'document_type_not_allowed':
+      return `${error.filename} is not a PDF, a photo (PNG, JPEG, WebP) or an XML e-invoice, so it cannot be attached.`;
   }
+}
+
+/** One decimal place, which is as precise as a file-size limit needs to be. */
+function megabytes(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(1);
 }
 
 /** `24687` at precision 3 → `24.687`. Kept local; errors carry raw scaled values. */

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { AttachmentsCard } from '@/app/(app)/documents/attachments-card';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -367,6 +368,8 @@ export default async function SalePage({ params }: { params: Promise<{ saleId: s
           </div>
         ) : null}
       </Card>
+
+      <AttachmentsCard target={{ transactionId: sale.transactionId }} path={`/sales/${sale.id}`} />
     </div>
   );
 }

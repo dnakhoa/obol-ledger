@@ -2,6 +2,7 @@ import {
   bigint,
   boolean,
   char,
+  customType,
   date,
   numeric,
   foreignKey,
@@ -24,6 +25,7 @@ import { ACCOUNT_ROLES, PERIOD_STATUSES } from '@/server/domain/period';
 import type { CostingMethod, WriteOffReason } from '@/server/domain/costing';
 import type { AllocationBasis } from '@/server/domain/landed-cost';
 import type { Supply, TaxTreatment } from '@/server/domain/tax';
+import type { DocumentContentType, DocumentKind } from '@/server/domain/document';
 import type { Unit } from '@/lib/quantity';
 import type { Locale } from '@/lib/i18n/locales';
 
@@ -1511,6 +1513,73 @@ export const supplierReturns = pgTable(
       name: 'supplier_returns_transaction_fk',
       columns: [table.transactionId, table.orgId],
       foreignColumns: [transactions.id, transactions.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/** Raw bytes. node-postgres hands back a Buffer and PGlite a Uint8Array; both are one. */
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+  dataType: () => 'bytea',
+});
+
+/**
+ * A file an entry rests on: a supplier invoice, a customs declaration.
+ *
+ * Stored once per tenant and identified by its SHA-256, which the database
+ * checks against the bytes. Never changed. See migration 0034.
+ */
+export const documents = pgTable(
+  'documents',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    sha256: char('sha256', { length: 64 }).notNull(),
+    filename: text('filename').notNull(),
+    contentType: text('content_type').$type<DocumentContentType>().notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    content: bytea('content').notNull(),
+    uploadedBy: text('uploaded_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('documents_id_org_key').on(table.id, table.orgId),
+    uniqueIndex('documents_org_sha256_key').on(table.orgId, table.sha256),
+  ],
+);
+
+/** What a document supports: one entry or one shipment. Removed, never deleted. */
+export const documentLinks = pgTable(
+  'document_links',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    documentId: text('document_id').notNull(),
+    transactionId: text('transaction_id'),
+    shipmentId: text('shipment_id'),
+    kind: text('kind').$type<DocumentKind>().notNull(),
+    note: text('note'),
+    linkedBy: text('linked_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp('removed_at', { withTimezone: true }),
+    removedBy: text('removed_by'),
+  },
+  (table) => [
+    index('document_links_org_transaction_idx').on(table.orgId, table.transactionId),
+    index('document_links_org_shipment_idx').on(table.orgId, table.shipmentId),
+    foreignKey({
+      name: 'document_links_document_fk',
+      columns: [table.documentId, table.orgId],
+      foreignColumns: [documents.id, documents.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'document_links_transaction_fk',
+      columns: [table.transactionId, table.orgId],
+      foreignColumns: [transactions.id, transactions.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'document_links_shipment_fk',
+      columns: [table.shipmentId, table.orgId],
+      foreignColumns: [shipments.id, shipments.orgId],
     }).onDelete('restrict'),
   ],
 );
