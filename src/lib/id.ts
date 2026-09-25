@@ -71,6 +71,9 @@ export const ID_PREFIXES = {
   supplierReturn: 'sret',
   document: 'doc',
   documentLink: 'dlink',
+  bankImport: 'bimp',
+  bankLine: 'bline',
+  bankMatch: 'bmatch',
 } as const;
 
 export type EntityKind = keyof typeof ID_PREFIXES;

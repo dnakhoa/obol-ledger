@@ -15,6 +15,7 @@ import { createSalesService } from './sales';
 import { createCreditNoteService } from './credit-notes';
 import { createSupplierReturnService } from './supplier-returns';
 import { createDocumentService } from './documents';
+import { createBankService } from './bank';
 import { samplePdf } from './sample-documents';
 
 /**
@@ -1387,6 +1388,69 @@ export async function populateSampleLedger(
     );
   }
 
+  // ---- A month of the bank's statement ------------------------------------
+  //
+  // What Vietcombank sent for the operating account over the last month, so
+  // a prospect can reconcile it: every movement the books have, as the bank
+  // describes it, plus three the books do not — the monthly fee, a charge on
+  // an international transfer, and interest. The last few days are not on
+  // the statement yet, which is what "in the books, not on the statement"
+  // looks like in real life. Most lines are matched here; the three the
+  // books never heard of are left for whoever is trying it.
+  const bank = createBankService(database, orgId);
+  const operating = ids['bankVnd'] ?? '';
+  const start = daysAgo(30, 0).toISOString().slice(0, 10);
+  const cutoff = daysAgo(4, 23).toISOString().slice(0, 10);
+  const moved = await bank.unmatchedPostings(operating, start);
+  const [account] = (await bank.accounts()).filter((candidate) => candidate.id === operating);
+  const statementLines = [
+    ...moved
+      .filter((posting) => posting.occurredOn <= cutoff)
+      .map((posting) => ({
+        occurredOn: posting.occurredOn,
+        amount: posting.amount,
+        description: bankStyle(posting.description),
+      })),
+    {
+      occurredOn: daysAgo(21, 0).toISOString().slice(0, 10),
+      amount: -55_000n,
+      description: 'PHI QUAN LY TAI KHOAN',
+    },
+    {
+      occurredOn: daysAgo(12, 0).toISOString().slice(0, 10),
+      amount: -330_000n,
+      description: 'PHI CHUYEN TIEN QUOC TE SWIFT',
+    },
+    {
+      occurredOn: daysAgo(6, 0).toISOString().slice(0, 10),
+      amount: 1_284_000n,
+      description: 'LAI TIEN GUI KY HAN KHONG KY HAN',
+    },
+  ].sort((a, b) => a.occurredOn.localeCompare(b.occurredOn));
+  if (account && statementLines.length > 0) {
+    // The bank's running balance: what the account held before the month,
+    // then each line as the bank applied it.
+    const since = moved.reduce((sum, posting) => sum + posting.amount, 0n);
+    let running = BigInt(account.balance.minorUnits) - since;
+    const fed = await bank.feed({
+      accountId: operating,
+      lines: statementLines.map((line, index) => {
+        running += line.amount;
+        return {
+          externalId: `VCB-SAMPLE-${String(index + 1).padStart(4, '0')}`,
+          occurredOn: line.occurredOn,
+          amount: line.amount,
+          description: line.description,
+          reference: `FT${line.occurredOn.replaceAll('-', '').slice(2)}${String(index + 1).padStart(4, '0')}`,
+          balance: running,
+        };
+      }),
+    });
+    if (!fed.ok) throw new Error(`bank statement failed: ${fed.error.code}`);
+    const matched = await bank.matchSuggested(operating);
+    log(`bank statement: ${fed.value.added} lines, ${matched} matched`);
+  }
+
   // Assert the *schema* carries the isolation policies.
   //
   // Deliberately not "does an unscoped read return nothing". Seeding is an
@@ -1398,4 +1462,17 @@ export async function populateSampleLedger(
   // application's question, answered by /api/v1/health.
 
   return { entries };
+}
+
+/** How a Vietnamese bank prints a narrative: capitals, no diacritics, cut short. */
+function bankStyle(description: string): string {
+  return description
+    .replace(/[đĐ]/gu, 'D')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^A-Za-z0-9 .,/-]/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toUpperCase()
+    .slice(0, 80);
 }

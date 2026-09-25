@@ -65,6 +65,16 @@ describe('sample ledgers and Thông tư 133', () => {
       'customs_declaration',
     ]);
 
+    // A month of the bank's statement, matched but for the three lines the
+    // books never heard of — left for whoever is trying it — and explained
+    // to the dong.
+    const [operating] = (await services.bank.accounts()).filter((account) => account.lines > 0);
+    const reconciliation = await services.bank.reconciliation(operating?.id ?? '');
+    expect(reconciliation).toMatchObject({
+      ok: true,
+      value: { bankOnly: { count: 3 }, difference: { minorUnits: '0' } },
+    });
+
     // The visitor is a member who can write, and is said to be trying it.
     const viewer = await resolveViewer({ ...visitor, name: 'Guest', email: '', isAnonymous: true });
     expect(viewer).toMatchObject({ kind: 'member', orgId, canWrite: true, sample: true });

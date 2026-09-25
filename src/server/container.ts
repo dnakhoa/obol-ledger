@@ -20,6 +20,7 @@ import { createSalesService } from '@/server/services/sales';
 import { createCreditNoteService } from '@/server/services/credit-notes';
 import { createSupplierReturnService } from '@/server/services/supplier-returns';
 import { createDocumentService } from '@/server/services/documents';
+import { createBankService } from '@/server/services/bank';
 import { createTaxReturnService } from '@/server/services/tax-return';
 import { createWebhookService } from './services/webhooks';
 import { SetupRequiredError } from './setup-error';
@@ -62,6 +63,7 @@ export function servicesFor(orgId: string, database: Database = db()) {
     creditNotes: createCreditNoteService(database, orgId),
     supplierReturns: createSupplierReturnService(database, orgId),
     documents: createDocumentService(database, orgId),
+    bank: createBankService(database, orgId),
     taxReturns: createTaxReturnService(database, orgId),
   };
 }

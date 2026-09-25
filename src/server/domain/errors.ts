@@ -239,7 +239,30 @@ export type LedgerError =
       /** Not a PDF, PNG, JPEG, WebP or plain XML file, judged by its content. */
       readonly code: 'document_type_not_allowed';
       readonly filename: string;
-    };
+    }
+  | { readonly code: 'bank_account_not_reconcilable'; readonly accountId: string }
+  | { readonly code: 'bank_line_not_found'; readonly lineId: string }
+  | {
+      /** The file has no column the ledger recognises as one of these. */
+      readonly code: 'bank_statement_unreadable';
+      readonly missing: readonly string[];
+    }
+  | {
+      /** Rows that could not be read. Nothing was imported. */
+      readonly code: 'bank_statement_has_problems';
+      readonly rows: readonly number[];
+    }
+  | { readonly code: 'bank_line_already_matched'; readonly lineId: string }
+  | { readonly code: 'bank_posting_already_matched'; readonly postingId: string }
+  | { readonly code: 'bank_line_not_matched'; readonly lineId: string }
+  | {
+      readonly code: 'bank_match_amount_mismatch';
+      /** Decimal strings in the account's currency. */
+      readonly lineAmount: string;
+      readonly postingAmount: string;
+      readonly currency: CurrencyCode;
+    }
+  | { readonly code: 'bank_posting_not_on_account'; readonly postingId: string };
 
 export type LedgerErrorCode = LedgerError['code'];
 
@@ -329,6 +352,15 @@ const TITLES: Record<LedgerErrorCode, string> = {
   document_empty: 'The file is empty',
   document_too_large: 'The file is too large',
   document_type_not_allowed: 'That kind of file cannot be attached',
+  bank_account_not_reconcilable: 'Only a bank or card account can be reconciled',
+  bank_line_not_found: 'Statement line not found',
+  bank_statement_unreadable: 'The statement has no columns the ledger recognises',
+  bank_statement_has_problems: 'Some rows of the statement could not be read',
+  bank_line_already_matched: 'That statement line is already matched',
+  bank_posting_already_matched: 'That entry is already matched to another statement line',
+  bank_line_not_matched: 'That statement line is not matched',
+  bank_match_amount_mismatch: 'The amounts do not agree',
+  bank_posting_not_on_account: 'That entry does not touch this account',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -507,6 +539,24 @@ export function describe(error: LedgerError): string {
       return `The file is ${megabytes(error.sizeBytes)} MB; the limit is ${megabytes(error.limitBytes)} MB. Scan at a lower resolution, or save the PDF smaller.`;
     case 'document_type_not_allowed':
       return `${error.filename} is not a PDF, a photo (PNG, JPEG, WebP) or an XML e-invoice, so it cannot be attached.`;
+    case 'bank_account_not_reconcilable':
+      return 'Only a bank account, a card or a loan — money held or owed — has a statement to reconcile against.';
+    case 'bank_line_not_found':
+      return `Statement line ${error.lineId} was not found.`;
+    case 'bank_statement_unreadable':
+      return `The file needs a date, an amount (or money-in and money-out columns) and a description. Could not find: ${error.missing.join(', ')}.`;
+    case 'bank_statement_has_problems':
+      return `Rows ${error.rows.slice(0, 10).join(', ')}${error.rows.length > 10 ? '…' : ''} could not be read. Nothing was imported; correct them and import again.`;
+    case 'bank_line_already_matched':
+      return 'That statement line is already matched. Undo the match first to change it.';
+    case 'bank_posting_already_matched':
+      return 'That entry is already matched to another statement line.';
+    case 'bank_line_not_matched':
+      return 'That statement line is not matched to anything.';
+    case 'bank_match_amount_mismatch':
+      return `The statement line is ${error.lineAmount} ${error.currency} and the entry is ${error.postingAmount} ${error.currency}. A match must be the same amount.`;
+    case 'bank_posting_not_on_account':
+      return 'That entry does not move money in or out of this account.';
   }
 }
 

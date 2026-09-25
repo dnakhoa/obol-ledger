@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import {
   AccountsIcon,
+  BankIcon,
   GaugeIcon,
   JournalIcon,
   ReportsIcon,
@@ -39,6 +40,7 @@ export type NavLabels = {
   readonly journal: string;
   readonly reports: string;
   readonly monthEnd: string;
+  readonly bank: string;
   readonly tax: string;
   readonly newEntry: string;
   readonly webhooks: string;
@@ -80,6 +82,7 @@ const LINKS = [
     exact: false,
     section: 'sectionAccounting',
   },
+  { href: '/bank', key: 'bank', Icon: BankIcon, exact: false, section: 'sectionAccounting' },
   {
     href: '/reports',
     key: 'reports',

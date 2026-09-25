@@ -505,6 +505,7 @@ export const postings = pgTable(
     }).onDelete('restrict'),
     index('postings_org_account_idx').on(table.orgId, table.accountId, table.id),
     uniqueIndex('postings_transaction_sequence_key').on(table.transactionId, table.sequence),
+    unique('postings_id_org_account_key').on(table.id, table.orgId, table.accountId),
     // Keyset pagination of an account's statement: WHERE account_id = $1 AND id < $2.
     index('postings_account_id_idx').on(table.accountId, table.id),
   ],
@@ -1580,6 +1581,104 @@ export const documentLinks = pgTable(
       name: 'document_links_shipment_fk',
       columns: [table.shipmentId, table.orgId],
       foreignColumns: [shipments.id, shipments.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/** A batch of statement lines: a file somebody imported, or a push from a bank feed. */
+export const bankImports = pgTable(
+  'bank_imports',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    accountId: text('account_id').notNull(),
+    source: text('source').$type<'file' | 'feed'>().notNull(),
+    filename: text('filename'),
+    linesAdded: integer('lines_added').notNull(),
+    linesSkipped: integer('lines_skipped').notNull(),
+    importedBy: text('imported_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('bank_imports_id_org_key').on(table.id, table.orgId),
+    foreignKey({
+      name: 'bank_imports_account_fk',
+      columns: [table.accountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/** One line of a bank statement, exactly as the bank gave it. Stored once. See migration 0035. */
+export const bankLines = pgTable(
+  'bank_lines',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    accountId: text('account_id').notNull(),
+    currency: char('currency', { length: 3 }).notNull(),
+    importId: text('import_id').notNull(),
+    occurredOn: date('occurred_on', { mode: 'string' }).notNull(),
+    /** Signed as the account sees it: money in positive, money out negative. */
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+    description: text('description').notNull(),
+    reference: text('reference'),
+    balanceMinor: bigint('balance_minor', { mode: 'bigint' }),
+    fingerprint: text('fingerprint').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('bank_lines_id_org_account_key').on(table.id, table.orgId, table.accountId),
+    uniqueIndex('bank_lines_account_fingerprint_key').on(table.accountId, table.fingerprint),
+    index('bank_lines_org_account_idx').on(
+      table.orgId,
+      table.accountId,
+      table.occurredOn,
+      table.id,
+    ),
+    foreignKey({
+      name: 'bank_lines_account_fk',
+      columns: [table.accountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'bank_lines_account_currency_fk',
+      columns: [table.accountId, table.currency],
+      foreignColumns: [accounts.id, accounts.currency],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'bank_lines_import_fk',
+      columns: [table.importId, table.orgId],
+      foreignColumns: [bankImports.id, bankImports.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/** A statement line and the posting that records the same movement. Undone, never deleted. */
+export const bankMatches = pgTable(
+  'bank_matches',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    accountId: text('account_id').notNull(),
+    lineId: text('line_id').notNull(),
+    postingId: text('posting_id').notNull(),
+    matchedBy: text('matched_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp('removed_at', { withTimezone: true }),
+    removedBy: text('removed_by'),
+  },
+  (table) => [
+    index('bank_matches_org_account_idx').on(table.orgId, table.accountId),
+    foreignKey({
+      name: 'bank_matches_line_fk',
+      columns: [table.lineId, table.orgId, table.accountId],
+      foreignColumns: [bankLines.id, bankLines.orgId, bankLines.accountId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'bank_matches_posting_fk',
+      columns: [table.postingId, table.orgId, table.accountId],
+      foreignColumns: [postings.id, postings.orgId, postings.accountId],
     }).onDelete('restrict'),
   ],
 );

@@ -277,6 +277,20 @@ const vi: ErrorMessages = {
     `Tệp có dung lượng ${(e.sizeBytes / 1048576).toFixed(1)} MB; giới hạn là ${(e.limitBytes / 1048576).toFixed(1)} MB. Hãy quét với độ phân giải thấp hơn hoặc lưu PDF nhỏ hơn.`,
   document_type_not_allowed: (e) =>
     `${e.filename} không phải PDF, ảnh (PNG, JPEG, WebP) hay hóa đơn điện tử XML nên không thể đính kèm.`,
+  bank_account_not_reconcilable: () =>
+    'Chỉ tài khoản ngân hàng, thẻ hoặc khoản vay mới có sao kê để đối chiếu.',
+  bank_line_not_found: (e) => `Không tìm thấy dòng sao kê ${e.lineId}.`,
+  bank_statement_unreadable: (e) =>
+    `Tệp cần có cột ngày, số tiền (hoặc cột ghi nợ và ghi có) và nội dung. Không tìm thấy: ${e.missing.join(', ')}.`,
+  bank_statement_has_problems: (e) =>
+    `Không đọc được các dòng ${e.rows.slice(0, 10).join(', ')}${e.rows.length > 10 ? '…' : ''}. Chưa có gì được nhập; hãy sửa rồi nhập lại.`,
+  bank_line_already_matched: () =>
+    'Dòng sao kê này đã được đối chiếu. Hãy hủy đối chiếu trước nếu muốn đổi.',
+  bank_posting_already_matched: () => 'Bút toán này đã được đối chiếu với một dòng sao kê khác.',
+  bank_line_not_matched: () => 'Dòng sao kê này chưa được đối chiếu.',
+  bank_match_amount_mismatch: (e) =>
+    `Dòng sao kê là ${vn.money(e.lineAmount)} ${e.currency} còn bút toán là ${vn.money(e.postingAmount)} ${e.currency}. Hai số tiền phải bằng nhau.`,
+  bank_posting_not_on_account: () => 'Bút toán này không làm thay đổi số dư tài khoản này.',
 };
 
 const jp = writing('ja');
@@ -477,6 +491,20 @@ const ja: ErrorMessages = {
     `ファイルは ${(e.sizeBytes / 1048576).toFixed(1)} MB です。上限は ${(e.limitBytes / 1048576).toFixed(1)} MB です。解像度を下げてスキャンするか、PDF を小さく保存してください。`,
   document_type_not_allowed: (e) =>
     `${e.filename} は PDF、画像（PNG・JPEG・WebP）、XML 電子インボイスのいずれでもないため添付できません。`,
+  bank_account_not_reconcilable: () =>
+    '照合できるのは預金口座・カード・借入金など、明細のある勘定だけです。',
+  bank_line_not_found: (e) => `明細行 ${e.lineId} が見つかりません。`,
+  bank_statement_unreadable: (e) =>
+    `日付、金額（または入金・出金の列）、摘要の列が必要です。見つからない列：${e.missing.join('、')}。`,
+  bank_statement_has_problems: (e) =>
+    `${e.rows.slice(0, 10).join('、')}${e.rows.length > 10 ? '…' : ''} 行目を読み取れませんでした。何も取り込んでいません。修正して再度取り込んでください。`,
+  bank_line_already_matched: () =>
+    'この明細行は照合済みです。変更するには照合を取り消してください。',
+  bank_posting_already_matched: () => 'この仕訳は別の明細行と照合済みです。',
+  bank_line_not_matched: () => 'この明細行はまだ照合されていません。',
+  bank_match_amount_mismatch: (e) =>
+    `明細は ${jp.money(e.lineAmount)} ${e.currency}、仕訳は ${jp.money(e.postingAmount)} ${e.currency} です。照合には同じ金額が必要です。`,
+  bank_posting_not_on_account: () => 'この仕訳はこの口座の残高を動かしていません。',
 };
 
 const TRANSLATIONS: Record<TranslatedLocale, ErrorMessages> = { vi, ja };

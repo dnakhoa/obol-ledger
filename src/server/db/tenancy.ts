@@ -131,6 +131,9 @@ const TENANT_TABLES = [
   'supplier_returns',
   'documents',
   'document_links',
+  'bank_imports',
+  'bank_lines',
+  'bank_matches',
 ] as const;
 
 // A fixed internal constant, inlined rather than bound: drizzle passes a JS
