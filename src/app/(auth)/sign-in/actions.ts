@@ -7,6 +7,7 @@ import { durableRateLimit } from '@/server/http/durable-rate-limit';
 import { logger } from '@/server/observability/logger';
 import { translations } from '@/server/i18n';
 import { createSampleLedger } from '@/server/services/onboarding';
+import { clientAddress } from '@/server/http/client-address';
 
 export type SampleLedgerState =
   { readonly status: 'done' } | { readonly status: 'error'; readonly message: string };
@@ -20,6 +21,8 @@ export type SampleLedgerState =
  * per address, because each call writes a quarter of books — cheap for a
  * person, and not something a script should be able to do in a loop.
  */
+const SAMPLE_LEDGERS_PER_DAY = Number(process.env['SAMPLE_LEDGERS_PER_DAY'] ?? 500);
+
 export async function startSampleLedgerAction(): Promise<SampleLedgerState> {
   const { t } = await translations();
   const viewer = await currentViewer();
@@ -27,10 +30,20 @@ export async function startSampleLedgerAction(): Promise<SampleLedgerState> {
   if (viewer.kind === 'guest') return { status: 'error', message: t.sample.failed };
 
   const requestHeaders = await headers();
-  const client = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const client = clientAddress(requestHeaders);
   const decision = await durableRateLimit(db(), `sample-ledger:${client}`, { limit: 3 });
   if (!decision.allowed) {
     return { status: 'error', message: t.sample.tooMany(decision.retryAfterSeconds) };
+  }
+  // And across everyone, per day: the per-address limit stops a script on one
+  // machine, and this stops many machines from filling the database with
+  // sample books nobody will read.
+  const daily = await durableRateLimit(db(), 'sample-ledger:all', {
+    limit: SAMPLE_LEDGERS_PER_DAY,
+    windowMs: 24 * 60 * 60 * 1000,
+  });
+  if (!daily.allowed) {
+    return { status: 'error', message: t.sample.tooMany(daily.retryAfterSeconds) };
   }
 
   try {

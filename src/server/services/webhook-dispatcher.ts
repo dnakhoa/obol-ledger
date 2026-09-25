@@ -210,7 +210,7 @@ export function createDispatcher(database: Database, orgId: string, deps: Dispat
         });
       }
 
-      const excerpt = (await response.text().catch(() => '')).slice(0, ERROR_EXCERPT_CHARS);
+      const excerpt = await readExcerpt(response);
       return finish(delivery, {
         ok: false,
         status: response.status,
@@ -287,4 +287,30 @@ export function createDispatcher(database: Database, orgId: string, deps: Dispat
 
     return outcome.ok ? 'succeeded' : exhausted ? 'failed' : 'retrying';
   }
+}
+
+/**
+ * The start of an error body, without reading the rest.
+ *
+ * `response.text()` buffers the whole body before anything can be cut from
+ * it, so a subscriber answering 500 with a gigabyte would cost this worker a
+ * gigabyte. Reading stops a little past what the log keeps.
+ */
+async function readExcerpt(response: Response): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return '';
+  const decoder = new TextDecoder();
+  let text = '';
+  try {
+    while (text.length < ERROR_EXCERPT_CHARS) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+  } catch {
+    // A body that fails halfway still has a start worth logging.
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  return text.slice(0, ERROR_EXCERPT_CHARS);
 }

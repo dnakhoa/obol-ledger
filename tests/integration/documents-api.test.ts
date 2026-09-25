@@ -1,9 +1,10 @@
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '../helpers/database';
 import { openAccount, servicesFor } from '../helpers/fixtures';
 import { setDatabaseForTesting } from '@/server/db/client';
 import { resetRateLimits } from '@/server/http/rate-limit';
-import { apiKeys } from '@/server/db/schema';
+import { apiKeys, organizations } from '@/server/db/schema';
 import { digestToken } from '@/server/services/authentication';
 import { newId } from '@/lib/id';
 import {
@@ -42,7 +43,7 @@ describe('documents API', () => {
     db = await createTestDatabase();
     setDatabaseForTesting(db);
     resetRateLimits();
-    process.env['DEMO_ORG_SLUG'] = 'primary';
+    await db.update(organizations).set({ isDemo: true }).where(eq(organizations.id, db.$orgId));
     await db.insert(apiKeys).values({
       id: newId('apiKey'),
       orgId: db.$orgId,

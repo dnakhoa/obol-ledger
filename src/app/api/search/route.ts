@@ -3,6 +3,7 @@ import { servicesFor } from '@/server/container';
 import { viewerFor } from '@/server/auth/viewer';
 import { SetupRequiredError } from '@/server/setup-error';
 import { rateLimit } from '@/server/http/rate-limit';
+import { clientAddress } from '@/server/http/client-address';
 
 /**
  * Search behind the command palette.
@@ -24,7 +25,7 @@ export async function GET(request: Request): Promise<Response> {
   const query = new URL(request.url).searchParams.get('q')?.trim() ?? '';
   if (query.length < 2) return NextResponse.json({ accounts: [], entries: [] });
 
-  const client = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const client = clientAddress(request.headers);
   // A search box fires on every keystroke, so the quota is generous where the
   // write endpoints' is not.
   const decision = rateLimit(`search:${client}`, Date.now(), 300);

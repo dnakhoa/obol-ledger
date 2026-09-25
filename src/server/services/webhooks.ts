@@ -101,8 +101,12 @@ export function createWebhookService(database: Database, orgId: string) {
             secret,
             eventTypes: [...(input.eventTypes ?? [])],
           })
+          // The check above answers the ordinary case; this answers two
+          // registrations of one URL racing past it, which would otherwise
+          // surface as a 500 carrying the losing insert's secret in its log.
+          .onConflictDoNothing({ target: [webhookEndpoints.orgId, webhookEndpoints.url] })
           .returning();
-        if (!row) throw new Error('INSERT ... RETURNING produced no endpoint row');
+        if (!row) return err({ code: 'endpoint_url_taken', url: input.url });
 
         // The only time the secret leaves the system. Showing it again later
         // would mean a read-only credential could exfiltrate the ability to

@@ -4,6 +4,7 @@ import { anonymous } from 'better-auth/plugins';
 import { eq } from 'drizzle-orm';
 import { db } from '@/server/db/client';
 import * as schema from '@/server/db/schema';
+import { retireSampleLedgers } from './retire-sample';
 
 /**
  * Authentication, delegated on purpose.
@@ -48,6 +49,22 @@ export function configuredProviders(): string[] {
   return Object.keys(socialProviders());
 }
 
+/**
+ * The key every session cookie and OAuth state is signed with.
+ *
+ * Required in production. A fallback there would sign with a string anyone
+ * can read in this repository, and better-auth's own check only recognises
+ * its built-in default, not ours — so the refusal has to be here.
+ */
+function authSecret(): string {
+  const secret = process.env['BETTER_AUTH_SECRET'];
+  if (secret) return secret;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('BETTER_AUTH_SECRET is not set. Generate one with `openssl rand -base64 32`.');
+  }
+  return 'development-only-secret';
+}
+
 function build() {
   return betterAuth({
     database: drizzleAdapter(db(), {
@@ -59,9 +76,7 @@ function build() {
         verification: schema.verifications,
       },
     }),
-    // Required in production and generated from it; a missing secret should
-    // fail loudly at boot rather than silently signing with a default.
-    secret: process.env['BETTER_AUTH_SECRET'] ?? 'development-only-secret',
+    secret: authSecret(),
     baseURL: process.env['BETTER_AUTH_URL'] ?? process.env['NEXT_PUBLIC_SITE_URL'],
     socialProviders: socialProviders(),
     session: {
@@ -94,7 +109,10 @@ function build() {
             .from(schema.memberships)
             .where(eq(schema.memberships.userId, newUser.user.id))
             .limit(1);
-          if (existing) return;
+          if (existing) {
+            await retireSampleLedgers(database, anonymousUser.user.id);
+            return;
+          }
           await database
             .update(schema.memberships)
             .set({ userId: newUser.user.id })

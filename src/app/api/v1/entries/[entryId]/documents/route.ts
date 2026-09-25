@@ -1,6 +1,7 @@
 import { defineRoute, json } from '@/server/http/route';
 import { problem, problemFor, problemResponse } from '@/server/http/problem';
 import { DOCUMENT_KINDS, MAX_DOCUMENT_BYTES, type DocumentKind } from '@/server/domain/document';
+import { readBody } from '@/server/http/body';
 
 type Params = { entryId: string };
 
@@ -31,13 +32,19 @@ export const GET = defineRoute<Params>(
 export const POST = defineRoute<Params>(
   { name: 'entries.documents.create', auth: true },
   async ({ params, request, requestId, services }) => {
-    // Refused before the body is read: a declared size over the limit is not
-    // worth buffering to find out.
-    const declared = Number(request.headers.get('content-length') ?? '0');
-    if (declared > MAX_DOCUMENT_BYTES + 64 * 1024) {
+    // Counted as it arrives, with room for the multipart framing: a declared
+    // size over the limit is refused unread, and an undeclared one is cut off
+    // at the first byte past it.
+    const body = await readBody(request, MAX_DOCUMENT_BYTES + 64 * 1024);
+    if (body === 'too_large') {
+      const declared = Number(request.headers.get('content-length') ?? '0');
       return problemResponse(
         problemFor(
-          { code: 'document_too_large', sizeBytes: declared, limitBytes: MAX_DOCUMENT_BYTES },
+          {
+            code: 'document_too_large',
+            sizeBytes: declared || MAX_DOCUMENT_BYTES + 1,
+            limitBytes: MAX_DOCUMENT_BYTES,
+          },
           requestId,
         ),
       );
@@ -45,7 +52,9 @@ export const POST = defineRoute<Params>(
 
     let form: FormData;
     try {
-      form = await request.formData();
+      form = await new Response(body, {
+        headers: { 'content-type': request.headers.get('content-type') ?? '' },
+      }).formData();
     } catch {
       return problemResponse({
         ...problem(

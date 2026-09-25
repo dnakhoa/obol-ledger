@@ -19,7 +19,9 @@ import { db } from '@/server/db/client';
  *     for: 1m
  *     severity: page
  */
-export const GET = defineRoute({ name: 'metrics', rateLimit: false }, async ({ services }) => {
+// Rate limited like any read: it is unauthenticated, and each call aggregates
+// the whole ledger and inspects every policy. A scraper asks every 15 seconds.
+export const GET = defineRoute({ name: 'metrics' }, async ({ services }) => {
   const [metrics, webhooks, isolation] = await Promise.all([
     services.reporting.metrics(),
     services.webhooks.summary(),

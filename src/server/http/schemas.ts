@@ -85,6 +85,9 @@ export type CreateAccountBody = z.infer<typeof createAccountSchema>;
 const fxRateSchema = z
   .string()
   .trim()
+  // numeric(20, 10) holds at most 21 characters; a bound here stops a
+  // megabyte of digits reaching BigInt, which parses in quadratic time.
+  .max(32)
   .regex(/^\d+(\.\d{1,10})?$/u, { message: 'Expected a positive decimal with up to 10 places' });
 
 const postingSchema = z.object({
@@ -128,7 +131,13 @@ export const createEntrySchema = z.object({
    * named account is still at that version. Lets a caller read a balance,
    * decide on it, and commit without holding a lock across the round trip.
    */
-  expectedVersions: z.record(accountIdSchema, z.number().int().min(0)).optional(),
+  expectedVersions: z
+    .record(accountIdSchema, z.number().int().min(0))
+    // One per posting at most, and an entry has at most 64 of those.
+    .refine((versions) => Object.keys(versions).length <= 64, {
+      message: 'At most 64 expected versions',
+    })
+    .optional(),
   metadata: metadataSchema,
 });
 
@@ -262,6 +271,7 @@ export const recordRateSchema = z.object({
   rate: z
     .string()
     .trim()
+    .max(32)
     .regex(/^\d+(\.\d{1,10})?$/u, { message: 'Expected a positive decimal with up to 10 places' }),
   /** The date this rate was in force, as YYYY-MM-DD. */
   asOf: z.iso.date(),

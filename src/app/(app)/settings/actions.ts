@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { createApiKeySchema } from '@/server/http/schemas';
-import { rateLimit } from '@/server/http/rate-limit';
+import { clientAddress } from '@/server/http/client-address';
+import { durableRateLimit } from '@/server/http/durable-rate-limit';
+import { db } from '@/server/db/client';
 
 export type ApiKeyFormState = {
   readonly status: 'idle' | 'error' | 'issued';
@@ -15,13 +17,13 @@ export type ApiKeyFormState = {
 };
 
 /**
- * Issues a key for the published demo tenant.
+ * Issues a key for the signed-in member's own ledger.
  *
- * Over the API this needs an existing key — minting a credential should
- * require one. The dashboard is the deliberate exception, because the demo
- * tenant's ledger already accepts writes from any visitor through these same
- * server actions; requiring a key to get a key would only mean nobody could
- * try the API. The quota is deliberately much tighter than the rest.
+ * Only a member who may write gets one — a guest looking at the demo is
+ * refused by `requireWriter`. The quota is deliberately much tighter than the
+ * rest, and counted across every instance: a key is a credential, and a
+ * signed-in session that has been taken over should not be able to mint them
+ * in bulk.
  */
 const HOURLY_QUOTA = 5;
 
@@ -30,8 +32,11 @@ export async function issueApiKeyAction(
   formData: FormData,
 ): Promise<ApiKeyFormState> {
   const requestHeaders = await headers();
-  const client = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-  const decision = rateLimit(`apikey:${client}`, Date.now(), HOURLY_QUOTA);
+  const client = clientAddress(requestHeaders);
+  const decision = await durableRateLimit(db(), `apikey:${client}`, {
+    limit: HOURLY_QUOTA,
+    windowMs: 60 * 60 * 1000,
+  });
   if (!decision.allowed) {
     return {
       status: 'error',

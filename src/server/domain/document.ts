@@ -57,26 +57,93 @@ export function sniffContentType(bytes: Uint8Array): DocumentContentType | null 
 /**
  * An XML document of the kind an e-invoice is, and nothing that renders.
  *
- * It must open with an XML declaration, carry no DOCTYPE — which is how
- * entity expansion and external entities get in, and which no e-invoice
- * schema uses — and its root must not be an SVG or XHTML document, the two
- * XML vocabularies a browser will execute.
+ * It must open with an XML declaration and carry no DOCTYPE or entity
+ * declaration anywhere — which is how entity expansion and external entities
+ * get in, and which no e-invoice schema uses. Nothing in it may belong to
+ * SVG or XHTML, the two XML vocabularies a browser will execute, whether as
+ * the root or as an element further down; and it may not ask for a
+ * stylesheet, which is how XSLT turns XML into a page. The root is found
+ * by walking past comments and processing instructions, so a tag written
+ * inside a comment cannot stand in for the real one.
+ *
+ * The whole file is read, not its first few kilobytes: a declaration placed
+ * after a long comment is still a declaration.
  */
 function isPlainXml(bytes: Uint8Array): boolean {
   let text: string;
   try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, 4096));
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
     return false;
   }
-  text = text.replace(/^﻿/u, '').trimStart();
+  text = text.replace(/^\uFEFF/u, '').trimStart();
   if (!text.startsWith('<?xml')) return false;
-  if (/<!DOCTYPE/iu.test(text)) return false;
+  if (/<!(DOCTYPE|ENTITY)/iu.test(text)) return false;
+  if (/<\?xml-stylesheet/iu.test(text)) return false;
+  if (declaresExecutableNamespace(text)) return false;
 
-  const root = /<(?![?!])([A-Za-z_][\w.:-]*)/u.exec(text)?.[1];
+  const root = rootElement(text);
   if (!root) return false;
   const local = (root.split(':').pop() ?? '').toLowerCase();
   return local !== 'svg' && local !== 'html' && local !== 'xhtml';
+}
+
+/**
+ * The namespaces a browser executes. An element is SVG or XHTML only when a
+ * namespace declaration names one of these exactly — XML compares namespace
+ * names as strings — so each declaration's value is compared whole.
+ */
+const EXECUTABLE_NAMESPACES = new Set([
+  'http://www.w3.org/1999/xhtml',
+  'http://www.w3.org/2000/svg',
+]);
+
+function declaresExecutableNamespace(text: string): boolean {
+  for (const match of text.matchAll(/\bxmlns(?::[\w.-]+)?\s*=\s*(["'])(.*?)\1/gsu)) {
+    if (EXECUTABLE_NAMESPACES.has(decodeAttribute(match[2] ?? '').trim())) return true;
+  }
+  return false;
+}
+
+/**
+ * An attribute value as a parser reads it: `xh&#116;ml` is `xhtml` by the
+ * time the namespace is compared, so it is here too.
+ */
+function decodeAttribute(value: string): string {
+  const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+  return value.replace(/&(?:#x([0-9a-f]+)|#(\d+)|(\w+));/giu, (whole, hex, decimal, name) => {
+    const code = hex ? Number.parseInt(String(hex), 16) : decimal ? Number(decimal) : undefined;
+    if (code !== undefined) return code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+    return named[String(name)] ?? whole;
+  });
+}
+
+/**
+ * The name of the first element, found the way a parser finds it: by walking
+ * past each comment and processing instruction in turn. Stripping them with a
+ * pattern instead can be defeated by one nested in another, which leaves a new
+ * `<!--` behind once the inner one is removed.
+ */
+function rootElement(text: string): string | null {
+  let at = 0;
+  for (;;) {
+    const open = text.indexOf('<', at);
+    if (open === -1) return null;
+    if (text.startsWith('<!--', open)) {
+      const end = text.indexOf('-->', open + 4);
+      if (end === -1) return null;
+      at = end + 3;
+    } else if (text.startsWith('<?', open)) {
+      const end = text.indexOf('?>', open + 2);
+      if (end === -1) return null;
+      at = end + 2;
+    } else if (text.startsWith('<!', open)) {
+      // A DOCTYPE was refused above; nothing else may precede the root.
+      return null;
+    } else {
+      return /^<([A-Za-z_][\w.:-]*)/u.exec(text.slice(open, open + 256))?.[1] ?? null;
+    }
+  }
 }
 
 const EXTENSION: Record<DocumentContentType, string> = {

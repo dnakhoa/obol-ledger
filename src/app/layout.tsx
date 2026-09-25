@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { viewerLocale } from '@/server/i18n';
@@ -79,11 +80,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // tells a screen reader which voice to use, and is what a translation tool
   // reads before offering to translate a page that is already translated.
   const locale = await viewerLocale();
+  // Set by `src/proxy.ts`; the page's policy runs only scripts that carry it.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className={`${inter.variable} ${mono.variable} font-sans antialiased`}>{children}</body>
     </html>

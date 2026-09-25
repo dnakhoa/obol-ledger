@@ -24,7 +24,9 @@ import { defineRoute, json } from '@/server/http/route';
  *    stays in the logs.
  */
 export const GET = defineRoute(
-  { name: 'health', rateLimit: false, tenantless: true },
+  // Limited like any other route: a probe calls it a few times a minute, and
+  // unlimited it would be a free way to make the database do work.
+  { name: 'health', tenantless: true },
   async ({ logger }) => {
     const configured = Boolean(process.env['DATABASE_URL']);
     const startedAt = performance.now();

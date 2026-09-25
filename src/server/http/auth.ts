@@ -1,4 +1,5 @@
-import { authentication, demoOrgSlug } from '@/server/container';
+import { authentication } from '@/server/container';
+import { DemoUnavailableError, demoOrgId } from '@/server/auth/viewer';
 import type { Principal } from '@/server/services/authentication';
 import { problem, type Problem } from './problem';
 
@@ -47,14 +48,17 @@ export async function authenticate(
     );
   }
 
-  const demo = await authentication().organizationBySlug(demoOrgSlug());
-  if (!demo) {
+  // By the flag the seed sets, never by slug: a slug is chosen by whoever
+  // names a ledger, and matching on one is how a tenant becomes public.
+  try {
+    return { orgId: await demoOrgId() };
+  } catch (error) {
+    if (!(error instanceof DemoUnavailableError)) throw error;
     return problem(
       503,
       'not-configured',
       'Service not configured',
-      `No organization with slug "${demoOrgSlug()}" exists, so there is no ledger to read. Run pnpm db:seed.`,
+      'No organization is marked as the demo, so there is no ledger to read. Run pnpm db:seed.',
     );
   }
-  return { orgId: demo.id };
 }

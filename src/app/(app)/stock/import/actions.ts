@@ -7,6 +7,11 @@ import { viewerServices } from '@/server/container';
 import { describeError, translations } from '@/server/i18n';
 import type { Messages } from '@/lib/i18n';
 import type { ImportPreview } from '@/server/services/stock-import';
+import { headers } from 'next/headers';
+import { db } from '@/server/db/client';
+import { clientAddress } from '@/server/http/client-address';
+import { durableRateLimit } from '@/server/http/durable-rate-limit';
+import { uploadAllowed } from '@/server/http/upload-quota';
 
 export type ImportState = {
   readonly status: 'idle' | 'previewed' | 'error' | 'done';
@@ -44,8 +49,17 @@ export type ImportState = {
  * clean preview really does mean a clean import.
  */
 
+/**
+ * The most a paste may hold. The preview is open to signed-out visitors, and
+ * each row becomes an object with its own message — so without a bound, a few
+ * megabytes of blank lines would cost the server hundreds of megabytes to
+ * describe. A real purchase history in one go is a few thousand rows.
+ */
+const MAX_ROWS = 5_000;
+const MAX_CHARS = 1_000_000;
+
 const schema = z.object({
-  text: z.string().min(1),
+  text: z.string().min(1).max(MAX_CHARS),
   creditAccountId: z.string().min(1),
   inventoryAccountId: z.string().min(1),
   cogsAccountId: z.string().min(1),
@@ -66,6 +80,18 @@ export async function previewImportAction(
   formData: FormData,
 ): Promise<ImportState> {
   const { t } = await translations();
+  const decision = await durableRateLimit(
+    db(),
+    `import-preview:${clientAddress(await headers())}`,
+    {
+      limit: 30,
+    },
+  );
+  if (!decision.allowed)
+    return { status: 'error', message: t.forms.tooManyTransitions(decision.retryAfterSeconds) };
+
+  const size = sizeOf(formData);
+  if (size === 'too_large') return { status: 'error', message: t.stockImport.tooLarge(MAX_ROWS) };
   const parsed = schema.safeParse(fields(formData));
   if (!parsed.success) return { status: 'error', message: t.stockImport.pasteRows };
 
@@ -99,6 +125,13 @@ export async function applyImportAction(
   if (!writer.allowed) return { status: 'error', message: await refusalMessage(writer.reason) };
 
   const { locale, t } = await translations();
+  if (sizeOf(formData) === 'too_large') {
+    return { status: 'error', message: t.stockImport.tooLarge(MAX_ROWS) };
+  }
+  const quota = await uploadAllowed(writer.viewer.orgId);
+  if (!quota.allowed) {
+    return { status: 'error', message: t.forms.tooManyTransitions(quota.retryAfterSeconds) };
+  }
   const parsed = schema.safeParse(fields(formData));
   if (!parsed.success) return { status: 'error', message: t.stockImport.rowsLost };
 
@@ -160,4 +193,17 @@ function fields(formData: FormData) {
     inventoryAccountId: String(formData.get('inventoryAccountId') ?? ''),
     cogsAccountId: String(formData.get('cogsAccountId') ?? ''),
   };
+}
+
+/** Refused before parsing, so an oversized paste costs a count, not a parse. */
+function sizeOf(formData: FormData): 'ok' | 'too_large' {
+  const text = formData.get('text');
+  if (typeof text !== 'string') return 'ok';
+  if (text.length > MAX_CHARS) return 'too_large';
+  let lines = 1;
+  for (let at = text.indexOf('\n'); at !== -1; at = text.indexOf('\n', at + 1)) {
+    lines += 1;
+    if (lines > MAX_ROWS + 1) return 'too_large';
+  }
+  return 'ok';
 }

@@ -246,7 +246,7 @@ describe('multi-currency entries', () => {
       // hundred times too small unless the service rescales it.
       setDatabaseForTesting(db);
       resetRateLimits();
-      process.env['DEMO_ORG_SLUG'] = 'primary';
+      await db.update(organizations).set({ isDemo: true }).where(eq(organizations.id, db.$orgId));
 
       await db.insert(apiKeys).values({
         id: newId('apiKey'),

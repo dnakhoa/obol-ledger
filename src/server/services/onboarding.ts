@@ -133,6 +133,8 @@ export function chartTemplates(): readonly ChartTemplate[] {
   return CHART_TEMPLATES;
 }
 
+const RESERVED_SLUGS = new Set(['demo', process.env['DEMO_ORG_SLUG'] ?? 'demo']);
+
 /**
  * A readable slug, made unique without a retry loop.
  *
@@ -154,5 +156,8 @@ async function uniqueSlug(tx: Transactional, name: string, orgId: string): Promi
     .where(eq(organizations.slug, base))
     .limit(1);
 
-  return taken ? `${base}-${orgId.slice(-6).toLowerCase()}` : base;
+  // The demo's slug is never handed out, even while no organisation holds it:
+  // a ledger that took it would be the one an old link, or an operator's
+  // mistyped DEMO_ORG_SLUG, publishes.
+  return taken || RESERVED_SLUGS.has(base) ? `${base}-${orgId.slice(-6).toLowerCase()}` : base;
 }

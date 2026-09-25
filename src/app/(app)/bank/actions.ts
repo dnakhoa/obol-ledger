@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { describeError, translations } from '@/server/i18n';
+import { uploadAllowed } from '@/server/http/upload-quota';
 
 export type BankState = {
   readonly status: 'idle' | 'error' | 'done';
@@ -34,6 +35,10 @@ export async function importStatementAction(
     return { status: 'error', message: t.bank.chooseFile };
   }
   if (file.size > MAX_STATEMENT_BYTES) return { status: 'error', message: t.bank.chooseFile };
+  const quota = await uploadAllowed(writer.viewer.orgId);
+  if (!quota.allowed) {
+    return { status: 'error', message: t.forms.tooManyTransitions(quota.retryAfterSeconds) };
+  }
 
   const result = await writer.services.bank.importFile({
     accountId: accountId.data,

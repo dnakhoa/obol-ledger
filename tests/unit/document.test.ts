@@ -25,6 +25,41 @@ describe('sniffContentType', () => {
     // Not valid UTF-8: not an XML document this ledger will hold.
     expect(sniffContentType(bytes(0x3c, 0x3f, 0x78, 0x6d, 0x6c, 0xff, 0xfe))).toBeNull();
   });
+
+  it('is not fooled by where the dangerous part is put', () => {
+    // A tag inside a comment is not the root.
+    expect(sniffContentType(text('<?xml version="1.0"?><!-- <a> --><svg/>'))).toBeNull();
+    // An XHTML script below an innocent root.
+    expect(
+      sniffContentType(
+        text(
+          '<?xml version="1.0"?><HDon><h:script xmlns:h="http://www.w3.org/1999/xhtml">x</h:script></HDon>',
+        ),
+      ),
+    ).toBeNull();
+    // A DOCTYPE after a long comment, past where a prefix check stops.
+    expect(
+      sniffContentType(text(`<?xml version="1.0"?><!--${'x'.repeat(5000)}--><!DOCTYPE a><a/>`)),
+    ).toBeNull();
+    // The namespace spelled with a character reference, which a parser decodes.
+    expect(
+      sniffContentType(
+        text('<?xml version="1.0"?><HDon xmlns:h="http://www.w3.org/1999/xh&#116;ml"/>'),
+      ),
+    ).toBeNull();
+    // A namespace that merely mentions the address is not the namespace.
+    expect(
+      sniffContentType(
+        text('<?xml version="1.0"?><HDon><Note>see www.w3.org/2000/svg</Note></HDon>'),
+      ),
+    ).toBe('application/xml');
+    // A comment nested so that stripping the inner one leaves a new opener.
+    expect(sniffContentType(text('<?xml version="1.0"?><!<!---->-- <a> --><svg/>'))).toBeNull();
+    // A stylesheet, which a browser applies to turn XML into a page.
+    expect(
+      sniffContentType(text('<?xml version="1.0"?><?xml-stylesheet href="x.xsl"?><HDon/>')),
+    ).toBeNull();
+  });
 });
 
 describe('cleanFilename', () => {

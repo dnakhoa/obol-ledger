@@ -98,4 +98,19 @@ describe('structured logger', () => {
 
     expect(lines).toHaveLength(1);
   });
+
+  it("keeps a failed query's bound values out of the log", () => {
+    const { lines, restore } = captureStderr();
+    const error = new Error(
+      'Failed query: insert into "webhook_endpoints" values ($1, $2)\nparams: whsec_secret,\nsecond line',
+    );
+    createLogger().error('request.failed', { error });
+    restore();
+
+    const line = lines[0] ?? '';
+    expect(line).not.toContain('whsec_secret');
+    expect(line).not.toContain('second line');
+    expect(line).toContain('insert into');
+    expect(line).toContain('params: [redacted]');
+  });
 });

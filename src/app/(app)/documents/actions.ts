@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { DOCUMENT_KINDS } from '@/server/domain/document';
 import { describeError, translations } from '@/server/i18n';
+import { uploadAllowed } from '@/server/http/upload-quota';
 
 export type AttachmentState = {
   readonly status: 'idle' | 'error' | 'done';
@@ -30,6 +31,10 @@ export async function attachDocumentAction(
   if (!writer.allowed) return { status: 'error', message: await refusalMessage(writer.reason) };
 
   const { locale, t } = await translations();
+  const quota = await uploadAllowed(writer.viewer.orgId);
+  if (!quota.allowed) {
+    return { status: 'error', message: t.forms.tooManyTransitions(quota.retryAfterSeconds) };
+  }
   const on = target.safeParse({
     transactionId: formData.get('transactionId') ?? '',
     shipmentId: formData.get('shipmentId') ?? '',

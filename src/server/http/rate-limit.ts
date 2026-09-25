@@ -31,6 +31,7 @@ export function rateLimit(
   key: string,
   now: number = Date.now(),
   limit: number = MAX_REQUESTS,
+  windowMs: number = WINDOW_MS,
 ): RateLimitDecision {
   // Opportunistic sweep: without it the map grows with every distinct client
   // for the lifetime of the instance.
@@ -42,7 +43,7 @@ export function rateLimit(
 
   const current = windows.get(key);
   if (!current || current.resetAt <= now) {
-    const window = { count: 1, resetAt: now + WINDOW_MS };
+    const window = { count: 1, resetAt: now + windowMs };
     windows.set(key, window);
     return { allowed: true, remaining: limit - 1, resetAt: window.resetAt };
   }
