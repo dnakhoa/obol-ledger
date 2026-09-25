@@ -57,23 +57,36 @@ export function sniffContentType(bytes: Uint8Array): DocumentContentType | null 
 /**
  * An XML document of the kind an e-invoice is, and nothing that renders.
  *
- * It must open with an XML declaration, carry no DOCTYPE — which is how
- * entity expansion and external entities get in, and which no e-invoice
- * schema uses — and its root must not be an SVG or XHTML document, the two
- * XML vocabularies a browser will execute.
+ * It must open with an XML declaration and carry no DOCTYPE or entity
+ * declaration anywhere — which is how entity expansion and external entities
+ * get in, and which no e-invoice schema uses. Nothing in it may belong to
+ * SVG or XHTML, the two XML vocabularies a browser will execute, whether as
+ * the root or as an element further down; and it may not ask for a
+ * stylesheet, which is how XSLT turns XML into a page. The root is found
+ * after comments, processing instructions and CDATA are set aside, so a tag
+ * written inside a comment cannot stand in for the real one.
+ *
+ * The whole file is read, not its first few kilobytes: a declaration placed
+ * after a long comment is still a declaration.
  */
 function isPlainXml(bytes: Uint8Array): boolean {
   let text: string;
   try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, 4096));
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
     return false;
   }
-  text = text.replace(/^﻿/u, '').trimStart();
+  text = text.replace(/^\uFEFF/u, '').trimStart();
   if (!text.startsWith('<?xml')) return false;
-  if (/<!DOCTYPE/iu.test(text)) return false;
+  if (/<!(DOCTYPE|ENTITY)/iu.test(text)) return false;
+  if (/<\?xml-stylesheet/iu.test(text)) return false;
+  if (/www\.w3\.org\/(1999\/xhtml|2000\/svg)/iu.test(text)) return false;
 
-  const root = /<(?![?!])([A-Za-z_][\w.:-]*)/u.exec(text)?.[1];
+  const body = text
+    .replace(/<!--[\s\S]*?-->/gu, '')
+    .replace(/<!\[CDATA\[[\s\S]*?\]\]>/gu, '')
+    .replace(/<\?[\s\S]*?\?>/gu, '');
+  const root = /<(?![?!])([A-Za-z_][\w.:-]*)/u.exec(body)?.[1];
   if (!root) return false;
   const local = (root.split(':').pop() ?? '').toLowerCase();
   return local !== 'svg' && local !== 'html' && local !== 'xhtml';

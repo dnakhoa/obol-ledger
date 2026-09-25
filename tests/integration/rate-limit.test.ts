@@ -119,7 +119,7 @@ describe('durable rate limiting', () => {
 
   it('sweeps counters nobody has touched', async () => {
     await durableRateLimit(db, 'old', { limit: 5, now });
-    await db.execute(sql`UPDATE rate_limits SET updated_at = now() - interval '2 hours'`);
+    await db.execute(sql`UPDATE rate_limits SET updated_at = now() - interval '3 days'`);
 
     expect(await sweepRateLimits(db)).toBe(1);
 

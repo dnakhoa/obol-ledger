@@ -6,8 +6,9 @@ import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { db } from '@/server/db/client';
 import { createEndpointSchema } from '@/server/http/schemas';
 import { createDispatcher } from '@/server/services/webhook-dispatcher';
-import { rateLimit } from '@/server/http/rate-limit';
 import { logger } from '@/server/observability/logger';
+import { clientAddress } from '@/server/http/client-address';
+import { durableRateLimit } from '@/server/http/durable-rate-limit';
 
 export type EndpointFormState = {
   readonly status: 'idle' | 'error' | 'created';
@@ -22,8 +23,8 @@ export async function registerEndpointAction(
   formData: FormData,
 ): Promise<EndpointFormState> {
   const requestHeaders = await headers();
-  const client = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-  const decision = rateLimit(`webhook:${client}`, Date.now(), 10);
+  const client = clientAddress(requestHeaders);
+  const decision = await durableRateLimit(db(), `webhook:${client}`, { limit: 10 });
   if (!decision.allowed) {
     return {
       status: 'error',

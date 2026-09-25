@@ -5,6 +5,8 @@ import { authenticate, type Authenticated } from './auth';
 import { servicesFor, type Services } from '@/server/container';
 import { rateLimitProblem } from './rate-limit';
 import { durableRateLimit } from './durable-rate-limit';
+import { MAX_JSON_BYTES, readBody } from './body';
+import { clientAddress } from './client-address';
 import { db } from '@/server/db/client';
 import { problem, problemResponse } from './problem';
 
@@ -48,7 +50,10 @@ export function defineRoute<Params = Record<string, never>>(
   return async (request, context) => {
     // Honour an inbound correlation id so a trace survives across services,
     // and mint one otherwise so every response can be tied back to its logs.
-    const requestId = request.headers.get('x-request-id') ?? randomUUID();
+    // Only an id that looks like one: this is echoed back and written to
+    // every log line, so it is not a place for a client's kilobyte of text.
+    const inbound = request.headers.get('x-request-id');
+    const requestId = inbound && /^[\w.:-]{1,128}$/u.test(inbound) ? inbound : randomUUID();
     const log = createLogger({ service: 'obol-ledger', route: options.name, requestId });
     const startedAt = performance.now();
 
@@ -132,8 +137,7 @@ export function defineRoute<Params = Record<string, never>>(
 }
 
 function clientKey(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  return forwarded?.split(',')[0]?.trim() || 'unknown';
+  return clientAddress(request.headers);
 }
 
 export function json(value: unknown, init: ResponseInit = {}): Response {
@@ -157,9 +161,25 @@ export async function readJson<Schema extends z.ZodType>(
   schema: Schema,
   requestId: string,
 ): Promise<{ ok: true; data: z.infer<Schema>; raw: unknown } | { ok: false; response: Response }> {
+  const body = await readBody(request, MAX_JSON_BYTES);
+  if (body === 'too_large') {
+    return {
+      ok: false,
+      response: problemResponse({
+        ...problem(
+          413,
+          'body-too-large',
+          'Request body too large',
+          `A JSON body may be at most ${MAX_JSON_BYTES / 1024} KB.`,
+        ),
+        requestId,
+      }),
+    };
+  }
+
   let raw: unknown;
   try {
-    raw = await request.json();
+    raw = JSON.parse(new TextDecoder().decode(body));
   } catch {
     return {
       ok: false,

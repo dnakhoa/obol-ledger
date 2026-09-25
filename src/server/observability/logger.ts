@@ -37,10 +37,21 @@ function serializeError(value: unknown): unknown {
   if (!(value instanceof Error)) return value;
   return {
     name: value.name,
-    message: value.message,
-    stack: value.stack,
+    message: redactParams(value.message),
+    // The stack opens with the message, so the same values are in it.
+    stack: value.stack?.replace(value.message, redactParams(value.message)),
     ...(value.cause === undefined ? {} : { cause: serializeError(value.cause) }),
   };
+}
+
+/**
+ * Drizzle puts a failed query's bound values in the error message, after
+ * `params:`. Those are whatever the query carried — a webhook secret, a
+ * document's bytes, a customer's tax code — and none of them belongs in a log
+ * a platform indexes. The SQL stays; it says which query failed.
+ */
+function redactParams(message: string): string {
+  return message.replace(/\nparams: [\s\S]*$/u, '\nparams: [redacted]');
 }
 
 function normalize(fields: LogFields): LogFields {

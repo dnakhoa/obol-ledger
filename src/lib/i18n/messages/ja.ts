@@ -873,6 +873,8 @@ export const ja: Messages = {
     fixFirst:
       '上で印の付いた行を修正し、もう一度確認してください。取込は全件か 0 件かのいずれかで、正しい行だけを取り込むことはしません。',
     rowProblem: (line, problem) => `${line} 行目：${problem}`,
+    tooLarge: (rows: number) =>
+      `${rows.toLocaleString('ja-JP')} 行を超えています。ファイルを分割して取り込んでください。`,
     pasteRows: '行を貼り付け、入庫の貸方勘定を選んでください。',
     rowsLost: '行のデータが失われました。もう一度貼り付けてください。',
     noColumn: (columns) =>

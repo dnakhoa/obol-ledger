@@ -20,7 +20,13 @@
  * ledger is broken.
  */
 
-const NEEDS_QUOTING = /[",\r\n]/u;
+/**
+ * Semicolons and tabs as well as commas: Excel in a Vietnamese, German or
+ * French locale splits an unquoted line on `;`, so `x;=HYPERLINK(…)` becomes a
+ * second cell that starts with `=` and slips past the formula guard below.
+ * Every spreadsheet honours the quotes whichever separator it chose.
+ */
+const NEEDS_QUOTING = /[",;\t\r\n]/u;
 
 /** Characters a spreadsheet treats as the start of a formula. */
 const FORMULA_START = /^[=+\-@\t\r]/u;

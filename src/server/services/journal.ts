@@ -979,7 +979,9 @@ export function createJournalService(database: Database, orgId: string) {
               )`
             : undefined,
           options.search
-            ? sql`${transactions.description} ilike ${`%${options.search}%`}`
+            ? // Escaped, so "50%" finds fifty percent rather than every
+              // description with a 50 in it.
+              sql`${transactions.description} ilike ${`%${options.search.slice(0, 120).replace(/[\\%_]/gu, '\\$&')}%`} escape '\\'`
             : undefined,
           options.status ? eq(transactions.status, options.status) : undefined,
           // Containment (`@>`), not `->>`, because containment is what the GIN

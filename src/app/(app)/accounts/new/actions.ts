@@ -5,9 +5,11 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { createAccountSchema } from '@/server/http/schemas';
-import { rateLimit } from '@/server/http/rate-limit';
 import { logger } from '@/server/observability/logger';
 import { describeError, translations } from '@/server/i18n';
+import { clientAddress } from '@/server/http/client-address';
+import { durableRateLimit } from '@/server/http/durable-rate-limit';
+import { db } from '@/server/db/client';
 
 export type AccountFormState = {
   readonly status: 'idle' | 'error';
@@ -21,8 +23,8 @@ export async function createAccountAction(
 ): Promise<AccountFormState> {
   const { locale, t } = await translations();
   const requestHeaders = await headers();
-  const client = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-  const decision = rateLimit(`account:${client}`, Date.now(), 20);
+  const client = clientAddress(requestHeaders);
+  const decision = await durableRateLimit(db(), `account:${client}`, { limit: 20 });
   if (!decision.allowed) {
     return {
       status: 'error',

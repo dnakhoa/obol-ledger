@@ -69,13 +69,14 @@ export const GET = POST;
  *
  * Compared in constant time, because this is a bearer token like any other and
  * the fact that only the platform is supposed to call the endpoint is not a
- * reason to compare it carelessly. When no secret is configured — a local
- * checkout — the endpoint is open, which is the correct trade for a machine
- * with no scheduler and no production data.
+ * reason to compare it carelessly. When no secret is configured the endpoint
+ * is open in development — a checkout with no scheduler and no production
+ * data — and closed in a production build, where a forgotten variable would
+ * otherwise let anyone set every tenant's deliveries going.
  */
 function authorized(request: Request): boolean {
   const expected = process.env['CRON_SECRET'];
-  if (!expected) return true;
+  if (!expected) return process.env.NODE_ENV !== 'production';
 
   const presented = request.headers.get('authorization')?.replace(/^Bearer /u, '') ?? '';
   const a = Buffer.from(presented);

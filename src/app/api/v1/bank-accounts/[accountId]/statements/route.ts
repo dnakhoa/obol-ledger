@@ -1,5 +1,6 @@
 import { defineRoute, json } from '@/server/http/route';
 import { problem, problemFor, problemResponse } from '@/server/http/problem';
+import { readBody } from '@/server/http/body';
 
 type Params = { accountId: string };
 
@@ -16,9 +17,9 @@ const MAX_STATEMENT_BYTES = 512 * 1024;
 export const POST = defineRoute<Params>(
   { name: 'bankAccounts.statements.import', auth: true },
   async ({ params, request, requestId, services }) => {
-    const declared = Number(request.headers.get('content-length') ?? '0');
-    const text = declared > MAX_STATEMENT_BYTES ? '' : await request.text();
-    if (!text || text.length > MAX_STATEMENT_BYTES) {
+    const body = await readBody(request, MAX_STATEMENT_BYTES);
+    const text = body === 'too_large' ? '' : new TextDecoder().decode(body);
+    if (!text) {
       return problemResponse({
         ...problem(
           422,

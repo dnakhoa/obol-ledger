@@ -888,6 +888,8 @@ export const en = {
     fixFirst:
       'Fix the rows marked above and check again. The import is all or nothing — it will not bring in the good rows and leave the rest.',
     rowProblem: (line: number, problem: string) => `Row ${line}: ${problem}`,
+    tooLarge: (rows: number) =>
+      `That is more than ${rows.toLocaleString('en-US')} rows. Split the file and import it in parts.`,
     pasteRows: 'Paste the rows in, and choose where the deliveries are charged.',
     rowsLost: 'The rows were lost. Paste them again.',
     noColumn: (columns: string) =>

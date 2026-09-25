@@ -26,7 +26,7 @@ import { createEInvoiceService } from '@/server/services/einvoices';
 import { createTaxReturnService } from '@/server/services/tax-return';
 import { createWebhookService } from './services/webhooks';
 import { SetupRequiredError } from './setup-error';
-import { currentViewer, type Viewer } from './auth/viewer';
+import { DemoUnavailableError, currentViewer, demoOrgId, type Viewer } from './auth/viewer';
 
 /**
  * Composition root.
@@ -127,13 +127,14 @@ export class OnboardingRequiredError extends Error {
  * exception carved out of it.
  */
 export async function demoServices(): Promise<Services> {
-  const org = await authentication().organizationBySlug(demoOrgSlug());
-  if (!org) {
+  try {
+    return servicesFor(await demoOrgId());
+  } catch (error) {
+    if (!(error instanceof DemoUnavailableError)) throw error;
     throw new SetupRequiredError(
-      `No organization with slug "${demoOrgSlug()}" exists yet, so there is no ledger to show.`,
+      'No organization is marked as the demo yet, so there is no ledger to show.',
     );
   }
-  return servicesFor(org.id);
 }
 
 export type Services = ReturnType<typeof servicesFor>;

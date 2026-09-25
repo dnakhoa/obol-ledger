@@ -226,11 +226,16 @@ function text(tag: string, value: string): string {
 }
 
 function escape(value: string): string {
-  return value
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/gu, '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;');
+  return (
+    value
+      // Characters XML 1.0 forbids outright: most C0 controls, the two
+      // non-characters and — `u` mode matches them only when unpaired — lone
+      // surrogates. Left in, the provider rejects the whole invoice.
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\uFFFE\uFFFF]|[\uD800-\uDFFF]/gu, '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&apos;')
+  );
 }

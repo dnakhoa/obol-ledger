@@ -46,17 +46,19 @@ type Row = { count: number; previous_count: number; window_start: string };
 export async function durableRateLimit(
   database: Database,
   key: string,
-  options: { limit?: number; now?: number } = {},
+  options: { limit?: number; now?: number; windowMs?: number } = {},
 ): Promise<DurableDecision> {
   const limit = options.limit ?? RATE_LIMIT.maxRequests;
   const now = options.now ?? Date.now();
+  // A key keeps one window length for its life; the length is part of what
+  // the key means, so callers that want an hourly quota use their own key.
+  const windowMs = options.windowMs ?? RATE_LIMIT.windowMs;
 
   // The local pre-check. It can only reject, never grant: a local count is a
   // subset of the shared one, so "already over here" implies "over there".
-  const local = rateLimit(key, now, limit);
+  const local = rateLimit(key, now, limit, windowMs);
   if (!local.allowed) return local;
 
-  const windowMs = RATE_LIMIT.windowMs;
   const currentStart = new Date(Math.floor(now / windowMs) * windowMs);
   const previousStart = new Date(currentStart.getTime() - windowMs);
 
@@ -123,7 +125,8 @@ export async function durableRateLimit(
 }
 
 /**
- * Removes counters nobody has touched for an hour.
+ * Removes counters nobody has touched for two days — the longest window any
+ * caller uses is a day, and its previous window still counts.
  *
  * Called from the webhook dispatch cron rather than given a schedule of its
  * own: a second cron entry to delete a few rows is a second thing that can
@@ -132,7 +135,7 @@ export async function durableRateLimit(
  */
 export async function sweepRateLimits(database: Database): Promise<number> {
   const result = (await database.execute(
-    sql`DELETE FROM rate_limits WHERE updated_at < now() - interval '1 hour'`,
+    sql`DELETE FROM rate_limits WHERE updated_at < now() - interval '2 days'`,
   )) as { rowCount?: number };
   return result.rowCount ?? 0;
 }

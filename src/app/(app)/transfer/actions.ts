@@ -7,8 +7,10 @@ import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { createEntrySchema } from '@/server/http/schemas';
 import { toDraftPostings } from '@/server/http/entries';
 import { describeError, translations } from '@/server/i18n';
-import { rateLimit } from '@/server/http/rate-limit';
 import { logger } from '@/server/observability/logger';
+import { clientAddress } from '@/server/http/client-address';
+import { durableRateLimit } from '@/server/http/durable-rate-limit';
+import { db } from '@/server/db/client';
 
 /**
  * Posting an entry from the UI.
@@ -41,8 +43,8 @@ export async function postEntryAction(
   // Server Actions are a public endpoint like any other, so they get the same
   // abuse protection the HTTP routes have.
   const requestHeaders = await headers();
-  const client = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-  const decision = rateLimit(`action:${client}`, Date.now(), 20);
+  const client = clientAddress(requestHeaders);
+  const decision = await durableRateLimit(db(), `action:${client}`, { limit: 20 });
   if (!decision.allowed) {
     return {
       status: 'error',

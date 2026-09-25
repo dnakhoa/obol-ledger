@@ -27,8 +27,13 @@ const WHEN = new Intl.DateTimeFormat('en-US', {
 
 export default async function SettingsPage() {
   let keys: ApiKeyDto[];
+  let member: boolean;
   try {
-    keys = await (await viewerServices()).services.apiKeys.list();
+    const { services, viewer } = await viewerServices();
+    // A signed-out visitor is reading the demo, and the demo's keys are not
+    // theirs to see — not even the few characters of each that identify it.
+    member = viewer.kind === 'member';
+    keys = member ? await services.apiKeys.list() : [];
   } catch (error) {
     if (error instanceof SetupRequiredError) return <SetupNotice detail={error.message} />;
     throw error;
@@ -80,13 +85,19 @@ export default async function SettingsPage() {
           <div className="space-y-0.5">
             <CardTitle>API keys</CardTitle>
             <CardDescription>
-              {active.length} active of {keys.length}. Revoked keys stay listed — a deleted row
-              answers &ldquo;who had access, and until when?&rdquo; with silence.
+              {member
+                ? `${active.length} active of ${keys.length}. Revoked keys stay listed — a deleted row answers “who had access, and until when?” with silence.`
+                : 'Bearer tokens for connecting other systems to your ledger.'}
             </CardDescription>
           </div>
         </CardHeader>
 
-        {keys.length === 0 ? (
+        {!member ? (
+          <EmptyState
+            title="Sign in to issue keys"
+            description="Keys belong to a ledger. Sign in, or try the sample ledger, to issue one for yours."
+          />
+        ) : keys.length === 0 ? (
           <EmptyState
             title="No keys yet"
             description="Issue one below, then use it as a bearer token against /api/v1."
@@ -140,9 +151,11 @@ export default async function SettingsPage() {
           </TableScroll>
         )}
 
-        <CardBody className="border-line border-t">
-          <ApiKeyForm action={issueApiKeyAction} />
-        </CardBody>
+        {member ? (
+          <CardBody className="border-line border-t">
+            <ApiKeyForm action={issueApiKeyAction} />
+          </CardBody>
+        ) : null}
       </Card>
 
       <Card>

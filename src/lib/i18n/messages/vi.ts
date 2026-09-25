@@ -895,6 +895,8 @@ export const vi: Messages = {
     fixFirst:
       'Hãy sửa những dòng được đánh dấu ở trên rồi kiểm tra lại. Nhập dữ liệu theo nguyên tắc toàn bộ hoặc không gì cả — hệ thống sẽ không nhập riêng các dòng đúng và bỏ lại phần còn lại.',
     rowProblem: (line, problem) => `Dòng ${line}: ${problem}`,
+    tooLarge: (rows: number) =>
+      `Tệp có hơn ${rows.toLocaleString('vi-VN')} dòng. Hãy chia tệp và nhập từng phần.`,
     pasteRows: 'Hãy dán các dòng vào và chọn tài khoản ghi Có cho các lần nhập hàng.',
     rowsLost: 'Các dòng dữ liệu đã bị mất. Hãy dán lại.',
     noColumn: (columns) =>

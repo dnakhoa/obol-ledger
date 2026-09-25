@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { LOCALE_COOKIE, isLocale } from '@/lib/i18n';
+import { isInternalPath } from '@/lib/internal-path';
 
 /**
  * Remembers a language choice, then returns to the page it was made on.
@@ -32,7 +33,9 @@ export async function setLocaleAction(formData: FormData): Promise<void> {
   // And then actually go there. Revalidation marks the server's cache stale;
   // it does not make a client that already holds a rendered payload ask for a
   // new one. Only an internal path is accepted — a `next` of `//evil.test`
-  // would otherwise turn a preference toggle into an open redirect.
+  // would otherwise turn a preference toggle into an open redirect, and so
+  // would `/\evil.test` or a tab after the slash, which browsers read as the
+  // same thing.
   const next = String(formData.get('next') ?? '/');
-  redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/');
+  redirect(isInternalPath(next) ? next : '/');
 }

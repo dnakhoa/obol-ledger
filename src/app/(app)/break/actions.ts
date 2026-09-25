@@ -6,6 +6,7 @@ import { db } from '@/server/db/client';
 import { durableRateLimit } from '@/server/http/durable-rate-limit';
 import { logger } from '@/server/observability/logger';
 import { isAttackId, type AttackResult } from '@/server/services/attacks';
+import { clientAddress } from '@/server/http/client-address';
 
 export type AttackActionResult =
   | { readonly ok: true; readonly result: AttackResult }
@@ -27,7 +28,7 @@ export async function runAttackAction(id: string): Promise<AttackActionResult> {
   if (!isAttackId(id)) return { ok: false, reason: 'failed' };
 
   const requestHeaders = await headers();
-  const client = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const client = clientAddress(requestHeaders);
   const decision = await durableRateLimit(db(), `attack:${client}`, { limit: 45 });
   if (!decision.allowed) {
     return { ok: false, reason: 'rate_limited', retryAfterSeconds: decision.retryAfterSeconds };
