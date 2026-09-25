@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
   // `pg` opens raw TCP sockets and loads native-ish internals; it has to stay a
   // real Node module rather than being traced and bundled by the compiler.
   serverExternalPackages: ['pg'],
+  experimental: {
+    // A scanned invoice or customs declaration, up to the 4 MiB the document
+    // store accepts, plus the form around it. Server Actions default to 1 MB,
+    // which refused an ordinary phone photo of a receipt.
+    serverActions: { bodySizeLimit: '5mb' },
+  },
   async headers() {
     return [
       {

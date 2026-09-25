@@ -56,6 +56,15 @@ describe('sample ledgers and Thông tư 133', () => {
       'CN-2612-01',
     ]);
 
+    // The container's paperwork is attached where an auditor would look.
+    const shipments = await services.landedCost.shipments();
+    const container = shipments.find((shipment) => shipment.reference === 'CONT-IT-2207');
+    const papers = await services.documents.list({ shipmentId: container?.id ?? '' });
+    expect(papers.map((paper) => paper.kind).sort()).toEqual([
+      'bill_of_lading',
+      'customs_declaration',
+    ]);
+
     // The visitor is a member who can write, and is said to be trying it.
     const viewer = await resolveViewer({ ...visitor, name: 'Guest', email: '', isAnonymous: true });
     expect(viewer).toMatchObject({ kind: 'member', orgId, canWrite: true, sample: true });
