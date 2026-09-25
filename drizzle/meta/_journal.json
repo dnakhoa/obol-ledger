@@ -253,6 +253,13 @@
       "when": 1789971000000,
       "tag": "0035_bank_reconciliation",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1789972000000,
+      "tag": "0036_vn_einvoices",
+      "breakpoints": true
     }
   ]
 }

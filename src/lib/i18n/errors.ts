@@ -291,6 +291,17 @@ const vi: ErrorMessages = {
   bank_match_amount_mismatch: (e) =>
     `Dòng sao kê là ${vn.money(e.lineAmount)} ${e.currency} còn bút toán là ${vn.money(e.postingAmount)} ${e.currency}. Hai số tiền phải bằng nhau.`,
   bank_posting_not_on_account: () => 'Bút toán này không làm thay đổi số dư tài khoản này.',
+  einvoice_seller_incomplete: () =>
+    'Hóa đơn điện tử phải ghi đầy đủ thông tin người bán. Hãy bổ sung tên, mã số thuế, địa chỉ và ký hiệu hóa đơn trong phần Cài đặt.',
+  einvoice_series_year: (e) =>
+    `Ký hiệu ${e.series} dùng cho năm 20${e.series.slice(1, 3)}, còn hóa đơn này lập năm ${e.year}. Hãy đăng ký ký hiệu cho năm nay và cập nhật trong Cài đặt.`,
+  einvoice_already_issued: () =>
+    'Đã lập hóa đơn điện tử cho nghiệp vụ này. Hóa đơn đã lập được sửa bằng hóa đơn điều chỉnh, không lập lại.',
+  einvoice_original_missing: () =>
+    'Hóa đơn điều chỉnh sửa một hóa đơn đã lập. Hãy lập hóa đơn điện tử cho lần bán hàng trước.',
+  einvoice_not_found: (e) => `Không tìm thấy hóa đơn điện tử ${e.einvoiceId}.`,
+  tax_id_invalid: (e) =>
+    `${e.taxId} không phải mã số thuế Việt Nam: gồm 10 chữ số, hoặc 10 chữ số, dấu gạch và 3 chữ số cho chi nhánh.`,
 };
 
 const jp = writing('ja');
@@ -505,6 +516,17 @@ const ja: ErrorMessages = {
   bank_match_amount_mismatch: (e) =>
     `明細は ${jp.money(e.lineAmount)} ${e.currency}、仕訳は ${jp.money(e.postingAmount)} ${e.currency} です。照合には同じ金額が必要です。`,
   bank_posting_not_on_account: () => 'この仕訳はこの口座の残高を動かしていません。',
+  einvoice_seller_incomplete: () =>
+    '電子インボイスには売手の情報がすべて必要です。設定で会社名・税コード・住所・インボイスの記号を登録してください。',
+  einvoice_series_year: (e) =>
+    `記号 ${e.series} は 20${e.series.slice(1, 3)} 年用ですが、このインボイスは ${e.year} 年付です。今年の記号を登録し、設定で更新してください。`,
+  einvoice_already_issued: () =>
+    '既に電子インボイスを発行しています。発行済みのインボイスは再発行ではなく修正インボイスで訂正します。',
+  einvoice_original_missing: () =>
+    '修正インボイスは発行済みのインボイスを訂正するものです。先に売上の電子インボイスを発行してください。',
+  einvoice_not_found: (e) => `電子インボイス ${e.einvoiceId} が見つかりません。`,
+  tax_id_invalid: (e) =>
+    `${e.taxId} はベトナムの税コードではありません。10 桁、または支店の場合は 10 桁・ハイフン・3 桁です。`,
 };
 
 const TRANSLATIONS: Record<TranslatedLocale, ErrorMessages> = { vi, ja };

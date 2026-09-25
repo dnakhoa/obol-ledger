@@ -48,15 +48,19 @@ export default async function ReportsPage({ searchParams }: PageProps) {
 
   let sheet: BalanceSheet;
   let income: IncomeStatement;
+  let statutory: boolean;
   try {
     const { services } = await viewerServices();
     const to = new Date();
     const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
     // Independent reads, issued together.
-    [sheet, income] = await Promise.all([
+    let forms;
+    [sheet, income, forms] = await Promise.all([
       services.reporting.balanceSheet(),
       services.reporting.incomeStatement({ from, to }),
+      services.statutory.forms(),
     ]);
+    statutory = forms !== null;
   } catch (error) {
     if (error instanceof SetupRequiredError) return <SetupNotice detail={error.message} />;
     throw error;
@@ -71,6 +75,9 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           <>
             <ButtonLink href="/reports/margins">{t.margins.title}</ButtonLink>
             <ButtonLink href="/reports/aging">{t.aging.title}</ButtonLink>
+            {statutory ? (
+              <ButtonLink href="/reports/statutory">{t.statutory.title}</ButtonLink>
+            ) : null}
           </>
         }
       />

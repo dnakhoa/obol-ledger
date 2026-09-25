@@ -44,14 +44,17 @@ export default async function SalesPage() {
   let taxRates: Record<string, number>;
   let items: SaleItemOption[];
   let functional: CurrencyCode;
+  let vietnamese: boolean;
   try {
     const { services } = await viewerServices();
-    const [recent, accounts, codes, stock] = await Promise.all([
+    const [recent, accounts, codes, stock, forms] = await Promise.all([
       services.sales.list(),
       services.accounts.list(),
       services.tax.list(),
       services.inventory.list(),
+      services.statutory.forms(),
     ]);
+    vietnamese = forms !== null;
     sales = recent;
     const label = (account: { code: string | null; name: string }) =>
       account.code ? `${account.code} — ${account.name}` : account.name;
@@ -154,10 +157,15 @@ export default async function SalesPage() {
         title={t.sales.title}
         description={t.sales.description}
         actions={
-          <ButtonLink href="/reports/margins" variant="primary">
-            {t.sales.marginsButton}
-            <ArrowRightIcon />
-          </ButtonLink>
+          <>
+            {vietnamese ? (
+              <ButtonLink href="/sales/einvoices">{t.einvoice.title}</ButtonLink>
+            ) : null}
+            <ButtonLink href="/reports/margins" variant="primary">
+              {t.sales.marginsButton}
+              <ArrowRightIcon />
+            </ButtonLink>
+          </>
         }
       />
 
