@@ -40,6 +40,18 @@ loadEnvConfig(process.cwd());
 
 const environment = process.env['VERCEL_ENV'];
 
+// A production deployment that cannot sign a session answers every page with
+// a 500, and Vercel promotes it anyway: the check that refuses to run without
+// the secret lives in the application, and the application only runs after
+// promotion. Refused here, the build fails and the previous deployment keeps
+// serving — which is what happened instead the first time, the hard way.
+if (environment === 'production' && !process.env['BETTER_AUTH_SECRET']) {
+  console.error(
+    'BETTER_AUTH_SECRET is not set for production. Add it in the Vercel project settings (generate one with `openssl rand -base64 32`), then redeploy.',
+  );
+  process.exit(1);
+}
+
 if (environment && environment !== 'production') {
   console.log(
     `skipping migrations: VERCEL_ENV is "${environment}", and preview builds share production's database`,
