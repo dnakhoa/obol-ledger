@@ -258,6 +258,18 @@ const vi: ErrorMessages = {
       : `${e.sku} chỉ còn ${vn.money(e.remaining)} ${e.currency} có thể giảm; bạn đã nhập ${vn.money(e.requested)}.`,
   credit_before_sale: (e) =>
     `Ngày phiếu giảm trừ không được trước ngày hóa đơn (${vn.day(e.invoicedOn)}).`,
+  supplier_return_reference_taken: (e) =>
+    `Số phiếu trả hàng ${e.reference} đã được dùng. Hãy chọn số khác.`,
+  supplier_return_not_found: (e) => `Không tìm thấy phiếu trả hàng ${e.supplierReturnId}.`,
+  supplier_refund_exceeds_lot: (e) =>
+    `Lô hàng này chỉ còn ${vn.money(e.remaining)} ${e.currency} có thể được hoàn; bạn đã nhập ${vn.money(e.requested)}.`,
+  supplier_return_before_receipt: (e) =>
+    `Ngày trả hàng không được trước ngày nhận lô hàng (${vn.day(e.receivedOn)}).`,
+  supplier_return_tax_needs_local_currency: (e) =>
+    `Lô hàng này mua bằng ${e.currency}. Chỉ điều chỉnh thuế được cho hàng mua bằng ${e.functional}; thuế nhập khẩu được khấu trừ qua hải quan, không qua nhà cung cấp.`,
+  supplier_account_required: () => 'Hãy chọn tài khoản nhà cung cấp hoặc ngân hàng nhận lại tiền.',
+  supplier_return_exceeds_lot: (e) =>
+    `Lô hàng này chỉ còn ${vn.quantity(e.remaining, e.precision)} ${vn.unit(e.unit)} có thể trả lại; bạn đã nhập ${vn.quantity(e.requested, e.precision)}.`,
 };
 
 const jp = writing('ja');
@@ -439,6 +451,18 @@ const ja: ErrorMessages = {
       : `${e.sku} で値引できる残りは ${jp.money(e.remaining)} ${e.currency} です（入力：${jp.money(e.requested)}）。`,
   credit_before_sale: (e) =>
     `返品・値引伝票の日付は請求書の日付（${jp.day(e.invoicedOn)}）より前にできません。`,
+  supplier_return_reference_taken: (e) =>
+    `返品番号 ${e.reference} は既に使われています。別の番号を指定してください。`,
+  supplier_return_not_found: (e) => `仕入返品 ${e.supplierReturnId} が見つかりません。`,
+  supplier_refund_exceeds_lot: (e) =>
+    `この入荷で返金を受けられる残りは ${jp.money(e.remaining)} ${e.currency} です（入力：${jp.money(e.requested)}）。`,
+  supplier_return_before_receipt: (e) =>
+    `返品日は入荷日（${jp.day(e.receivedOn)}）より前にできません。`,
+  supplier_return_tax_needs_local_currency: (e) =>
+    `この入荷は ${e.currency} 建てです。消費税を戻せるのは ${e.functional} 建ての仕入だけです。輸入消費税は仕入先ではなく税関を通じて控除します。`,
+  supplier_account_required: () => '返金する仕入先の勘定、または銀行口座を選んでください。',
+  supplier_return_exceeds_lot: (e) =>
+    `この入荷で返品できる残りは ${jp.quantity(e.remaining, e.precision)} ${jp.unit(e.unit)} です（入力：${jp.quantity(e.requested, e.precision)}）。`,
 };
 
 const TRANSLATIONS: Record<TranslatedLocale, ErrorMessages> = { vi, ja };

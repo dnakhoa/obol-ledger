@@ -302,6 +302,23 @@ export const ja: Messages = {
     writeOffReferenceHint: '棚卸表または破損報告書の番号。',
     needLossAccount: '在庫損失用の費用科目を',
     writtenOff: '廃棄',
+    returnedToSupplier: '仕入先へ返品',
+    supplierReturnTitle: '仕入先への返品',
+    supplierReturnHint:
+      '入荷の一部を仕入先へ返します。買掛金は返金額だけ減ります。返金されない運賃や関税は費用に振り替えます。',
+    returnFromDelivery: '返品する入荷',
+    howMuchGoesBack: (unit) => `返品数量（${unit}）`,
+    refund: '返金額',
+    refundHint: (currency) => `${currency} 建て・税抜。空欄なら仕入価格で計算します。`,
+    refundedBy: '返金元',
+    refundedByDefault: 'この入荷の仕入先',
+    unrefundedTo: '返金されない分の振替先',
+    unrefundedToDefault: '売上原価',
+    taxToReverse: '戻す消費税',
+    noTax: 'なし',
+    taxToReverseHint: '国内仕入の場合のみ。',
+    supplierReturnReferenceHint: '返品伝票の番号。',
+    supplierReturnButton: '返品を計上',
     sold: '販売',
     soldFor: '売上',
   },
@@ -1007,6 +1024,9 @@ export const ja: Messages = {
     writtenOff: (quantity, unit) => `${quantity} ${unit} を廃棄しました。`,
     writtenOffFrom: (quantity, unit, lots) =>
       `${quantity} ${unit} を廃棄しました。原価は ${lots} から計算しました。`,
+    returnedToSupplier: (quantity, unit, lot, refund) =>
+      `${lot} から ${quantity} ${unit} を返品しました。買掛金が ${refund} 減りました。`,
+    chooseDelivery: '返品する入荷を選んでください。',
   },
   breakIt: {
     title: '壊してみる',

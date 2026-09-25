@@ -12,7 +12,14 @@ import { StatTile } from '@/components/stat-tile';
 import { SetupNotice } from '@/components/setup-notice';
 import { SetupRequiredError } from '@/server/setup-error';
 import { ArrowLeftIcon } from '@/components/icons';
-import { IssueForm, ReceiveForm, WriteOffForm, type AccountOption } from '@/components/stock-forms';
+import {
+  IssueForm,
+  ReceiveForm,
+  SupplierReturnForm,
+  WriteOffForm,
+  type AccountOption,
+  type ReturnableLotOption,
+} from '@/components/stock-forms';
 import { viewerServices } from '@/server/container';
 import { translations } from '@/server/i18n';
 import { dateFormats, type Messages } from '@/lib/i18n';
@@ -59,15 +66,17 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const { locale, t } = await translations();
   const DATE = dateFormats(locale);
 
-  let item, lots, movements, accounts, functional;
+  let item, lots, movements, accounts, returnable, taxCodes, functional;
   try {
     const { services } = await viewerServices();
     item = await services.inventory.item(id);
     if (!item) notFound();
-    [lots, movements, accounts] = await Promise.all([
+    [lots, movements, accounts, returnable, taxCodes] = await Promise.all([
       services.inventory.layers(id),
       services.inventory.movements(id),
       services.accounts.list(),
+      services.supplierReturns.returnable(id),
+      services.tax.list(),
     ]);
     functional = item.currency;
   } catch (error) {
@@ -117,6 +126,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       id: account.id,
       label: account.code ? `${account.code} — ${account.name}` : account.name,
     }));
+
+  // A delivery's refund is in the currency it was bought in, so each lot
+  // carries its own hint; and only a local purchase has VAT a supplier gives back.
+  const returnableLots: ReturnableLotOption[] = returnable.map((lot) => ({
+    id: lot.layerId,
+    label: t.product.lotOption(
+      lot.reference ?? t.product.delivery,
+      `${quantity(lot.remainingQuantityMinor)} ${unitLabel(item.unit)}`,
+    ),
+    refundHint: t.product.refundHint(lot.currency),
+    local: lot.currency === functional,
+  }));
+  const purchaseTaxCodes: AccountOption[] = taxCodes
+    .filter((code) => code.treatment === 'vat' && code.inputAccountId !== null)
+    .map((code) => ({ id: code.id, label: code.name }));
 
   const lotOptions = lots.map((lot) => ({
     id: lot.id,
@@ -175,6 +199,25 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     lotHint: issueLabels.lotHint,
     lotPlaceholder: issueLabels.lotPlaceholder,
     submit: t.product.writeOffButton,
+    working: t.common.working,
+  };
+
+  const supplierReturnLabels = {
+    lot: t.product.returnFromDelivery,
+    quantity: t.product.howMuchGoesBack(unitName),
+    refund: t.product.refund,
+    refundedBy: t.product.refundedBy,
+    refundedByDefault: t.product.refundedByDefault,
+    unrefundedTo: t.product.unrefundedTo,
+    unrefundedToDefault: t.product.unrefundedToDefault,
+    taxToReverse: t.product.taxToReverse,
+    taxToReverseHint: t.product.taxToReverseHint,
+    noTax: t.product.noTax,
+    date: t.product.date,
+    reference: t.product.reference,
+    referenceHint: t.product.supplierReturnReferenceHint,
+    reason: t.product.reason,
+    submit: t.product.supplierReturnButton,
     working: t.common.working,
   };
 
@@ -347,6 +390,30 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
       <Card>
         <CardHeader>
+          <CardTitle>{t.product.supplierReturnTitle}</CardTitle>
+          <CardDescription>{t.product.supplierReturnHint}</CardDescription>
+        </CardHeader>
+        <CardBody>
+          {returnableLots.length === 0 ? (
+            <p className="text-ink-secondary text-sm">{t.product.nothingToShip}</p>
+          ) : (
+            <SupplierReturnForm
+              itemId={item.id}
+              unit={item.unit}
+              precision={item.quantityPrecision}
+              today={today}
+              lots={returnableLots}
+              counterpartyAccounts={creditAccounts}
+              expenseAccounts={expenseAccounts}
+              taxCodes={purchaseTaxCodes}
+              labels={supplierReturnLabels}
+            />
+          )}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>{t.product.movementsTitle}</CardTitle>
           <CardDescription>{t.product.movementsHint}</CardDescription>
         </CardHeader>
@@ -447,6 +514,7 @@ function reasonLabel(reason: WriteOffReason, t: Messages): string {
 function movementLabel(movement: MovementSummary, t: Messages): string {
   if (movement.kind === 'receipt') return t.product.deliveryIn;
   if (movement.kind === 'return') return t.product.returnedByCustomer;
+  if (movement.kind === 'supplier_return') return t.product.returnedToSupplier;
   if (movement.kind === 'writeoff') {
     return movement.reason
       ? `${t.product.writtenOff} · ${reasonLabel(movement.reason, t)}`

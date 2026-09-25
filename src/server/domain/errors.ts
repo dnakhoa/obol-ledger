@@ -197,6 +197,39 @@ export type LedgerError =
       readonly code: 'credit_before_sale';
       readonly creditedOn: string;
       readonly invoicedOn: string;
+    }
+  | { readonly code: 'supplier_return_reference_taken'; readonly reference: string }
+  | { readonly code: 'supplier_return_not_found'; readonly supplierReturnId: string }
+  | {
+      /** A refund that would take more back than was paid for the lot. */
+      readonly code: 'supplier_refund_exceeds_lot';
+      readonly layerId: string;
+      /** Decimal strings in the lot's currency. */
+      readonly remaining: string;
+      readonly requested: string;
+      readonly currency: CurrencyCode;
+    }
+  | {
+      readonly code: 'supplier_return_before_receipt';
+      readonly returnedOn: string;
+      readonly receivedOn: string;
+    }
+  | {
+      /** Input tax can only be reversed on a lot bought in the books' own currency. */
+      readonly code: 'supplier_return_tax_needs_local_currency';
+      readonly currency: CurrencyCode;
+      readonly functional: CurrencyCode;
+    }
+  | { readonly code: 'supplier_account_required'; readonly layerId: string }
+  | {
+      /** More than is left of the delivery to send back. */
+      readonly code: 'supplier_return_exceeds_lot';
+      readonly layerId: string;
+      /** Scaled by the item's precision. */
+      readonly remaining: string;
+      readonly requested: string;
+      readonly precision: number;
+      readonly unit: string;
     };
 
 export type LedgerErrorCode = LedgerError['code'];
@@ -275,6 +308,13 @@ const TITLES: Record<LedgerErrorCode, string> = {
   credit_line_repeated: 'An invoice line appears twice on the credit note',
   credit_exceeds_sale: 'More than the invoice line has left to credit',
   credit_before_sale: 'The credit note is dated before the invoice',
+  supplier_return_reference_taken: 'That return number is already in use',
+  supplier_return_not_found: 'Supplier return not found',
+  supplier_refund_exceeds_lot: 'More than was paid for the delivery',
+  supplier_return_before_receipt: 'The return is dated before the delivery arrived',
+  supplier_return_tax_needs_local_currency: 'Tax can only be reversed on a local purchase',
+  supplier_account_required: 'Choose who gives the money back',
+  supplier_return_exceeds_lot: 'More than is left of the delivery',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -429,6 +469,20 @@ export function describe(error: LedgerError): string {
         : `Only ${error.remaining} ${error.currency} of ${error.sku} can still be credited; ${error.requested} was entered.`;
     case 'credit_before_sale':
       return `A credit note cannot be dated before its invoice, which is dated ${error.invoicedOn}.`;
+    case 'supplier_return_reference_taken':
+      return `Return number ${error.reference} is already used. Choose another number.`;
+    case 'supplier_return_not_found':
+      return `Supplier return ${error.supplierReturnId} was not found.`;
+    case 'supplier_refund_exceeds_lot':
+      return `Only ${error.remaining} ${error.currency} of this delivery can still be refunded; ${error.requested} was entered.`;
+    case 'supplier_return_before_receipt':
+      return `A return cannot be dated before the delivery arrived, on ${error.receivedOn}.`;
+    case 'supplier_return_tax_needs_local_currency':
+      return `This delivery was bought in ${error.currency}. Tax can only be reversed on a purchase in ${error.functional}; import tax is reclaimed from customs, not from the supplier.`;
+    case 'supplier_account_required':
+      return 'Choose the supplier account or bank that gives the money back.';
+    case 'supplier_return_exceeds_lot':
+      return `Only ${quantityText(error.remaining, error.precision)} ${error.unit} of this delivery is left to return; ${quantityText(error.requested, error.precision)} was entered.`;
   }
 }
 

@@ -19,7 +19,7 @@
   <a href="https://obol-ledger.vercel.app/break"><b>Try to break it</b></a> ·
   <a href="docs/design-rationale.md">Design rationale</a> ·
   <a href="docs/architecture.md">Architecture</a> ·
-  <a href="#documentation">22 ADRs</a>
+  <a href="#documentation">23 ADRs</a>
 </p>
 
 A double-entry ledger with a typed HTTP API and a server-rendered dashboard.
@@ -44,7 +44,7 @@ posting inserts and Postgres reports `40P01 deadlock detected`. Remove
 **Double-entry core** · **multi-currency** balanced in the functional currency ·
 **FIFO inventory costing** · **landed cost** spread across the lots it arrived
 with · **sales that know their margin** — invoice and cost of goods sold in one
-entry, by product and by customer · **credit notes** that put returned goods back into the lot they left from · **write-offs** with a reason · stock
+entry, by product and by customer · **credit notes** that put returned goods back into the lot they left from · **supplier returns** that send the freight nobody refunds to an expense · **write-offs** with a reason · stock
 **reconciled** to the inventory accounts · **consumption-tax returns** that carry an unused credit forward as a
 balance rather than a number on a form · receivables and payables aged by **due date and payment terms** ·
 pending/posted/archived with three balances · reversals · idempotency · keyset
@@ -590,6 +590,7 @@ including the metadata filter and every problem type, are in the
 - [ADR 20](docs/adr/0020-attacks-on-the-live-demo.md) — let a stranger attack the live demo
 - [ADR 21](docs/adr/0021-credit-notes.md) — a sale is corrected by a credit note, never by an edit
 - [ADR 22](docs/adr/0022-sample-ledgers.md) — a prospect gets a writable copy of the sample books
+- [ADR 23](docs/adr/0023-supplier-returns.md) — goods go back to a supplier from the delivery they came in
 
 ## Licence
 

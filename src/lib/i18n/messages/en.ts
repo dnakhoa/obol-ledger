@@ -303,6 +303,24 @@ export const en = {
     writeOffReferenceHint: 'The stocktake sheet or damage report.',
     needLossAccount: 'Open an expense account for stock losses on the',
     writtenOff: 'Written off',
+    returnedToSupplier: 'Returned to supplier',
+    supplierReturnTitle: 'Return to supplier',
+    supplierReturnHint:
+      'Send part of a delivery back. The supplier’s account comes down by what they refund. Freight and duty they do not refund go to an expense.',
+    returnFromDelivery: 'From delivery',
+    howMuchGoesBack: (unit: string) => `How much goes back (${unit})`,
+    refund: 'Refund',
+    refundHint: (currency: string) =>
+      `In ${currency}, before tax. Leave blank for the supplier’s own price.`,
+    refundedBy: 'Refunded by',
+    refundedByDefault: 'The supplier on the delivery',
+    unrefundedTo: 'Anything not refunded goes to',
+    unrefundedToDefault: 'Cost of sales',
+    taxToReverse: 'VAT to reverse',
+    noTax: 'None',
+    taxToReverseHint: 'Only for a purchase in your own currency.',
+    supplierReturnReferenceHint: 'The debit note or return number.',
+    supplierReturnButton: 'Return to supplier',
     sold: 'Sold',
     soldFor: 'Sold for',
   },
@@ -1027,6 +1045,9 @@ export const en = {
     writtenOff: (quantity: string, unit: string) => `Wrote off ${quantity} ${unit}.`,
     writtenOffFrom: (quantity: string, unit: string, lots: string) =>
       `Wrote off ${quantity} ${unit}, costed from ${lots}.`,
+    returnedToSupplier: (quantity: string, unit: string, lot: string, refund: string) =>
+      `Returned ${quantity} ${unit} from ${lot}. The supplier owes ${refund} less.`,
+    chooseDelivery: 'Choose the delivery the goods go back from.',
   },
   breakIt: {
     title: 'Try to break it',

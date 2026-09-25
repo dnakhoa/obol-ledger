@@ -13,6 +13,7 @@ import { createTaxService } from './tax';
 import { createTaxReturnService } from './tax-return';
 import { createSalesService } from './sales';
 import { createCreditNoteService } from './credit-notes';
+import { createSupplierReturnService } from './supplier-returns';
 
 /**
  * Seeds a quarter's books for a Vietnamese stone exporter.
@@ -1021,6 +1022,30 @@ export async function populateSampleLedger(
       ],
     });
     if (!credited.ok) throw new Error(`credit note failed: ${credited.error.code}`);
+    entries += 1;
+  }
+
+  // ---- Chipped slabs going back to Italy -----------------------------------
+  //
+  // Twelve square metres of the Carrara container arrived with chipped edges,
+  // and the quarry agreed to take them back. It refunds its own price, in
+  // dollars at the rate the container was bought at; the freight, duty and
+  // broker's fees that landed on those slabs are nobody's to refund, and go
+  // to 811 rather than staying in stock that has left the yard.
+  const marbleLot = (await inventory.layers(itemIds['marble'] ?? '')).find(
+    (lot) => lot.reference === 'CONT-IT-2207',
+  );
+  const chipped = 12n * (SCALE['m2'] ?? 1n);
+  if (marbleLot && BigInt(marbleLot.remainingQuantityMinor) >= chipped) {
+    const sentBack = await createSupplierReturnService(database, orgId).returnToSupplier({
+      layerId: marbleLot.id,
+      quantity: chipped,
+      reference: 'RTV-IT-2207-01',
+      expenseAccountId: ids['stockLoss'] ?? '',
+      reason: 'Sứt cạnh khi dỡ container — nhà cung cấp đồng ý nhận lại',
+      occurredAt: daysAgo(30, 10),
+    });
+    if (!sentBack.ok) throw new Error(`supplier return failed: ${sentBack.error.code}`);
     entries += 1;
   }
 

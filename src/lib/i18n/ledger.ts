@@ -36,6 +36,7 @@ export type LedgerMessages = {
   /** An invoice raised against stock: revenue and its cost in one entry. */
   readonly saleInvoiced: (reference: string, customer: string) => string;
   readonly creditNoteIssued: (reference: string, invoice: string, customer: string) => string;
+  readonly returnedToSupplier: (reference: string, item: string, lot: string) => string;
 };
 
 const withReference = (base: string, reference?: string | undefined): string =>
@@ -63,6 +64,8 @@ const en: LedgerMessages = {
   saleInvoiced: (reference, customer) => `Sale ${reference} to ${customer}`,
   creditNoteIssued: (reference, invoice, customer) =>
     `Credit note ${reference} against ${invoice} — ${customer}`,
+  returnedToSupplier: (reference, item, lot) =>
+    `Returned to supplier ${reference}: ${item} from ${lot}`,
 };
 
 /**
@@ -100,6 +103,8 @@ const vi: LedgerMessages = {
   saleInvoiced: (reference, customer) => `Bán hàng theo hóa đơn ${reference} — ${customer}`,
   creditNoteIssued: (reference, invoice, customer) =>
     `Giảm trừ doanh thu ${reference} cho hóa đơn ${invoice} — ${customer}`,
+  returnedToSupplier: (reference, item, lot) =>
+    `Xuất trả lại nhà cung cấp ${reference}: ${item} thuộc lô ${lot}`,
 };
 
 /**
@@ -136,6 +141,7 @@ const ja: LedgerMessages = {
   saleInvoiced: (reference, customer) => `売上：${reference}（${customer}）`,
   creditNoteIssued: (reference, invoice, customer) =>
     `返品・値引：${reference}（${invoice}・${customer}）`,
+  returnedToSupplier: (reference, item, lot) => `仕入返品：${reference}（${item}・${lot}）`,
 };
 
 const LEDGER: Record<Locale, LedgerMessages> = { en, vi, ja };

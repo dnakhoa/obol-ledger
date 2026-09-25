@@ -6,6 +6,7 @@ import {
   createItemSchema,
   createSaleSchema,
   createCreditNoteSchema,
+  createSupplierReturnSchema,
   recordRateSchema,
   createEndpointSchema,
   createEntrySchema,
@@ -212,7 +213,7 @@ const movementSchema = {
   type: 'object',
   properties: {
     id: { type: 'string', examples: ['move_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'] },
-    kind: { enum: ['receipt', 'issue', 'writeoff', 'return'] },
+    kind: { enum: ['receipt', 'issue', 'writeoff', 'return', 'supplier_return'] },
     ...quantityPair('quantity', 'How much moved'),
     cost: { allOf: [money], description: 'In the functional currency.' },
     occurredAt: { type: 'string', format: 'date-time' },
@@ -337,6 +338,43 @@ const creditNoteSchema = {
         },
       },
     },
+  },
+} as const;
+
+const supplierReturnSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string', examples: ['sret_01JBQZ8Q2N7K3F5M9R1T4V6X8Z'] },
+    reference: { type: 'string', description: 'The debit note or return authorisation number.' },
+    itemId: { type: 'string' },
+    sku: { type: 'string' },
+    itemName: { type: 'string' },
+    unit: { type: 'string' },
+    quantityPrecision: { type: 'integer' },
+    layerId: { type: 'string', description: 'The delivery the goods went back from.' },
+    layerReference: { type: ['string', 'null'] },
+    counterpartyAccountId: { type: 'string', description: 'Who gives the money back.' },
+    counterpartyName: { type: 'string' },
+    expenseAccountId: {
+      type: ['string', 'null'],
+      description: 'Where unrefunded cost went; null when there was none.',
+    },
+    occurredAt: { type: 'string', format: 'date-time' },
+    reason: { type: ['string', 'null'] },
+    ...quantityPair('quantity', 'How much went back'),
+    refund: { allOf: [money], description: 'Given back, net, in the lot’s currency.' },
+    tax: { allOf: [money], description: 'Input tax reversed with it.' },
+    gross: money,
+    carrying: {
+      allOf: [money],
+      description:
+        'What the lot carried the goods at, landed cost included, in the functional currency.',
+    },
+    unrecovered: {
+      allOf: [money],
+      description: 'Carrying less refund: landed cost nobody refunds. Negative is a gain.',
+    },
+    transactionId: { type: 'string' },
   },
 } as const;
 
@@ -469,6 +507,8 @@ export function openApiDocument(): Record<string, unknown> {
         Sale: saleSchema,
         CreditNote: creditNoteSchema,
         CreateCreditNote: jsonSchema(createCreditNoteSchema),
+        SupplierReturn: supplierReturnSchema,
+        CreateSupplierReturn: jsonSchema(createSupplierReturnSchema),
         CreateItem: jsonSchema(createItemSchema),
         ReceiveStock: jsonSchema(receiveStockSchema),
         IssueStock: jsonSchema(issueStockSchema),
@@ -1427,6 +1467,113 @@ export function openApiDocument(): Record<string, unknown> {
               content: {
                 'application/json': {
                   schema: envelope({ $ref: '#/components/schemas/CreditNote' }),
+                },
+              },
+            },
+            ...problemResponses(404, 429),
+          },
+        },
+      },
+      '/items/{itemId}/supplier-returns': {
+        get: {
+          tags: ['Stock'],
+          summary: 'What went back to suppliers from one product',
+          parameters: [{ name: 'itemId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': {
+              description: 'Newest first',
+              content: {
+                'application/json': {
+                  schema: envelope({
+                    type: 'array',
+                    items: { $ref: '#/components/schemas/SupplierReturn' },
+                  }),
+                },
+              },
+            },
+            ...problemResponses(404, 429),
+          },
+        },
+        post: {
+          tags: ['Stock'],
+          summary: 'Send part of a delivery back to the supplier',
+          description:
+            'The goods leave the named lot at what it carries them at, landed cost included. The supplier’s account comes down by the refund — its own price for the goods unless refund says otherwise — at the rate the delivery was bought at. Landed cost the refund does not cover goes to expenseAccountId, or the product’s cost of sales. With taxCodeId, the input tax on the refund is reversed and lands on the return for the month of the return; only for a delivery bought in the functional currency. More than is left of the lot is a 409 supplier_return_exceeds_lot; a refund above what was paid for the delivery is a 409 supplier_refund_exceeds_lot. Nothing is written either way.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'itemId', in: 'path', required: true, schema: { type: 'string' } },
+            idempotencyHeader,
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/CreateSupplierReturn' },
+              },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'The return and the entry it posted',
+              content: {
+                'application/json': {
+                  schema: envelope({
+                    type: 'object',
+                    required: ['supplierReturn', 'entry'],
+                    properties: {
+                      supplierReturn: { $ref: '#/components/schemas/SupplierReturn' },
+                      entry: { $ref: '#/components/schemas/Transaction' },
+                    },
+                  }),
+                },
+              },
+            },
+            '200': { description: 'Idempotent replay of an earlier request' },
+            ...problemResponses(400, 401, 404, 409, 422, 429),
+          },
+        },
+      },
+      '/supplier-returns': {
+        get: {
+          tags: ['Stock'],
+          summary: 'Recent returns to suppliers, newest first',
+          parameters: [
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Returns to suppliers',
+              content: {
+                'application/json': {
+                  schema: envelope({
+                    type: 'array',
+                    items: { $ref: '#/components/schemas/SupplierReturn' },
+                  }),
+                },
+              },
+            },
+            ...problemResponses(400, 429),
+          },
+        },
+      },
+      '/supplier-returns/{supplierReturnId}': {
+        get: {
+          tags: ['Stock'],
+          summary: 'Fetch one return to a supplier',
+          parameters: [
+            { name: 'supplierReturnId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': {
+              description: 'The return',
+              content: {
+                'application/json': {
+                  schema: envelope({ $ref: '#/components/schemas/SupplierReturn' }),
                 },
               },
             },

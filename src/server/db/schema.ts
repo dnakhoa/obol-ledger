@@ -813,6 +813,12 @@ export const costLayers = pgTable(
   },
   (table) => [
     unique('cost_layers_id_org_key').on(table.id, table.orgId),
+    unique('cost_layers_id_org_item_currency_key').on(
+      table.id,
+      table.orgId,
+      table.itemId,
+      table.currency,
+    ),
     index('cost_layers_item_idx').on(table.orgId, table.itemId, table.acquiredAt),
     foreignKey({
       name: 'cost_layers_item_fk',
@@ -1067,7 +1073,9 @@ export const inventoryMovements = pgTable(
     id: text('id').primaryKey(),
     orgId: text('org_id').notNull(),
     itemId: text('item_id').notNull(),
-    kind: text('kind').$type<'receipt' | 'issue' | 'writeoff' | 'return'>().notNull(),
+    kind: text('kind')
+      .$type<'receipt' | 'issue' | 'writeoff' | 'return' | 'supplier_return'>()
+      .notNull(),
     quantityMinor: bigint('quantity_minor', { mode: 'bigint' }).notNull(),
     costMinor: bigint('cost_minor', { mode: 'bigint' }).notNull(),
     baseCostMinor: bigint('base_cost_minor', { mode: 'bigint' }).notNull(),
@@ -1111,6 +1119,7 @@ export const inventoryMovements = pgTable(
   (table) => [
     unique('inventory_movements_id_org_key').on(table.id, table.orgId),
     unique('inventory_movements_id_org_sale_key').on(table.id, table.orgId, table.saleId),
+    unique('inventory_movements_id_org_item_key').on(table.id, table.orgId, table.itemId),
     index('inventory_movements_item_idx').on(table.orgId, table.itemId, table.occurredAt, table.id),
     index('inventory_movements_transaction_idx').on(table.orgId, table.transactionId),
     uniqueIndex('inventory_movements_sale_line_key')
@@ -1418,6 +1427,90 @@ export const taxReturnMonths = pgTable(
       name: 'tax_return_months_return_fk',
       columns: [table.returnId, table.orgId],
       foreignColumns: [taxReturns.id, taxReturns.orgId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/**
+ * Goods sent back to the supplier they came from, and the debit note for it.
+ *
+ * The goods leave the lot they arrived in at what the lot carries them at;
+ * the supplier gives back what they agree to, in the lot's own currency. The
+ * difference — freight and duty nobody refunds — goes to an expense. See
+ * migration 0033.
+ */
+export const supplierReturns = pgTable(
+  'supplier_returns',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    reference: text('reference').notNull(),
+    itemId: text('item_id').notNull(),
+    layerId: text('layer_id').notNull(),
+    movementId: text('movement_id').notNull(),
+    /** The supplier's payable, or a bank when they refund in cash. */
+    counterpartyAccountId: text('counterparty_account_id').notNull(),
+    /** Where the unrefunded carrying cost goes. Set exactly when there is some. */
+    expenseAccountId: text('expense_account_id'),
+    taxCodeId: text('tax_code_id'),
+    currency: char('currency', { length: 3 }).notNull(),
+    fxRate: numeric('fx_rate', { precision: 20, scale: 10 }).notNull(),
+    quantityMinor: bigint('quantity_minor', { mode: 'bigint' }).notNull(),
+    refundMinor: bigint('refund_minor', { mode: 'bigint' }).notNull(),
+    taxMinor: bigint('tax_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    refundBaseMinor: bigint('refund_base_minor', { mode: 'bigint' }).notNull(),
+    taxBaseMinor: bigint('tax_base_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    carryingBaseMinor: bigint('carrying_base_minor', { mode: 'bigint' }).notNull(),
+    unrecoveredBaseMinor: bigint('unrecovered_base_minor', { mode: 'bigint' }).notNull(),
+    reason: text('reason'),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    transactionId: text('transaction_id').notNull(),
+    metadata: jsonb('metadata')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('supplier_returns_id_org_key').on(table.id, table.orgId),
+    uniqueIndex('supplier_returns_org_reference_key').on(table.orgId, table.reference),
+    uniqueIndex('supplier_returns_movement_key').on(table.movementId),
+    index('supplier_returns_org_layer_idx').on(table.orgId, table.layerId, table.occurredAt),
+    index('supplier_returns_org_occurred_idx').on(table.orgId, table.occurredAt, table.id),
+    index('supplier_returns_transaction_idx').on(table.orgId, table.transactionId),
+    foreignKey({
+      name: 'supplier_returns_layer_fk',
+      columns: [table.layerId, table.orgId, table.itemId, table.currency],
+      foreignColumns: [costLayers.id, costLayers.orgId, costLayers.itemId, costLayers.currency],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'supplier_returns_movement_fk',
+      columns: [table.movementId, table.orgId, table.itemId],
+      foreignColumns: [inventoryMovements.id, inventoryMovements.orgId, inventoryMovements.itemId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'supplier_returns_counterparty_fk',
+      columns: [table.counterpartyAccountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'supplier_returns_expense_fk',
+      columns: [table.expenseAccountId, table.orgId],
+      foreignColumns: [accounts.id, accounts.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'supplier_returns_tax_code_fk',
+      columns: [table.taxCodeId, table.orgId],
+      foreignColumns: [taxCodes.id, taxCodes.orgId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'supplier_returns_transaction_fk',
+      columns: [table.transactionId, table.orgId],
+      foreignColumns: [transactions.id, transactions.orgId],
     }).onDelete('restrict'),
   ],
 );

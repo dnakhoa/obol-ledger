@@ -68,6 +68,7 @@ export const ID_PREFIXES = {
   creditNote: 'cn',
   creditNoteLine: 'cnl',
   layerRestoration: 'rest',
+  supplierReturn: 'sret',
 } as const;
 
 export type EntityKind = keyof typeof ID_PREFIXES;
