@@ -308,6 +308,23 @@ export const vi: Messages = {
     writeOffReferenceHint: 'Số biên bản kiểm kê hoặc biên bản hàng hỏng.',
     needLossAccount: 'Hãy mở một tài khoản chi phí cho hao hụt hàng tồn kho ở',
     writtenOff: 'Xuất hủy',
+    returnedToSupplier: 'Trả lại nhà cung cấp',
+    supplierReturnTitle: 'Trả hàng cho nhà cung cấp',
+    supplierReturnHint:
+      'Trả lại một phần lô hàng. Công nợ phải trả giảm theo số tiền nhà cung cấp hoàn lại. Cước vận chuyển và thuế nhập khẩu không được hoàn sẽ ghi vào chi phí.',
+    returnFromDelivery: 'Từ lô hàng',
+    howMuchGoesBack: (unit) => `Số lượng trả lại (${unit})`,
+    refund: 'Số tiền được hoàn',
+    refundHint: (currency) => `Bằng ${currency}, chưa thuế. Để trống để dùng giá mua gốc.`,
+    refundedBy: 'Bên hoàn tiền',
+    refundedByDefault: 'Nhà cung cấp của lô hàng',
+    unrefundedTo: 'Phần không được hoàn ghi vào',
+    unrefundedToDefault: 'Giá vốn hàng bán',
+    taxToReverse: 'Thuế GTGT điều chỉnh giảm',
+    noTax: 'Không có',
+    taxToReverseHint: 'Chỉ áp dụng cho hàng mua trong nước.',
+    supplierReturnReferenceHint: 'Số phiếu xuất trả hoặc biên bản trả hàng.',
+    supplierReturnButton: 'Trả hàng',
     sold: 'Bán',
     soldFor: 'Doanh thu',
   },
@@ -1033,6 +1050,9 @@ export const vi: Messages = {
     writtenOff: (quantity, unit) => `Đã xuất hủy ${quantity} ${unit}.`,
     writtenOffFrom: (quantity, unit, lots) =>
       `Đã xuất hủy ${quantity} ${unit}, giá vốn tính từ ${lots}.`,
+    returnedToSupplier: (quantity, unit, lot, refund) =>
+      `Đã trả ${quantity} ${unit} từ lô ${lot}. Công nợ nhà cung cấp giảm ${refund}.`,
+    chooseDelivery: 'Hãy chọn lô hàng cần trả lại.',
   },
   breakIt: {
     title: 'Thử phá sổ cái',

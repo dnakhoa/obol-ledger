@@ -407,6 +407,29 @@ export const createCreditNoteSchema = z.object({
   metadata: metadataSchema,
 });
 
+export const createSupplierReturnSchema = z.object({
+  /** The delivery the goods go back from: a lot of this product. */
+  layerId: idOf('costLayer'),
+  /** How much goes back, in the item's unit. */
+  quantity: quantitySchema,
+  /** The debit note number, or the supplier's return authorisation. Unique. */
+  reference: stockReferenceSchema,
+  /**
+   * What the supplier gives back, net, in the lot's currency. Its own price
+   * for the goods when absent.
+   */
+  refund: decimalAmountSchema.optional(),
+  /** Who gives it back. The account the delivery was credited to when absent. */
+  counterpartyAccountId: accountIdSchema.optional(),
+  /** Where unrefunded cost goes. The product's cost of sales when absent. */
+  expenseAccountId: accountIdSchema.optional(),
+  /** The purchase tax code to reverse, for a delivery bought in the books' currency. */
+  taxCodeId: idOf('taxCode').optional(),
+  reason: z.string().trim().min(1).max(280).optional(),
+  occurredAt: z.iso.datetime({ offset: true }).optional(),
+  metadata: metadataSchema,
+});
+
 export const salesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });

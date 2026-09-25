@@ -232,6 +232,13 @@
       "when": 1789968000000,
       "tag": "0032_anonymous_users",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1789969000000,
+      "tag": "0033_supplier_returns",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,7 @@ import {
   createItemAction,
   issueAction,
   receiveAction,
+  returnToSupplierAction,
   writeOffAction,
 } from '@/app/(app)/stock/actions';
 
@@ -427,6 +428,167 @@ export function WriteOffForm({
             ))}
           </Select>
         </Field>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Submit pending={pending} working={labels.working}>
+          {labels.submit}
+        </Submit>
+        <Outcome state={state} />
+      </div>
+    </form>
+  );
+}
+
+export type ReturnableLotOption = {
+  readonly id: string;
+  readonly label: string;
+  /** Resolved on the server: the refund is read in this lot's own currency. */
+  readonly refundHint: string;
+  /** Whether input VAT can be reversed on it: a purchase in the books' own currency. */
+  readonly local: boolean;
+};
+
+export type SupplierReturnLabels = {
+  readonly lot: string;
+  readonly quantity: string;
+  readonly refund: string;
+  readonly refundedBy: string;
+  readonly refundedByDefault: string;
+  readonly unrefundedTo: string;
+  readonly unrefundedToDefault: string;
+  readonly taxToReverse: string;
+  readonly taxToReverseHint: string;
+  readonly noTax: string;
+  readonly date: string;
+  readonly reference: string;
+  readonly referenceHint: string;
+  readonly reason: string;
+  readonly submit: string;
+  readonly working: string;
+};
+
+/**
+ * Part of a delivery going back to the supplier.
+ *
+ * Only the delivery, the quantity and the return number are needed; the rest
+ * defaults to the ordinary case — refunded at the supplier's own price, by the
+ * supplier the delivery was booked against, with no tax — and says so in the
+ * empty option rather than hiding the choice.
+ */
+export function SupplierReturnForm({
+  itemId,
+  unit,
+  precision,
+  today,
+  lots,
+  counterpartyAccounts,
+  expenseAccounts,
+  taxCodes,
+  labels,
+}: {
+  itemId: string;
+  unit: string;
+  precision: number;
+  today: string;
+  lots: readonly ReturnableLotOption[];
+  counterpartyAccounts: readonly AccountOption[];
+  expenseAccounts: readonly AccountOption[];
+  taxCodes: readonly AccountOption[];
+  labels: SupplierReturnLabels;
+}) {
+  const [state, action, pending] = useActionState(returnToSupplierAction, INITIAL);
+  const [lotId, setLotId] = useState(lots.length === 1 ? (lots[0]?.id ?? '') : '');
+  const lot = lots.find((candidate) => candidate.id === lotId);
+  const id = useId();
+
+  return (
+    <form action={action} className="space-y-4">
+      <input type="hidden" name="itemId" value={itemId} />
+      <input type="hidden" name="unit" value={unit} />
+      <input type="hidden" name="precision" value={precision} />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={labels.lot} htmlFor={`${id}-lot`}>
+          <Select
+            id={`${id}-lot`}
+            name="layerId"
+            value={lotId}
+            onChange={(event) => setLotId(event.target.value)}
+            required
+          >
+            <option value="" disabled>
+              —
+            </option>
+            {lots.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={labels.quantity} htmlFor={`${id}-qty`}>
+          <Input id={`${id}-qty`} name="quantity" required inputMode="decimal" placeholder="20" />
+        </Field>
+        <Field
+          label={labels.refund}
+          htmlFor={`${id}-refund`}
+          {...(lot ? { hint: lot.refundHint } : {})}
+        >
+          <Input id={`${id}-refund`} name="refund" inputMode="decimal" autoComplete="off" />
+        </Field>
+        <Field label={labels.reference} htmlFor={`${id}-ref`} hint={labels.referenceHint}>
+          <Input
+            id={`${id}-ref`}
+            name="reference"
+            required
+            placeholder="RTV-2026-01"
+            autoComplete="off"
+          />
+        </Field>
+        <Field label={labels.date} htmlFor={`${id}-date`}>
+          <Input id={`${id}-date`} name="occurredAt" type="date" defaultValue={today} required />
+        </Field>
+        <Field label={labels.reason} htmlFor={`${id}-reason`}>
+          <Input id={`${id}-reason`} name="reason" maxLength={280} autoComplete="off" />
+        </Field>
+        <Field label={labels.refundedBy} htmlFor={`${id}-by`}>
+          <Select id={`${id}-by`} name="counterpartyAccountId" defaultValue="">
+            <option value="">{labels.refundedByDefault}</option>
+            {counterpartyAccounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={labels.unrefundedTo} htmlFor={`${id}-rest`}>
+          <Select id={`${id}-rest`} name="expenseAccountId" defaultValue="">
+            <option value="">{labels.unrefundedToDefault}</option>
+            {expenseAccounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        {taxCodes.length > 0 ? (
+          <Field label={labels.taxToReverse} htmlFor={`${id}-tax`} hint={labels.taxToReverseHint}>
+            <Select
+              id={`${id}-tax`}
+              name="taxCodeId"
+              defaultValue=""
+              disabled={lot ? !lot.local : false}
+            >
+              <option value="">{labels.noTax}</option>
+              {taxCodes.map((code) => (
+                <option key={code.id} value={code.id}>
+                  {code.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

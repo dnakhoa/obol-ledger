@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { refusalMessage, requireWriter } from '@/server/auth/guard';
 import { COSTING_METHODS, WRITE_OFF_REASONS } from '@/server/domain/costing';
 import { describeError, translations } from '@/server/i18n';
+import { formatAmount } from '@/lib/format';
 import { SUPPORTED_CURRENCIES, parseDecimal } from '@/lib/money';
 import {
   SUPPORTED_UNITS,
@@ -327,4 +328,122 @@ function atNoon(date: string): Date {
 function precisionFor(unit: Unit, supplied: FormDataEntryValue | null): number {
   const parsed = Number(supplied);
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 6 ? parsed : defaultPrecision(unit);
+}
+
+/**
+ * Goods going back to the supplier they came from.
+ *
+ * The refund is read in the delivery's own currency, which is taken from the
+ * lot on the server rather than trusted from the page.
+ */
+export async function returnToSupplierAction(
+  _previous: StockState,
+  formData: FormData,
+): Promise<StockState> {
+  const writer = await requireWriter();
+  if (!writer.allowed) return { status: 'error', message: await refusalMessage(writer.reason) };
+
+  const { locale, t } = await translations();
+  const optionalId = z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || undefined);
+  const parsed = z
+    .object({
+      itemId: z.string().trim().min(1),
+      unit: z.enum(SUPPORTED_UNITS),
+      layerId: z.string().trim().min(1),
+      quantity: quantityField,
+      refund: z
+        .string()
+        .trim()
+        .regex(/^(\d+(\.\d+)?)?$/u),
+      counterpartyAccountId: optionalId,
+      expenseAccountId: optionalId,
+      taxCodeId: optionalId,
+      occurredAt: z.iso.date(),
+      reference: z.string().trim().min(1).max(60),
+      reason: z.string().trim().max(280).optional(),
+    })
+    .safeParse({
+      itemId: formData.get('itemId'),
+      unit: formData.get('unit'),
+      layerId: formData.get('layerId') ?? '',
+      quantity: formData.get('quantity'),
+      refund: formData.get('refund') ?? '',
+      counterpartyAccountId: formData.get('counterpartyAccountId') ?? '',
+      expenseAccountId: formData.get('expenseAccountId') ?? '',
+      taxCodeId: formData.get('taxCodeId') ?? '',
+      occurredAt: formData.get('occurredAt'),
+      reference: formData.get('reference') ?? '',
+      reason: formData.get('reason') ?? '',
+    });
+
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path[0];
+    return {
+      status: 'error',
+      message:
+        field === 'layerId'
+          ? t.stockOutcome.chooseDelivery
+          : field === 'reference'
+            ? t.creditNotes.checkForm
+            : field === 'quantity' || field === 'refund'
+              ? t.stockOutcome.plainNumber
+              : t.stockOutcome.checkQuantity,
+    };
+  }
+
+  const precision = precisionFor(parsed.data.unit, formData.get('precision'));
+  const quantity = parseQuantity(parsed.data.quantity, precision);
+  if (!quantity.ok) {
+    return {
+      status: 'error',
+      message:
+        quantity.error === 'too_many_decimals'
+          ? t.stockOutcome.tooManyDecimals(precision)
+          : t.stockOutcome.quantityPlain,
+    };
+  }
+
+  const lot = (await writer.services.supplierReturns.returnable(parsed.data.itemId)).find(
+    (candidate) => candidate.layerId === parsed.data.layerId,
+  );
+  if (!lot) return { status: 'error', message: t.stockOutcome.chooseDelivery };
+
+  let refund: bigint | undefined;
+  if (parsed.data.refund) {
+    const amount = parseDecimal(parsed.data.refund, lot.currency);
+    if (!amount.ok) return { status: 'error', message: t.stockOutcome.plainNumber };
+    refund = amount.value;
+  }
+
+  const result = await writer.services.supplierReturns.returnToSupplier({
+    layerId: lot.layerId,
+    quantity: quantity.value,
+    reference: parsed.data.reference,
+    refund,
+    counterpartyAccountId: parsed.data.counterpartyAccountId,
+    expenseAccountId: parsed.data.expenseAccountId,
+    taxCodeId: parsed.data.taxCodeId,
+    ...(parsed.data.reason ? { reason: parsed.data.reason } : {}),
+    occurredAt: atNoon(parsed.data.occurredAt),
+    actor: { userId: writer.viewer.userId, via: 'ui' },
+  });
+
+  revalidatePath('/stock');
+  revalidatePath(`/stock/${parsed.data.itemId}`);
+  if (!result.ok) return { status: 'error', message: describeError(result.error, locale) };
+
+  const done = result.value.supplierReturn;
+  return {
+    status: 'done',
+    message: t.stockOutcome.returnedToSupplier(
+      toQuantityString(quantity.value, precision),
+      unitLabel(parsed.data.unit),
+      done.layerReference ?? done.reference,
+      `${formatAmount(done.gross, locale)} ${done.gross.currency}`,
+    ),
+  };
 }
