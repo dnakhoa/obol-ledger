@@ -74,6 +74,7 @@ export const ID_PREFIXES = {
   bankImport: 'bimp',
   bankLine: 'bline',
   bankMatch: 'bmatch',
+  einvoice: 'einv',
 } as const;
 
 export type EntityKind = keyof typeof ID_PREFIXES;

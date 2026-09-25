@@ -1684,6 +1684,80 @@ export function openApiDocument(): Record<string, unknown> {
           },
         },
       },
+      '/sales/{saleId}/einvoices': {
+        get: {
+          tags: ['Sales'],
+          summary: 'The Vietnamese e-invoice for a sale, and its adjustments',
+          parameters: [{ name: 'saleId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: { '200': { description: 'In number order' }, ...problemResponses(429) },
+        },
+        post: {
+          tags: ['Sales'],
+          summary: 'Issue the Vietnamese e-invoice for a sale',
+          description:
+            'Takes the next number in the company’s series — the database refuses a gap or a repeat — and builds the invoice XML in the national format: seller and buyer by tax code, lines, tax by rate, total in words. Issued once; a second request is a 409. The document is unsigned: a licensed provider signs it and obtains the tax office’s code. Needs the company’s registered name, tax code, address and a series for the year of issue.',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'saleId', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { issuedOn: { type: 'string', format: 'date' } },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': { description: 'The e-invoice' },
+            ...problemResponses(400, 401, 404, 409, 422, 429),
+          },
+        },
+      },
+      '/credit-notes/{creditNoteId}/einvoice': {
+        post: {
+          tags: ['Sales'],
+          summary: 'Issue the adjustment e-invoice for a credit note',
+          description:
+            'Names the original e-invoice and carries the reduction as negative amounts. The original is never reissued or changed. The sale’s own e-invoice must exist first.',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'creditNoteId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { issuedOn: { type: 'string', format: 'date' } },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': { description: 'The adjustment e-invoice' },
+            ...problemResponses(400, 401, 404, 409, 422, 429),
+          },
+        },
+      },
+      '/einvoices/{einvoiceId}/xml': {
+        get: {
+          tags: ['Sales'],
+          summary: 'Download an e-invoice’s XML exactly as issued',
+          parameters: [
+            { name: 'einvoiceId', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': {
+              description: 'The invoice document',
+              content: { 'application/xml': { schema: { type: 'string' } } },
+            },
+            ...problemResponses(404, 429),
+          },
+        },
+      },
       '/credit-notes': {
         get: {
           tags: ['Sales'],
@@ -1835,6 +1909,44 @@ export function openApiDocument(): Record<string, unknown> {
                 },
               },
             },
+            ...problemResponses(404, 429),
+          },
+        },
+      },
+      '/reports/statutory': {
+        get: {
+          tags: ['Reports'],
+          summary: 'Vietnam’s statutory balance sheet or income statement',
+          description:
+            'In the layout of the circular the books follow: Mẫu B01-DN and B02-DN under Thông tư 200, B01a-DNN and B02-DNN under Thông tư 133. Each line carries the form’s code, its Vietnamese caption with an English gloss, the figure and the comparative the form asks for (start of the year, or the same period a year earlier). unplaced lists accounts with a balance no line claims. A 404 for books under any other chart.',
+          parameters: [
+            {
+              name: 'form',
+              in: 'query',
+              required: false,
+              schema: { enum: ['balance-sheet', 'income-statement'], default: 'balance-sheet' },
+            },
+            {
+              name: 'asOf',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', format: 'date' },
+            },
+            {
+              name: 'from',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', format: 'date' },
+            },
+            {
+              name: 'to',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', format: 'date' },
+            },
+          ],
+          responses: {
+            '200': { description: 'The statement' },
             ...problemResponses(404, 429),
           },
         },

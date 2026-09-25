@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AttachmentsCard } from '@/app/(app)/documents/attachments-card';
+import { EInvoiceCard } from '@/app/(app)/sales/einvoices/einvoice-card';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -368,6 +369,12 @@ export default async function SalePage({ params }: { params: Promise<{ saleId: s
           </div>
         ) : null}
       </Card>
+
+      <EInvoiceCard
+        saleId={sale.id}
+        customerAccountId={sale.customerAccountId}
+        creditNotes={sale.creditNotes.map((note) => ({ id: note.id, reference: note.reference }))}
+      />
 
       <AttachmentsCard target={{ transactionId: sale.transactionId }} path={`/sales/${sale.id}`} />
     </div>

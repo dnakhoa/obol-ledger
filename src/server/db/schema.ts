@@ -99,6 +99,12 @@ export const organizations = pgTable('organizations', {
    * left exactly as they were typed.
    */
   locale: text('locale').$type<Locale>().notNull().default('en'),
+  /** The seller as a Vietnamese e-invoice must name it. See migration 0036. */
+  legalName: text('legal_name'),
+  taxId: text('tax_id'),
+  address: text('address'),
+  einvoiceTemplate: text('einvoice_template'),
+  einvoiceSeries: text('einvoice_series'),
   /**
    * The one ledger a signed-out visitor may read.
    *
@@ -362,6 +368,10 @@ export const accounts = pgTable(
     openItems: boolean('open_items').notNull().default(false),
     /** Days a customer or supplier has to pay; null assumes thirty. Only on open items. */
     paymentTermsDays: integer('payment_terms_days'),
+    /** A customer or supplier as an invoice names it. */
+    legalName: text('legal_name'),
+    taxId: text('tax_id'),
+    address: text('address'),
     /** Optimistic-concurrency token, incremented on every balance change. */
     version: integer('version').notNull().default(0),
     /**
@@ -1679,6 +1689,45 @@ export const bankMatches = pgTable(
       name: 'bank_matches_posting_fk',
       columns: [table.postingId, table.orgId, table.accountId],
       foreignColumns: [postings.id, postings.orgId, postings.accountId],
+    }).onDelete('restrict'),
+  ],
+);
+
+/** A Vietnamese e-invoice: for a sale, or an adjustment for a credit note. Never changed. See migration 0036. */
+export const einvoices = pgTable(
+  'einvoices',
+  {
+    id: text('id').primaryKey(),
+    orgId: text('org_id').notNull(),
+    kind: text('kind').$type<'original' | 'adjustment'>().notNull(),
+    saleId: text('sale_id').notNull(),
+    creditNoteId: text('credit_note_id'),
+    adjustsId: text('adjusts_id'),
+    template: text('template').notNull(),
+    series: text('series').notNull(),
+    number: integer('number').notNull(),
+    issuedOn: date('issued_on', { mode: 'string' }).notNull(),
+    currency: char('currency', { length: 3 }).notNull(),
+    netMinor: bigint('net_minor', { mode: 'bigint' }).notNull(),
+    taxMinor: bigint('tax_minor', { mode: 'bigint' }).notNull(),
+    xml: text('xml').notNull(),
+    sha256: char('sha256', { length: 64 }).notNull(),
+    issuedBy: text('issued_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('einvoices_id_org_sale_key').on(table.id, table.orgId, table.saleId),
+    uniqueIndex('einvoices_number_key').on(table.orgId, table.template, table.series, table.number),
+    index('einvoices_org_issued_idx').on(table.orgId, table.issuedOn, table.number),
+    foreignKey({
+      name: 'einvoices_sale_fk',
+      columns: [table.saleId, table.orgId, table.currency],
+      foreignColumns: [sales.id, sales.orgId, sales.currency],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'einvoices_credit_note_fk',
+      columns: [table.creditNoteId, table.orgId, table.saleId],
+      foreignColumns: [creditNotes.id, creditNotes.orgId, creditNotes.saleId],
     }).onDelete('restrict'),
   ],
 );

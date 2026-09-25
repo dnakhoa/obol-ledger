@@ -262,7 +262,17 @@ export type LedgerError =
       readonly postingAmount: string;
       readonly currency: CurrencyCode;
     }
-  | { readonly code: 'bank_posting_not_on_account'; readonly postingId: string };
+  | { readonly code: 'bank_posting_not_on_account'; readonly postingId: string }
+  | {
+      /** The seller details an e-invoice must carry, and which are missing. */
+      readonly code: 'einvoice_seller_incomplete';
+      readonly missing: readonly ('legalName' | 'taxId' | 'address' | 'series')[];
+    }
+  | { readonly code: 'einvoice_series_year'; readonly series: string; readonly year: string }
+  | { readonly code: 'einvoice_already_issued'; readonly einvoiceId: string }
+  | { readonly code: 'einvoice_original_missing'; readonly saleId: string }
+  | { readonly code: 'einvoice_not_found'; readonly einvoiceId: string }
+  | { readonly code: 'tax_id_invalid'; readonly taxId: string };
 
 export type LedgerErrorCode = LedgerError['code'];
 
@@ -361,6 +371,12 @@ const TITLES: Record<LedgerErrorCode, string> = {
   bank_line_not_matched: 'That statement line is not matched',
   bank_match_amount_mismatch: 'The amounts do not agree',
   bank_posting_not_on_account: 'That entry does not touch this account',
+  einvoice_seller_incomplete: 'The company details an e-invoice needs are missing',
+  einvoice_series_year: 'The invoice series is for another year',
+  einvoice_already_issued: 'An e-invoice has already been issued for this',
+  einvoice_original_missing: 'Issue the e-invoice for the sale first',
+  einvoice_not_found: 'E-invoice not found',
+  tax_id_invalid: 'That is not a Vietnamese tax code',
 };
 
 export function titleOf(error: LedgerError): string {
@@ -557,6 +573,18 @@ export function describe(error: LedgerError): string {
       return `The statement line is ${error.lineAmount} ${error.currency} and the entry is ${error.postingAmount} ${error.currency}. A match must be the same amount.`;
     case 'bank_posting_not_on_account':
       return 'That entry does not move money in or out of this account.';
+    case 'einvoice_seller_incomplete':
+      return `An e-invoice names the seller in full. Add the company's ${error.missing.join(', ')} in Settings first.`;
+    case 'einvoice_series_year':
+      return `Series ${error.series} is for 20${error.series.slice(1, 3)}, and this invoice is dated ${error.year}. Register the series for this year and set it in Settings.`;
+    case 'einvoice_already_issued':
+      return 'An e-invoice has already been issued for this. An issued invoice is corrected by an adjustment invoice, not issued again.';
+    case 'einvoice_original_missing':
+      return 'An adjustment invoice corrects an issued e-invoice. Issue the e-invoice for the sale first.';
+    case 'einvoice_not_found':
+      return `E-invoice ${error.einvoiceId} was not found.`;
+    case 'tax_id_invalid':
+      return `${error.taxId} is not a Vietnamese tax code: ten digits, or ten digits, a dash and three more for a branch.`;
   }
 }
 

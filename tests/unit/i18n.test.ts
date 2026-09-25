@@ -63,6 +63,8 @@ describe('message catalogues', () => {
     'common.appName',
     'nav.api',
     'nav.webhooks',
+    // The file format's own name, the same in every language.
+    'einvoice.download',
     'stock.methodAverageOption',
     'stockImport.colProductCodeHint',
     'stockImport.colQuantityHint',

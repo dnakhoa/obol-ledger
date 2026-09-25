@@ -16,6 +16,7 @@ import { createCreditNoteService } from './credit-notes';
 import { createSupplierReturnService } from './supplier-returns';
 import { createDocumentService } from './documents';
 import { createBankService } from './bank';
+import { createEInvoiceService } from './einvoices';
 import { samplePdf } from './sample-documents';
 
 /**
@@ -1449,6 +1450,37 @@ export async function populateSampleLedger(
     if (!fed.ok) throw new Error(`bank statement failed: ${fed.error.code}`);
     const matched = await bank.matchSuggested(operating);
     log(`bank statement: ${fed.value.added} lines, ${matched} matched`);
+  }
+
+  // ---- The e-invoice for the cracked container, and its adjustment --------
+  //
+  // Vietnam's legal invoice for INV-2612 and the adjustment invoice for the
+  // credit note against it, so a prospect sees both documents rather than a
+  // button. The company details are a sample's: the tax code belongs to no
+  // one, and the series is this year's.
+  const einvoices = createEInvoiceService(database, orgId);
+  const seller = await einvoices.updateSeller({
+    legalName: 'Công ty TNHH Đá Bình Minh (mẫu)',
+    taxId: '9999999999',
+    address: 'Khu công nghiệp Phú Tài, Quy Nhơn, Bình Định',
+    series: `C${new Date().toISOString().slice(2, 4)}TBM`,
+  });
+  if (!seller.ok) throw new Error(`e-invoice seller failed: ${seller.error.code}`);
+  const export2612 = soldByInvoice.get('INV-2612');
+  const sale2612 = export2612 ? await sales.get(export2612.id) : undefined;
+  if (sale2612) {
+    await einvoices.updateBuyer({
+      accountId: sale2612.customerAccountId,
+      legalName: 'Southern Landscape Supplies Pty Ltd',
+      taxId: null,
+      address: 'Brisbane, Queensland, Australia',
+    });
+    const invoice = await einvoices.issueForSale({ saleId: sale2612.id });
+    if (!invoice.ok) throw new Error(`e-invoice failed: ${invoice.error.code}`);
+    for (const note of sale2612.creditNotes) {
+      const adjustment = await einvoices.issueForCreditNote({ creditNoteId: note.id });
+      if (!adjustment.ok) throw new Error(`adjustment e-invoice failed: ${adjustment.error.code}`);
+    }
   }
 
   // Assert the *schema* carries the isolation policies.
