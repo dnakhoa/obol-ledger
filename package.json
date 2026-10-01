@@ -20,7 +20,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test",
-    "test:concurrency": "vitest run tests/concurrency",
+    "test:concurrency": "vitest run tests/concurrency --no-file-parallelism",
     "benchmark": "tsx scripts/benchmark.ts",
     "db:status": "tsx scripts/migrate-status.ts"
   },

@@ -6,24 +6,27 @@ on:
   pull_request:
   workflow_dispatch:
 
-# A new push to a branch makes the run in flight irrelevant; cancelling it frees
-# a runner instead of paying for an answer nobody will read.
+# A new push to a pull request makes the run in flight irrelevant; cancelling
+# it frees a runner instead of paying for an answer nobody will read.
+#
+# Pull requests only. The group used to be the ref, which put back-to-back
+# merges to main in one group too — and the second cancelled the first, so a
+# commit could land on main that CI never finished checking. On main every
+# run is its own group (`run_id`), so every commit there gets a verdict.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
+# Three jobs side by side rather than one after another: the wall clock is the
+# slowest of them, not their sum.
 jobs:
-  verify:
-    name: Verify
+  checks:
+    name: 'Checks: format, lint, types, build'
     runs-on: ubuntu-latest
-    # Raised from 10 when the suite passed 600 tests and started running into
-    # the cap. Most of the time is PGlite: every integration file boots its own
-    # Postgres so row-level security is actually enforced during tests, which
-    # is worth several minutes of wall clock.
-    timeout-minutes: 20
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v5
@@ -49,13 +52,47 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
-      # Integration tests run against PGlite — Postgres compiled to WebAssembly
-      # and embedded in the test process — so CI needs no database service.
-      - name: Test
-        run: pnpm run test:coverage
+      # Next.js reuses compiled output between builds from `.next/cache`; this
+      # is the cache its CI guide describes, keyed on the lockfile and the
+      # sources so a change to either starts from the nearest older cache.
+      - uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('src/**/*.ts', 'src/**/*.tsx', 'src/**/*.css') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Build
         run: pnpm run build
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    # Ten minutes is several times what the suite takes. It is a guard against
+    # a hang, not a budget: a suite that starts needing it is a regression to
+    # investigate, not a cap to raise.
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Integration tests run against PGlite — Postgres compiled to WebAssembly
+      # and embedded in the test process — so CI needs no database service.
+      # Every test gets a Postgres of its own, loaded from one migrated
+      # snapshot (tests/helpers/database-template.ts), and test files run in
+      # parallel across the runner's cores.
+      - name: Test
+        run: pnpm run test:coverage
 
       - name: Upload coverage
         if: always()
