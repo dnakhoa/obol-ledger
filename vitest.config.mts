@@ -12,11 +12,15 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
-    // Concurrency suites open many real connections; running files in
-    // sequence keeps them from contending for the pool with each other.
-    fileParallelism: false,
-    // Each integration test spins up its own in-process Postgres (PGlite),
-    // so files are isolated but cheap; no external database is required.
+    // Migrates one PGlite database before any worker starts; every
+    // integration test loads a copy of it. See the file for why.
+    globalSetup: ['tests/helpers/database-template.ts'],
+    // Files run in parallel: every integration test has an in-process
+    // Postgres of its own, so files share nothing. The concurrency suites are
+    // the exception — they share one real server and race on it on purpose —
+    // and `test:concurrency` runs them one file at a time.
+    // Each integration test loads its own PGlite (Postgres in WebAssembly);
+    // no external database is required.
     testTimeout: 30_000,
     hookTimeout: 30_000,
     coverage: {
