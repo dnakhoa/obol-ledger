@@ -8,7 +8,7 @@ import { SignInButtons } from '@/components/sign-in-buttons';
 import { configuredProviders } from '@/server/auth/config';
 import { currentViewer } from '@/server/auth/viewer';
 import { TrySample } from '@/components/try-sample';
-import { startSampleLedgerAction } from './actions';
+import { startSampleLedgerAction } from '@/server/actions/sample-ledger';
 
 export const metadata: Metadata = { title: 'Sign in' };
 export const dynamic = 'force-dynamic';

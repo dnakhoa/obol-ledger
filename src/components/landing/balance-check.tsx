@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Field, Input } from '@/components/ui/field';
+import { Field, Input, describedBy } from '@/components/ui/field';
 import { AlertIcon, CheckIcon } from '@/components/icons';
 import { cn } from '@/lib/cn';
 import type { Locale } from '@/lib/i18n/locales';
@@ -63,7 +63,7 @@ export function BalanceCheck({ labels, locale }: { labels: BalanceCheckLabels; l
             autoComplete="off"
             value={debitText}
             onChange={(event) => setDebitText(event.target.value)}
-            aria-describedby={`${id}-debit-hint`}
+            aria-describedby={describedBy(`${id}-debit`, labels.unit)}
             className="numeric h-11 font-mono text-base"
           />
         </Field>
@@ -74,7 +74,7 @@ export function BalanceCheck({ labels, locale }: { labels: BalanceCheckLabels; l
             autoComplete="off"
             value={creditText}
             onChange={(event) => setCreditText(event.target.value)}
-            aria-describedby={`${id}-credit-hint`}
+            aria-describedby={describedBy(`${id}-credit`, labels.unit)}
             className="numeric h-11 font-mono text-base"
           />
         </Field>

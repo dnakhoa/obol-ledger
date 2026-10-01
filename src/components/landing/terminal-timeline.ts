@@ -33,6 +33,13 @@ export const PACE = {
 } as const;
 
 /**
+ * The most keystrokes a statement takes to type. A longer one types several
+ * characters a stroke instead, so a complete multi-line attack takes about
+ * as long to watch (~2 s) as a one-line one, rather than four times as long.
+ */
+export const TYPING_TICKS = 110;
+
+/**
  * The first frame: the first exchange already answered.
  *
  * Server-rendered as it is, so the terminal says something before any script
@@ -55,7 +62,11 @@ export function advance(
     return { next: { exchange, typed: 0, phase: 'typing' }, after: PACE.read };
   }
   if (state.typed < length) {
-    return { next: { ...state, typed: state.typed + 1 }, after: PACE.keystroke };
+    const stroke = Math.max(1, Math.ceil(length / TYPING_TICKS));
+    return {
+      next: { ...state, typed: Math.min(state.typed + stroke, length) },
+      after: PACE.keystroke,
+    };
   }
   return { next: { ...state, phase: 'replied' }, after: PACE.think };
 }

@@ -4,14 +4,17 @@ import { ButtonLink } from '@/components/ui/button';
 import { ArrowRightIcon } from '@/components/icons';
 import { Backdrop } from './backdrop';
 import { RefusalTerminal } from './refusal-terminal';
+import { headingId } from './section';
+
+const SECTION = 'hero';
 
 /**
  * The first screen: the claim, the proof of it running, and the way in.
  *
  * The primary action arrives as a slot rather than being built here, because
- * it is the sign-in flow's own button wired to the sign-in route's own server
- * action. The hero lays it out; it does not need to know how a sample ledger
- * is made.
+ * it is the sign-in page's own sample-ledger button, wired to the server
+ * action both pages share. The hero lays it out; it does not need to know how
+ * a sample ledger is made.
  */
 export function Hero({
   copy,
@@ -22,7 +25,7 @@ export function Hero({
 }) {
   return (
     <section
-      aria-labelledby="hero-title"
+      aria-labelledby={headingId(SECTION)}
       className="relative isolate px-4 pt-32 pb-20 sm:px-6 sm:pt-40 lg:pb-28"
     >
       <Backdrop />
@@ -34,7 +37,7 @@ export function Hero({
           </p>
 
           <h1
-            id="hero-title"
+            id={headingId(SECTION)}
             className="animate-rise text-[2.75rem] leading-[1.02] font-semibold tracking-[-0.04em] text-balance [animation-delay:90ms] sm:text-6xl lg:text-7xl"
           >
             {/*

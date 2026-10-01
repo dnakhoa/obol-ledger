@@ -82,6 +82,8 @@
   --shadow-card: 0 1px 2px oklch(0.21 0.02 258 / 0.05);
   --shadow-raised:
     0 1px 2px oklch(0.21 0.02 258 / 0.06), 0 8px 24px -8px oklch(0.21 0.02 258 / 0.12);
+  /* A large surface lifted well off the page: the landing page's screenshot. */
+  --shadow-hero: 0 50px 100px -30px oklch(0.21 0.02 258 / 0.35);
 }
 
 /*
@@ -133,6 +135,7 @@
 
   --shadow-card: 0 1px 2px oklch(0 0 0 / 0.3);
   --shadow-raised: 0 1px 2px oklch(0 0 0 / 0.35), 0 8px 24px -8px oklch(0 0 0 / 0.55);
+  --shadow-hero: 0 50px 100px -30px oklch(0 0 0 / 0.7);
 }
 
 @theme inline {

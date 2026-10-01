@@ -36,7 +36,7 @@ export function ProductReveal({
           aria-hidden="true"
           className="bg-brand-glow absolute inset-x-[10%] -bottom-10 h-1/2 rounded-full blur-3xl"
         />
-        <figure className="border-line-strong bg-surface relative overflow-hidden rounded-2xl border p-1.5 shadow-[0_50px_100px_-30px_oklch(0_0_0/0.7)]">
+        <figure className="border-line-strong bg-surface relative overflow-hidden rounded-2xl border p-1.5 shadow-[var(--shadow-hero)]">
           <div aria-hidden="true" className="flex h-8 items-center gap-1.5 px-3">
             <span className="bg-line-strong size-2.5 rounded-full" />
             <span className="bg-line-strong size-2.5 rounded-full" />

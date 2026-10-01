@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { translations } from '@/server/i18n';
-import { hasSession } from '@/server/auth/viewer';
+import { signedInViewer } from '@/server/auth/viewer';
+import { landingRedirect } from '@/server/auth/landing';
+import { LOCALES } from '@/lib/i18n';
 import { TrySample } from '@/components/try-sample';
 import { LandingNav } from '@/components/landing/landing-nav';
 import { Hero } from '@/components/landing/hero';
@@ -13,7 +15,7 @@ import { Capabilities } from '@/components/landing/capabilities';
 import { Engineering } from '@/components/landing/engineering';
 import { ClosingCta } from '@/components/landing/closing-cta';
 import { LandingFooter } from '@/components/landing/landing-footer';
-import { startSampleLedgerAction } from '../(auth)/sign-in/actions';
+import { startSampleLedgerAction } from '@/server/actions/sample-ledger';
 import overview from './_assets/overview-dark.png';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -32,38 +34,39 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * Where each number on the page comes from, so the next person to change one
- * knows what to recount: the suite's own total (README, "Tests that run the
- * real schema"), the attack page's list, `docs/adr/`, the locale list, and
- * the attack page's promise that every attack ends in ROLLBACK.
+ * The two numbers on the page nothing in the code can count: the suite's
+ * total (README, "Tests that run the real schema"), rounded down, and the
+ * files in `docs/adr/`. The rest are derived below from what they describe,
+ * so they cannot drift from it.
  */
 const TESTS = 1100;
-const ATTACKS = 9;
 const DECISIONS = 27;
-const LANGUAGES = 3;
 
 /**
  * The landing page.
  *
- * A Server Component that does three things: steps aside for anyone with a
- * session, picks the words for this visitor's language, and hands each
+ * A Server Component that does three things: steps aside for anyone with
+ * somewhere better to be (`landingRedirect`), picks the words for this visitor's language, and hands each
  * section the slice of them it shows. Every section is a Server Component
  * too; the only JavaScript this page ships is the terminal, the balance
  * check, the card spotlight, the language toggle and the sample button.
  */
 export default async function LandingPage() {
-  // Someone signed in came for their books, not for the pitch.
-  if (await hasSession()) redirect('/overview');
+  const elsewhere = landingRedirect(await signedInViewer());
+  if (elsewhere) redirect(elsewhere);
 
   const { locale, t } = await translations();
   const copy = t.landing;
   const count = new Intl.NumberFormat(locale);
+  const attacks = Object.keys(t.breakIt.attacks).length;
 
   const figures: readonly Figure[] = [
     { key: 'tests', value: `${count.format(TESTS)}+` },
-    { key: 'attacks', value: `${ATTACKS}/${ATTACKS}` },
+    // Every attack the attack page lists, refused: the page's own promise.
+    { key: 'attacks', value: `${attacks}/${attacks}` },
     { key: 'decisions', value: count.format(DECISIONS) },
-    { key: 'languages', value: count.format(LANGUAGES) },
+    { key: 'languages', value: count.format(LOCALES.length) },
+    // Every attack ends in ROLLBACK, including one that gets through.
     { key: 'rowsKept', value: count.format(0) },
   ];
 

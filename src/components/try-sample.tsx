@@ -6,7 +6,7 @@ import { Button, type ButtonVariant } from './ui/button';
 import { AlertIcon } from './icons';
 import { cn } from '@/lib/cn';
 import { authClient } from '@/lib/auth-client';
-import type { SampleLedgerState } from '@/app/(auth)/sign-in/actions';
+import type { SampleLedgerState } from '@/server/actions/sample-ledger';
 
 /**
  * One click to a writable ledger of your own.

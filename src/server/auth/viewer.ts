@@ -56,25 +56,23 @@ export type Viewer =
 const WRITERS = new Set(['owner', 'member']);
 
 export async function currentViewer(): Promise<Viewer> {
+  return (await signedInViewer()) ?? resolveViewer();
+}
+
+/**
+ * The viewer behind this request's session, or `null` when there is none.
+ *
+ * `currentViewer` without its fallback: a visitor with no session costs no
+ * database read here, where `currentViewer` would look up the demo
+ * organisation for them. The landing page — the one page most likely to be
+ * opened cold, by somebody who has never been here — needs only this half.
+ */
+export async function signedInViewer(): Promise<Viewer | null> {
   // `next/headers` is the only way a Server Component can see the request,
   // and it throws outside one — which is why route handlers use
   // `viewerFor(request)` instead of reaching for the same magic.
   const session = await auth().api.getSession({ headers: await headers() });
-  return resolveViewer(session?.user ?? undefined);
-}
-
-/**
- * Whether this request is signed in at all, without asking whose ledger.
- *
- * For the landing page, which only needs to know whether to step aside for
- * someone who already has books to go to. `currentViewer` would also look up
- * the demo organisation for a visitor with no session, which is a database
- * read the landing page — the one page most likely to be opened cold, by
- * somebody who has never been here — has no use for.
- */
-export async function hasSession(): Promise<boolean> {
-  const session = await auth().api.getSession({ headers: await headers() });
-  return session !== null;
+  return session ? resolveViewer(session.user) : null;
 }
 
 /** The same resolution for a route handler, which already holds the request. */

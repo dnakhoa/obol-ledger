@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import {
   PACE,
+  TYPING_TICKS,
   advance,
   opening,
   type Exchange,
@@ -32,6 +33,18 @@ describe('the landing terminal', () => {
       next: { exchange: 1, typed: 4, phase: 'typing' },
       after: PACE.keystroke,
     });
+  });
+
+  it('types a long statement in no more strokes than a short one may take', () => {
+    const long: readonly Exchange[] = [{ statement: 'x'.repeat(TYPING_TICKS * 4 + 3), reply: [] }];
+    let state: TerminalState = { exchange: 0, typed: 0, phase: 'typing' };
+    let strokes = 0;
+    while (state.phase === 'typing' && state.typed < (long[0]?.statement.length ?? 0)) {
+      state = advance(state, long).next;
+      strokes += 1;
+    }
+    expect(strokes).toBeLessThanOrEqual(TYPING_TICKS);
+    expect(state.typed).toBe(long[0]?.statement.length);
   });
 
   it('pauses for Postgres to answer once the statement is complete', () => {
