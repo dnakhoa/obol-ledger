@@ -1352,6 +1352,166 @@ export const en = {
       jp: 'Japanese account titles, with consumption tax paid and collected.',
     },
   },
+  /**
+   * The page a link to the product opens on.
+   *
+   * Every claim here is one the repository can back: the counts are the
+   * suite's and the ADR folder's, the refusals are the attack page's, and the
+   * three proofs are the README's. A landing page that oversells is the one
+   * page of this project a reader would be right not to trust.
+   */
+  landing: {
+    metaTitle: 'Obol — the ledger Postgres keeps honest',
+    metaDescription:
+      'A double-entry ledger whose rules live in the database: balanced by construction, append-only, isolated per tenant. Try to break it on the live demo.',
+    nav: {
+      label: 'Site',
+      guarantees: 'Guarantees',
+      features: 'Features',
+      engineering: 'Engineering',
+      openDemo: 'Open the demo',
+    },
+    hero: {
+      eyebrow: 'Open source · MIT licence',
+      // The spaces are part of the copy: see the hero, and Japanese, which has none.
+      titleLead: 'The ledger that ',
+      titleAccent: 'refuses',
+      titleTail: ' to be wrong.',
+      lede: 'Double-entry books where every rule — entries that balance, history nobody can edit, one company never seeing another’s — is enforced by Postgres itself. Not by a code path someone can forget.',
+      breakIt: 'Try to break it',
+      reassurance: 'No sign-up. Your own copy of a stone exporter’s books, ready in seconds.',
+      terminalTitle: 'psql — connected as obol_app',
+      pause: 'Pause the animation',
+      play: 'Play the animation',
+      transcript: 'Statements sent to the database, and how Postgres answered each one',
+    },
+    stats: {
+      label: 'Obol in numbers',
+      tests: 'tests, run against real Postgres',
+      attacks: 'attacks on the live database, refused',
+      decisions: 'architecture decisions, written down',
+      languages: 'languages, translated to the last label',
+      rowsKept: 'rows an attacker gets to keep',
+    },
+    product: {
+      eyebrow: 'The live demo',
+      title: 'Real books. Not a to-do list with a currency sign.',
+      lede: 'A quarter of trading for a Vietnamese stone exporter — FIFO lots, export invoices in three currencies, landed cost and VAT — kept in dong under Thông tư 200. Every number on it is live.',
+      imageAlt:
+        'The Obol overview in dark mode: stock on hand, receivables, payables and this month’s margin, a chip confirming the books balance, thirty days of activity and the position by account class.',
+      open: 'Open the live demo',
+    },
+    balance: {
+      eyebrow: 'Balanced by construction',
+      title: 'Debits equal credits. Postgres makes sure.',
+      lede: 'Every entry is checked at COMMIT by a deferred constraint trigger, so not even a hand-typed psql session can leave the books one unit out. Go on — unbalance it.',
+      debit: 'Debit',
+      credit: 'Credit',
+      unit: 'minor units',
+      balanced: 'Balanced. The entry posts.',
+      unbalanced: 'Off by {amount}. Postgres refuses the entry, and nothing is kept.',
+      makeItBalance: 'Balance it',
+      knockItOut: 'Knock it out by one',
+      simulated: 'This is the rule, run in your browser. The real one runs in Postgres —',
+      fireIt: 'fire it at the live database',
+      scaleLabel: 'A balance scale, level only when debits equal credits',
+      terminalTitle: 'What Postgres answers at COMMIT',
+    },
+    guarantees: {
+      eyebrow: 'Nine attacks. Nine refusals.',
+      title: 'We tried to break it so you would not have to. You still can.',
+      lede: 'Raw SQL that goes around the application entirely, fired at the live database. Every answer below is Postgres’ own.',
+      postgresSays: 'Postgres says',
+      noRows: '0 rows',
+      cta: 'Fire all nine yourself',
+    },
+    features: {
+      eyebrow: 'Beyond the core',
+      title: 'Everything a trading business needs to close the month.',
+      lede: 'One balanced core underneath, so every module below posts entries the database has already checked.',
+      items: {
+        currency: {
+          title: 'Multi-currency',
+          body: 'Invoice in any currency, balanced in the functional one, with realised and unrealised exchange gains.',
+        },
+        stock: {
+          title: 'FIFO stock and landed cost',
+          body: 'Lots costed first in, first out, with freight and duty spread across the goods they arrived with.',
+        },
+        sales: {
+          title: 'Sales that know their margin',
+          body: 'Invoice and cost of goods sold in one entry, so margin by product and by customer is never a guess.',
+        },
+        bank: {
+          title: 'Bank reconciliation',
+          body: 'Statements imported once and matched line by line, with fees booked straight from the line.',
+        },
+        tax: {
+          title: 'VAT and consumption tax',
+          body: 'Returns that carry an unused credit forward as a balance, not a number typed onto a form.',
+        },
+        statutory: {
+          title: 'Vietnam, done properly',
+          body: 'Mẫu B01 and B02 under Thông tư 200 and 133, and e-invoices numbered without gaps.',
+        },
+        documents: {
+          title: 'Documents on the entry',
+          body: 'The invoice, customs declaration and bill of lading, attached to the entry they support.',
+        },
+        webhooks: {
+          title: 'Webhooks through an outbox',
+          body: 'Recorded in the same transaction as the entry, so no event ever announces a rollback.',
+        },
+        api: {
+          title: 'A typed HTTP API',
+          body: 'Idempotency keys, keyset pagination and a generated OpenAPI document for every route.',
+        },
+      },
+    },
+    engineering: {
+      eyebrow: 'Proof by deletion',
+      title: 'Every promise is one deleted line from a failing test.',
+      lede: 'A claim that could be false is checked by removing the line that makes it true and watching the suite go red. Three of them:',
+      proofs: {
+        sort: {
+          change: 'Remove the sort that orders posting inserts',
+          result: 'Two concurrent transfers deadlock, and Postgres reports 40P01.',
+        },
+        skipLocked: {
+          change: 'Remove SKIP LOCKED from the webhook queue',
+          result: 'Four workers collapse into one, and the concurrency suite says so.',
+        },
+        bypassRls: {
+          change: 'Connect as a role that bypasses row-level security',
+          result: 'The health probe reports it before a single request is served.',
+        },
+      },
+      practicesLabel: 'Also in the box',
+      practices: {
+        concurrency: 'Optimistic concurrency',
+        pagination: 'Keyset pagination',
+        retries: 'Idempotent retries',
+        outbox: 'Transactional outbox',
+        metrics: 'Prometheus metrics',
+        traces: 'OpenTelemetry traces',
+        history: 'Append-only history',
+        tenancy: 'Row-level security',
+      },
+    },
+    closing: {
+      title: 'Open your own books in one click.',
+      lede: 'A writable copy of the sample company — a quarter of sales, stock and VAT. Change anything. Break what you can.',
+      readOnly: 'Or look around the read-only demo',
+    },
+    footer: {
+      tagline: 'Balanced by construction, refused by Postgres.',
+      licence: 'Open source under the MIT licence',
+      source: 'Source on GitHub',
+      api: 'API reference',
+      demo: 'Live demo',
+      breakIt: 'Try to break it',
+    },
+  },
 } as const;
 
 /**

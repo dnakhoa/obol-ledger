@@ -205,6 +205,12 @@ export const PlayIcon = (props: IconProps) => (
   </Icon>
 );
 
+export const PauseIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M8 5v14M16 5v14" />
+  </Icon>
+);
+
 export const CrossIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M6 6l12 12M18 6 6 18" />

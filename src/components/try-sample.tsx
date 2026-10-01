@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from './ui/button';
+import { Button, type ButtonVariant } from './ui/button';
 import { AlertIcon } from './icons';
+import { cn } from '@/lib/cn';
 import { authClient } from '@/lib/auth-client';
-import type { SampleLedgerState } from '@/app/(auth)/sign-in/actions';
+import type { SampleLedgerState } from '@/server/actions/sample-ledger';
 
 /**
  * One click to a writable ledger of your own.
@@ -17,9 +18,14 @@ import type { SampleLedgerState } from '@/app/(auth)/sign-in/actions';
 export function TrySample({
   start,
   labels,
+  variant = 'primary',
+  className,
 }: {
   start: () => Promise<SampleLedgerState>;
   labels: { readonly start: string; readonly working: string; readonly failed: string };
+  variant?: ButtonVariant;
+  /** Sizes the block; the button fills whatever width it is given. */
+  className?: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -43,13 +49,22 @@ export function TrySample({
       setError(result.message);
       return;
     }
-    router.push('/');
+    router.push('/overview');
     router.refresh();
   }
 
   return (
-    <div className="space-y-2">
-      <Button size="lg" className="w-full" disabled={pending} onClick={() => void go()}>
+    <div className={cn('space-y-2', className)}>
+      <Button
+        size="lg"
+        variant={variant}
+        className="w-full"
+        disabled={pending}
+        // Says the page is busy to a screen reader, which cannot see the
+        // label change from "Open" to "Setting up…" as an event.
+        aria-busy={pending}
+        onClick={() => void go()}
+      >
         {pending ? labels.working : labels.start}
       </Button>
       {error ? (
