@@ -76,5 +76,5 @@ export async function createLedgerAction(
     locale: await viewerLocale(),
   });
 
-  redirect('/');
+  redirect('/overview');
 }

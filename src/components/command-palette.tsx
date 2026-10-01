@@ -57,7 +57,7 @@ type Item = {
  */
 function pagesFor(nav: PaletteLabels['nav'], group: string): Item[] {
   return [
-    { id: 'p-overview', href: '/', label: nav.overview, group, Icon: GaugeIcon },
+    { id: 'p-overview', href: '/overview', label: nav.overview, group, Icon: GaugeIcon },
     { id: 'p-accounts', href: '/accounts', label: nav.accounts, group, Icon: AccountsIcon },
     { id: 'p-stock', href: '/stock', label: nav.stock, group, Icon: StockIcon },
     { id: 'p-journal', href: '/journal', label: nav.journal, group, Icon: JournalIcon },

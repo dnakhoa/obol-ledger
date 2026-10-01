@@ -1356,4 +1356,157 @@ export const vi: Messages = {
       jp: 'Tên tài khoản theo Nhật Bản, có thuế tiêu dùng đầu vào và đầu ra.',
     },
   },
+  landing: {
+    metaTitle: 'Obol — sổ cái được Postgres giữ cho trung thực',
+    metaDescription:
+      'Sổ cái kế toán kép với mọi quy tắc nằm trong cơ sở dữ liệu: cân bằng ngay từ cấu trúc, chỉ ghi thêm, tách biệt từng doanh nghiệp. Hãy thử phá nó trên bản demo trực tiếp.',
+    nav: {
+      label: 'Trang',
+      guarantees: 'Cam kết',
+      features: 'Tính năng',
+      engineering: 'Kỹ thuật',
+      openDemo: 'Mở bản demo',
+    },
+    hero: {
+      eyebrow: 'Mã nguồn mở · Giấy phép MIT',
+      titleLead: 'Sổ cái ',
+      titleAccent: 'từ chối',
+      titleTail: ' mọi sai lệch.',
+      lede: 'Sổ sách kế toán kép trong đó mọi quy tắc — bút toán luôn cân, lịch sử không ai sửa được, doanh nghiệp này không bao giờ thấy sổ của doanh nghiệp khác — đều do chính Postgres thực thi. Không phải một đoạn mã mà ai đó có thể quên.',
+      breakIt: 'Thử phá sổ cái',
+      reassurance:
+        'Không cần đăng ký. Bản sao sổ sách riêng của một công ty xuất khẩu đá, sẵn sàng sau vài giây.',
+      terminalTitle: 'psql — kết nối với vai trò obol_app',
+      pause: 'Tạm dừng hoạt ảnh',
+      play: 'Phát hoạt ảnh',
+      transcript: 'Các câu lệnh gửi tới cơ sở dữ liệu, và Postgres trả lời từng câu ra sao',
+    },
+    stats: {
+      label: 'Obol qua những con số',
+      tests: 'bài kiểm thử, chạy trên Postgres thật',
+      attacks: 'cuộc tấn công vào cơ sở dữ liệu thật, đều bị chặn',
+      decisions: 'quyết định kiến trúc, được ghi lại',
+      languages: 'ngôn ngữ, dịch đến từng nhãn cuối cùng',
+      rowsKept: 'dòng dữ liệu kẻ tấn công giữ lại được',
+    },
+    product: {
+      eyebrow: 'Bản demo trực tiếp',
+      title: 'Sổ sách thật. Không phải danh sách việc cần làm gắn thêm ký hiệu tiền tệ.',
+      lede: 'Một quý kinh doanh của một công ty xuất khẩu đá Việt Nam — lô hàng FIFO, hóa đơn xuất khẩu bằng ba loại tiền, chi phí mua hàng phân bổ và thuế GTGT — ghi sổ bằng đồng theo Thông tư 200. Mọi con số đều là dữ liệu thật.',
+      imageAlt:
+        'Màn hình tổng quan Obol ở chế độ tối: hàng tồn kho, phải thu, phải trả và lãi gộp tháng này, nhãn xác nhận sổ cân, hoạt động ba mươi ngày và số dư theo loại tài khoản.',
+      open: 'Mở bản demo trực tiếp',
+    },
+    balance: {
+      eyebrow: 'Cân bằng ngay từ cấu trúc',
+      title: 'Tổng Nợ bằng tổng Có. Postgres bảo đảm điều đó.',
+      lede: 'Mỗi bút toán được kiểm tra lúc COMMIT bằng một trigger ràng buộc hoãn, nên ngay cả một phiên psql gõ tay cũng không thể làm sổ lệch một đơn vị. Cứ thử làm lệch xem.',
+      debit: 'Nợ',
+      credit: 'Có',
+      unit: 'đơn vị nhỏ nhất',
+      balanced: 'Đã cân. Bút toán được ghi sổ.',
+      unbalanced: 'Lệch {amount}. Postgres từ chối bút toán, và không có gì được giữ lại.',
+      makeItBalance: 'Làm cho cân',
+      knockItOut: 'Làm lệch một đơn vị',
+      simulated:
+        'Đây là quy tắc đó, chạy trong trình duyệt của bạn. Quy tắc thật chạy trong Postgres —',
+      fireIt: 'hãy thử trên cơ sở dữ liệu thật',
+      scaleLabel: 'Một chiếc cân, chỉ thăng bằng khi tổng Nợ bằng tổng Có',
+      terminalTitle: 'Postgres trả lời gì lúc COMMIT',
+    },
+    guarantees: {
+      eyebrow: 'Chín cuộc tấn công. Chín lần từ chối.',
+      title: 'Chúng tôi đã thử phá nó để bạn không phải làm. Nhưng bạn vẫn có thể thử.',
+      lede: 'SQL thô đi vòng qua ứng dụng hoàn toàn, bắn thẳng vào cơ sở dữ liệu thật. Mọi câu trả lời dưới đây đều là lời của chính Postgres.',
+      postgresSays: 'Postgres trả lời',
+      noRows: '0 dòng',
+      cta: 'Tự mình chạy cả chín',
+    },
+    features: {
+      eyebrow: 'Ngoài phần lõi',
+      title: 'Mọi thứ một doanh nghiệp thương mại cần để khóa sổ cuối tháng.',
+      lede: 'Bên dưới là một lõi luôn cân, nên mọi phân hệ dưới đây đều ghi những bút toán mà cơ sở dữ liệu đã kiểm tra.',
+      items: {
+        currency: {
+          title: 'Đa tiền tệ',
+          body: 'Lập hóa đơn bằng bất kỳ loại tiền nào, cân theo đồng tiền hạch toán, kèm chênh lệch tỷ giá đã và chưa thực hiện.',
+        },
+        stock: {
+          title: 'Tồn kho FIFO và chi phí mua hàng',
+          body: 'Lô hàng tính giá nhập trước xuất trước, cước vận chuyển và thuế nhập khẩu phân bổ vào đúng hàng đi cùng chuyến.',
+        },
+        sales: {
+          title: 'Bán hàng biết rõ lãi gộp',
+          body: 'Hóa đơn và giá vốn hàng bán trong cùng một bút toán, nên lãi gộp theo sản phẩm và khách hàng không bao giờ là phỏng đoán.',
+        },
+        bank: {
+          title: 'Đối chiếu ngân hàng',
+          body: 'Sao kê nhập một lần và khớp từng dòng, phí ngân hàng ghi sổ ngay từ dòng sao kê.',
+        },
+        tax: {
+          title: 'Thuế GTGT và thuế tiêu dùng',
+          body: 'Tờ khai chuyển số thuế còn được khấu trừ sang kỳ sau như một số dư, không phải con số gõ tay vào biểu mẫu.',
+        },
+        statutory: {
+          title: 'Chuẩn mực Việt Nam, làm đúng cách',
+          body: 'Mẫu B01 và B02 theo Thông tư 200 và 133, cùng hóa đơn điện tử đánh số liên tục không bỏ sót.',
+        },
+        documents: {
+          title: 'Chứng từ gắn với bút toán',
+          body: 'Hóa đơn, tờ khai hải quan và vận đơn, đính kèm ngay bút toán mà chúng làm căn cứ.',
+        },
+        webhooks: {
+          title: 'Webhook qua outbox',
+          body: 'Được ghi trong cùng giao dịch với bút toán, nên không sự kiện nào thông báo về một lần hoàn tác.',
+        },
+        api: {
+          title: 'HTTP API có kiểu dữ liệu',
+          body: 'Khóa idempotency, phân trang keyset và tài liệu OpenAPI sinh tự động cho mọi route.',
+        },
+      },
+    },
+    engineering: {
+      eyebrow: 'Chứng minh bằng cách xóa',
+      title: 'Mỗi cam kết chỉ cách một bài kiểm thử thất bại đúng một dòng bị xóa.',
+      lede: 'Một khẳng định có thể sai được kiểm chứng bằng cách xóa dòng mã làm nó đúng, rồi xem bộ kiểm thử chuyển đỏ. Ba ví dụ:',
+      proofs: {
+        sort: {
+          change: 'Xóa phép sắp xếp thứ tự chèn các dòng hạch toán',
+          result: 'Hai lệnh chuyển tiền đồng thời bị deadlock, và Postgres báo 40P01.',
+        },
+        skipLocked: {
+          change: 'Xóa SKIP LOCKED khỏi hàng đợi webhook',
+          result: 'Bốn worker dồn lại thành một, và bộ kiểm thử đồng thời chỉ ra điều đó.',
+        },
+        bypassRls: {
+          change: 'Kết nối bằng một vai trò bỏ qua bảo mật cấp dòng',
+          result: 'Đầu dò sức khỏe báo ngay trước khi phục vụ yêu cầu đầu tiên.',
+        },
+      },
+      practicesLabel: 'Còn có sẵn',
+      practices: {
+        concurrency: 'Đồng thời lạc quan',
+        pagination: 'Phân trang keyset',
+        retries: 'Thử lại an toàn',
+        outbox: 'Outbox giao dịch',
+        metrics: 'Chỉ số Prometheus',
+        traces: 'Truy vết OpenTelemetry',
+        history: 'Lịch sử chỉ ghi thêm',
+        tenancy: 'Bảo mật cấp dòng',
+      },
+    },
+    closing: {
+      title: 'Mở sổ sách của riêng bạn chỉ với một cú nhấp.',
+      lede: 'Một bản sao có thể ghi của công ty mẫu — một quý bán hàng, tồn kho và thuế GTGT. Thay đổi bất cứ thứ gì. Phá được gì cứ phá.',
+      readOnly: 'Hoặc xem bản demo chỉ đọc',
+    },
+    footer: {
+      tagline: 'Cân bằng từ cấu trúc, được Postgres canh giữ.',
+      licence: 'Mã nguồn mở theo giấy phép MIT',
+      source: 'Mã nguồn trên GitHub',
+      api: 'Tài liệu API',
+      demo: 'Bản demo trực tiếp',
+      breakIt: 'Thử phá sổ cái',
+    },
+  },
 };

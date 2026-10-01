@@ -65,7 +65,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
       <aside className="border-line bg-surface sticky top-0 hidden h-dvh flex-col border-r lg:flex">
         <div className="border-line flex h-14 items-center gap-2 border-b px-4">
-          <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+          <Link href="/overview" className="flex items-center gap-2 font-semibold tracking-tight">
             <span className="bg-action text-action-ink flex size-7 items-center justify-center rounded-md">
               <ScaleIcon width={15} height={15} />
             </span>
@@ -100,7 +100,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
       <div className="flex min-h-dvh min-w-0 flex-col">
         <header className="border-line bg-surface/90 sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b px-4 backdrop-blur-sm lg:hidden">
-          <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+          <Link href="/overview" className="flex items-center gap-2 font-semibold tracking-tight">
             <span className="bg-action text-action-ink flex size-7 items-center justify-center rounded-md">
               <ScaleIcon width={15} height={15} />
             </span>

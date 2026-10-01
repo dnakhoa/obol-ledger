@@ -20,7 +20,7 @@ export default async function SignInPage() {
   const viewer = await currentViewer();
   // A sample-ledger visitor comes back here to keep what they built, by
   // signing in with a provider; anyone else with a ledger has nothing to do.
-  if (viewer.kind === 'member' && !viewer.sample) redirect('/');
+  if (viewer.kind === 'member' && !viewer.sample) redirect('/overview');
   const keeping = viewer.kind === 'member' && viewer.sample;
   // An anonymous visitor mid-way through creating a sample ledger is
   // unenrolled for a moment; they stay here, where the button finishes it.
@@ -76,7 +76,7 @@ export default async function SignInPage() {
       )}
 
       <p className="text-ink-muted text-center text-xs">
-        <Link href="/" className="hover:text-ink-secondary underline">
+        <Link href="/overview" className="hover:text-ink-secondary underline">
           {t.sample.orReadOnly}
         </Link>
       </p>

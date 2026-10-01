@@ -63,6 +63,20 @@ export async function currentViewer(): Promise<Viewer> {
   return resolveViewer(session?.user ?? undefined);
 }
 
+/**
+ * Whether this request is signed in at all, without asking whose ledger.
+ *
+ * For the landing page, which only needs to know whether to step aside for
+ * someone who already has books to go to. `currentViewer` would also look up
+ * the demo organisation for a visitor with no session, which is a database
+ * read the landing page — the one page most likely to be opened cold, by
+ * somebody who has never been here — has no use for.
+ */
+export async function hasSession(): Promise<boolean> {
+  const session = await auth().api.getSession({ headers: await headers() });
+  return session !== null;
+}
+
 /** The same resolution for a route handler, which already holds the request. */
 export async function viewerFor(request: Request): Promise<Viewer> {
   const session = await auth().api.getSession({ headers: request.headers });

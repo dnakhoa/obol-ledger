@@ -53,6 +53,17 @@
   --focus: oklch(0.55 0.2 264);
 
   /*
+   * The coin an obol is. Used by the landing page for its one call to action
+   * and the word the headline turns on, and nowhere in the application,
+   * where the inverted action surface stays the only emphasis. Always a fill
+   * under dark ink, never text on a light surface, which it would not clear.
+   */
+  --brand: oklch(0.7 0.14 75);
+  --brand-ink: oklch(0.21 0.02 258);
+  --brand-hover: oklch(0.75 0.14 78);
+  --brand-glow: oklch(0.7 0.14 75 / 0.16);
+
+  /*
    * The terminal the attack page prints SQL into. Dark in both themes, on
    * purpose: it is a psql session, and reads as one against either surface.
    * Its hues are its own rather than borrowed from status, so a highlighted
@@ -73,7 +84,16 @@
     0 1px 2px oklch(0.21 0.02 258 / 0.06), 0 8px 24px -8px oklch(0.21 0.02 258 / 0.12);
 }
 
-[data-theme='dark'] {
+/*
+ * The second selector is the landing page, which is dark whatever the visitor
+ * chose. It cannot set `data-theme` on `<html>` — the root layout's script owns
+ * that — so it marks itself, and the whole document resolves the dark tokens
+ * while it is mounted: `body` included, so an overscroll on a light-theme
+ * machine does not flash white. Leaving for the app unmounts it, and the
+ * visitor's own theme comes back without a reload.
+ */
+[data-theme='dark'],
+:root:has([data-theme-lock='dark']) {
   color-scheme: dark;
 
   --canvas: oklch(0.16 0.012 258);
@@ -103,6 +123,10 @@
   --series-wash: oklch(0.72 0.15 264 / 0.18);
 
   --focus: oklch(0.78 0.13 264);
+
+  --brand: oklch(0.83 0.14 82);
+  --brand-hover: oklch(0.88 0.12 85);
+  --brand-glow: oklch(0.83 0.14 82 / 0.16);
 
   --terminal: oklch(0.13 0.012 262);
   --terminal-line: oklch(0.25 0.016 262);
@@ -142,6 +166,11 @@
   --color-series-wash: var(--series-wash);
   --color-focus: var(--focus);
 
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-glow: var(--brand-glow);
+
   --color-terminal: var(--terminal);
   --color-terminal-line: var(--terminal-line);
   --color-terminal-ink: var(--terminal-ink);
@@ -160,6 +189,26 @@
    */
   --animate-verdict-in: verdict-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
   --animate-scan: scan 1.1s ease-in-out infinite;
+  /* The landing terminal's cursor, which says "still typing". */
+  --animate-caret: caret 1s steps(1) infinite;
+  /* The landing hero arriving, line by line, and the stroke under its verb. */
+  --animate-rise: reveal 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-draw: draw 900ms cubic-bezier(0.65, 0, 0.35, 1) 700ms both;
+
+  @keyframes draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes caret {
+    50% {
+      opacity: 0;
+    }
+  }
 
   @keyframes verdict-in {
     from {
@@ -207,6 +256,17 @@
   }
 
   /*
+   * Monospace here is always a quotation — SQL, a psql prompt, a file path —
+   * and JetBrains Mono's ligatures would misquote it: psql's `=>` prompt drawn
+   * as ⇒, a `<>` as ≠. Off wherever the face is used.
+   */
+  .font-mono,
+  code,
+  pre {
+    font-variant-ligatures: none;
+  }
+
+  /*
    * Figures in a column must align on the decimal point, or the eye cannot
    * compare magnitudes by length. Applied by the `.numeric` utility rather than
    * globally: `tabular-nums` makes large standalone numbers look gappy.
@@ -221,11 +281,59 @@
     *::before,
     *::after {
       animation-duration: 0.01ms !important;
+      /* A staggered entrance would otherwise sit invisible for its delay. */
+      animation-delay: 0s !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
   }
+}
+
+/*
+ * The landing page's sections arriving as they scroll in, and its dashboard
+ * screenshot settling from a tilt to flat.
+ *
+ * Driven by the scroll position in CSS rather than by an observer in
+ * JavaScript, so the sections stay Server Components with nothing to hydrate.
+ * Both are enhancements in the strict sense: a browser without scroll-driven
+ * animations, or a visitor who asked for less motion, gets the finished state
+ * — the content is never hidden waiting for an animation that will not run.
+ */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 70%;
+    }
+
+    .tilt-in {
+      animation: tilt-in linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 45%;
+    }
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+  }
+}
+
+@keyframes tilt-in {
+  from {
+    opacity: 0.35;
+    transform: perspective(1800px) rotateX(22deg) scale(0.9);
+  }
+}
+
+/* In-page links land below the landing page's sticky bar, not under it. */
+:root:has([data-theme-lock]) {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
 }
 
 @layer utilities {

@@ -33,7 +33,7 @@ export default async function OnboardingPage() {
   const { locale, t } = await translations();
   const viewer = await currentViewer();
   if (viewer.kind === 'guest') redirect('/sign-in');
-  if (viewer.kind === 'member') redirect('/');
+  if (viewer.kind === 'member') redirect('/overview');
 
   const firstName = viewer.name.split(' ')[0] ?? '';
 

@@ -11,7 +11,7 @@ export default async function NotFound() {
         <p className="text-ink-muted text-xs">{t.misc.notFoundBody}</p>
       </div>
       <Link
-        href="/"
+        href="/overview"
         className="bg-action text-action-ink inline-flex h-9 items-center rounded-lg px-4 text-sm font-medium"
       >
         {t.misc.backToOverview}

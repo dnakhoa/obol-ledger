@@ -65,7 +65,7 @@ export type NavLabels = {
  * is the one quick action worth a thumb's reach on the move.
  */
 const LINKS = [
-  { href: '/', key: 'overview', Icon: GaugeIcon, exact: true, section: null },
+  { href: '/overview', key: 'overview', Icon: GaugeIcon, exact: true, section: null },
   { href: '/sales', key: 'sales', Icon: TagIcon, exact: false, section: 'sectionTrading' },
   { href: '/stock', key: 'stock', Icon: StockIcon, exact: false, section: 'sectionTrading' },
   {

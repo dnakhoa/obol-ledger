@@ -14,6 +14,10 @@ const VARIANTS = {
   primary: 'bg-action text-action-ink hover:bg-action-hover',
   secondary: 'border border-line bg-surface text-ink hover:bg-surface-hover',
   ghost: 'text-ink-secondary hover:bg-surface-hover hover:text-ink',
+  // The landing page's one call to action. The app has no use for it: there,
+  // the inverted `primary` is the strongest thing on any screen.
+  brand:
+    'bg-brand text-brand-ink hover:bg-brand-hover shadow-[0_0_0_1px_var(--brand),0_8px_32px_-8px_var(--brand-glow)]',
 } as const;
 
 const SIZES = {
