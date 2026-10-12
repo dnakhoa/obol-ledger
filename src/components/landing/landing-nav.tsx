@@ -5,7 +5,7 @@ import { LanguageToggle } from '@/components/language-toggle';
 import { Wordmark } from './wordmark';
 
 /** In-page anchors: plain `<a>`, since they leave neither the page nor the router. */
-const ANCHORS = ['guarantees', 'features', 'engineering'] as const;
+const ANCHORS = ['features', 'trust', 'developers'] as const;
 
 /**
  * The bar across the top: where you are, where to jump, and the way in.
