@@ -1,22 +1,27 @@
 import type { Metadata } from 'next';
+import type { StaticImageData } from 'next/image';
 import { redirect } from 'next/navigation';
 import { translations } from '@/server/i18n';
 import { signedInViewer } from '@/server/auth/viewer';
 import { landingRedirect } from '@/server/auth/landing';
-import { LOCALES } from '@/lib/i18n';
 import { TrySample } from '@/components/try-sample';
 import { LandingNav } from '@/components/landing/landing-nav';
 import { Hero } from '@/components/landing/hero';
-import { ProofStats, type Figure } from '@/components/landing/proof-stats';
-import { ProductReveal } from '@/components/landing/product-reveal';
-import { BalanceSection } from '@/components/landing/balance-section';
-import { Guarantees } from '@/components/landing/guarantees';
-import { Capabilities } from '@/components/landing/capabilities';
-import { Engineering } from '@/components/landing/engineering';
+import { Features, type FeatureKey } from '@/components/landing/features';
+import { MoreFeatures } from '@/components/landing/more-features';
+import { Trust } from '@/components/landing/trust';
+import { Developers } from '@/components/landing/developers';
 import { ClosingCta } from '@/components/landing/closing-cta';
 import { LandingFooter } from '@/components/landing/landing-footer';
 import { startSampleLedgerAction } from '@/server/actions/sample-ledger';
 import overview from './_assets/overview-dark.png';
+import sales from './_assets/sales-dark.png';
+import stock from './_assets/stock-dark.png';
+import bank from './_assets/bank-dark.png';
+import tax from './_assets/tax-dark.png';
+
+/** The demo's own screens, taken from the seeded sample company in dark mode. */
+const SCREENSHOTS: Record<FeatureKey, StaticImageData> = { sales, stock, bank, tax };
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await translations();
@@ -34,22 +39,16 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * The two numbers on the page nothing in the code can count: the suite's
- * total (README, "Tests that run the real schema"), rounded down, and the
- * files in `docs/adr/`. The rest are derived below from what they describe,
- * so they cannot drift from it.
- */
-const TESTS = 1100;
-const DECISIONS = 27;
-
-/**
  * The landing page.
  *
  * A Server Component that does three things: steps aside for anyone with
- * somewhere better to be (`landingRedirect`), picks the words for this visitor's language, and hands each
- * section the slice of them it shows. Every section is a Server Component
- * too; the only JavaScript this page ships is the terminal, the balance
- * check, the card spotlight, the language toggle and the sample button.
+ * somewhere better to be (`landingRedirect`), picks the words for this
+ * visitor's language, and hands each section the slice of them it shows.
+ * Every section is a Server Component too; the only JavaScript this page
+ * ships is the language toggle and the sample button.
+ *
+ * In the order a visitor's questions come: what is it, what does it do, why
+ * should I believe the numbers, can I run it myself, how do I try it.
  */
 export default async function LandingPage() {
   const elsewhere = landingRedirect(await signedInViewer());
@@ -57,18 +56,6 @@ export default async function LandingPage() {
 
   const { locale, t } = await translations();
   const copy = t.landing;
-  const count = new Intl.NumberFormat(locale);
-  const attacks = Object.keys(t.breakIt.attacks).length;
-
-  const figures: readonly Figure[] = [
-    { key: 'tests', value: `${count.format(TESTS)}+` },
-    // Every attack the attack page lists, refused: the page's own promise.
-    { key: 'attacks', value: `${attacks}/${attacks}` },
-    { key: 'decisions', value: count.format(DECISIONS) },
-    { key: 'languages', value: count.format(LOCALES.length) },
-    // Every attack ends in ROLLBACK, including one that gets through.
-    { key: 'rowsKept', value: count.format(0) },
-  ];
 
   // Built once and placed twice. Each placement is its own instance with its
   // own pending state; they share only the action they call.
@@ -92,17 +79,11 @@ export default async function LandingPage() {
       <LandingNav copy={copy.nav} locale={locale} languageLabel={t.common.language} />
 
       <main id="main">
-        <Hero copy={copy.hero} primaryAction={trySample} />
-        <ProofStats copy={copy.stats} figures={figures} />
-        <ProductReveal copy={copy.product} screenshot={overview} />
-        <BalanceSection copy={copy.balance} locale={locale} />
-        <Guarantees
-          copy={copy.guarantees}
-          attacks={t.breakIt.attacks}
-          verdicts={{ refused: t.breakIt.verdictRefused, held: t.breakIt.verdictHeld }}
-        />
-        <Capabilities copy={copy.features} />
-        <Engineering copy={copy.engineering} />
+        <Hero copy={copy.hero} primaryAction={trySample} screenshot={overview} />
+        <Features copy={copy.features} screenshots={SCREENSHOTS} />
+        <MoreFeatures copy={copy.more} />
+        <Trust copy={copy.trust} />
+        <Developers copy={copy.developers} />
         <ClosingCta copy={copy.closing} primaryAction={trySample} />
       </main>
 

@@ -183,6 +183,14 @@ export const CalendarIcon = (props: IconProps) => (
   </Icon>
 );
 
+/** A globe: the languages the app is translated into. */
+export const GlobeIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+  </Icon>
+);
+
 /** A price tag: selling, as distinct from the receipt that is tax. */
 export const TagIcon = (props: IconProps) => (
   <Icon {...props}>
@@ -202,12 +210,6 @@ export const ShieldIcon = (props: IconProps) => (
 export const PlayIcon = (props: IconProps) => (
   <Icon {...props}>
     <path d="M7 4.5v15l12-7.5Z" />
-  </Icon>
-);
-
-export const PauseIcon = (props: IconProps) => (
-  <Icon {...props}>
-    <path d="M8 5v14M16 5v14" />
   </Icon>
 );
 

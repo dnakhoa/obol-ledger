@@ -1355,156 +1355,151 @@ export const en = {
   /**
    * The page a link to the product opens on.
    *
-   * Every claim here is one the repository can back: the counts are the
-   * suite's and the ADR folder's, the refusals are the attack page's, and the
-   * three proofs are the README's. A landing page that oversells is the one
-   * page of this project a reader would be right not to trust.
+   * Written for someone who keeps books, not someone who reads SQL: what the
+   * product does, shown on its own screens, and why its numbers can be
+   * trusted, in plain words. The proof for an engineer lives a click away, on
+   * `/break` and in the README. Every claim here is one the demo can show.
    */
   landing: {
-    metaTitle: 'Obol — the ledger Postgres keeps honest',
+    metaTitle: 'Obol — accounting for businesses that trade goods',
     metaDescription:
-      'A double-entry ledger whose rules live in the database: balanced by construction, append-only, isolated per tenant. Try to break it on the live demo.',
+      'Open-source double-entry accounting for importers, exporters and distributors: invoices that show their margin, FIFO stock and landed cost, bank reconciliation, VAT returns and Vietnamese statutory reports.',
     nav: {
       label: 'Site',
-      guarantees: 'Guarantees',
       features: 'Features',
-      engineering: 'Engineering',
-      openDemo: 'Open the demo',
+      trust: 'Why trust it',
+      developers: 'Developers',
+      openDemo: 'Live demo',
     },
     hero: {
       eyebrow: 'Open source · MIT licence',
-      // The spaces are part of the copy: see the hero, and Japanese, which has none.
-      titleLead: 'The ledger that ',
-      titleAccent: 'refuses',
-      titleTail: ' to be wrong.',
-      lede: 'Double-entry books where every rule — entries that balance, history nobody can edit, one company never seeing another’s — is enforced by Postgres itself. Not by a code path someone can forget.',
-      breakIt: 'Try to break it',
-      reassurance: 'No sign-up. Your own copy of a stone exporter’s books, ready in seconds.',
-      terminalTitle: 'psql — connected as obol_app',
-      pause: 'Pause the animation',
-      play: 'Play the animation',
-      transcript: 'Statements sent to the database, and how Postgres answered each one',
-    },
-    stats: {
-      label: 'Obol in numbers',
-      tests: 'tests, run against real Postgres',
-      attacks: 'attacks on the live database, refused',
-      decisions: 'architecture decisions, written down',
-      languages: 'languages, translated to the last label',
-      rowsKept: 'rows an attacker gets to keep',
-    },
-    product: {
-      eyebrow: 'The live demo',
-      title: 'Real books. Not a to-do list with a currency sign.',
-      lede: 'A quarter of trading for a Vietnamese stone exporter — FIFO lots, export invoices in three currencies, landed cost and VAT — kept in dong under Thông tư 200. Every number on it is live.',
+      title: 'Accounting for businesses that buy, stock and sell goods.',
+      lede: 'Obol keeps your sales, stock, bank and tax in one set of double-entry books — in any currency, with every invoice showing what the goods cost and what you made.',
+      secondary: 'View the live demo',
+      reassurance: 'No sign-up. You get a writable copy of a sample company’s books in seconds.',
       imageAlt:
         'The Obol overview in dark mode: stock on hand, receivables, payables and this month’s margin, a chip confirming the books balance, thirty days of activity and the position by account class.',
-      open: 'Open the live demo',
-    },
-    balance: {
-      eyebrow: 'Balanced by construction',
-      title: 'Debits equal credits. Postgres makes sure.',
-      lede: 'Every entry is checked at COMMIT by a deferred constraint trigger, so not even a hand-typed psql session can leave the books one unit out. Go on — unbalance it.',
-      debit: 'Debit',
-      credit: 'Credit',
-      unit: 'minor units',
-      balanced: 'Balanced. The entry posts.',
-      unbalanced: 'Off by {amount}. Postgres refuses the entry, and nothing is kept.',
-      makeItBalance: 'Balance it',
-      knockItOut: 'Knock it out by one',
-      simulated: 'This is the rule, run in your browser. The real one runs in Postgres —',
-      fireIt: 'fire it at the live database',
-      scaleLabel: 'A balance scale, level only when debits equal credits',
-      terminalTitle: 'What Postgres answers at COMMIT',
-    },
-    guarantees: {
-      eyebrow: 'Nine attacks. Nine refusals.',
-      title: 'We tried to break it so you would not have to. You still can.',
-      lede: 'Raw SQL that goes around the application entirely, fired at the live database. Every answer below is Postgres’ own.',
-      postgresSays: 'Postgres says',
-      noRows: '0 rows',
-      cta: 'Fire all nine yourself',
     },
     features: {
-      eyebrow: 'Beyond the core',
-      title: 'Everything a trading business needs to close the month.',
-      lede: 'One balanced core underneath, so every module below posts entries the database has already checked.',
+      eyebrow: 'What it does',
+      title: 'From the first invoice to the filed return.',
+      lede: 'Every part posts to the same books, so sales, stock, bank and tax always agree with each other.',
+      open: 'See it in the demo',
+      items: {
+        sales: {
+          title: 'Sales that show their margin',
+          body: 'An invoice records the revenue and the cost of the goods it sold in the same entry, so you see the margin on every sale, product and customer as you go — not at year end.',
+          points: [
+            'Invoice in any currency; the books stay in yours',
+            'Credit notes that put returned goods back in stock',
+            'Receivables aged by due date and payment terms',
+          ],
+          imageAlt:
+            'The Sales page: recent invoices in Australian dollars, US dollars and euros, each with its revenue, cost and margin in dong.',
+        },
+        stock: {
+          title: 'Stock that matches the accounts',
+          body: 'Goods are costed first in, first out, delivery by delivery. Freight and duty are spread over the goods they arrived with, so cost of sales is what the goods really cost.',
+          points: [
+            'FIFO lots, traced back to the delivery',
+            'Landed cost: freight, duty and fees',
+            'Supplier returns, and write-offs with a reason',
+          ],
+          imageAlt:
+            'The Stock page: four stone products with the quantity on hand and its value, and a check confirming the stock agrees with the inventory account.',
+        },
+        bank: {
+          title: 'Bank reconciliation, line by line',
+          body: 'Import a statement and match each line to an entry in the books. Fees and interest the books do not have yet are booked straight from the statement line.',
+          points: [
+            'Statement and books side by side',
+            'The difference shown until it reaches zero',
+            'Each statement line imported only once',
+          ],
+          imageAlt:
+            'A bank account being reconciled: the balance in the books and per the bank, three statement lines still to match, and the lines already matched.',
+        },
+        tax: {
+          title: 'Tax returns and statutory reports',
+          body: 'Tax charged and tax paid add up, period by period, into a return ready to file, with any unused credit carried into the next one. Vietnamese companies get the statements the circulars require.',
+          points: [
+            'A VAT or consumption-tax return for each period',
+            'Unused credit carried forward automatically',
+            'Mẫu B01 and B02 under Thông tư 200 and 133, and e-invoices',
+          ],
+          imageAlt:
+            'The Tax page: the September return ready to file, with tax charged on sales, tax paid on purchases and the amount to pay.',
+        },
+      },
+    },
+    more: {
+      title: 'Also included',
       items: {
         currency: {
           title: 'Multi-currency',
-          body: 'Invoice in any currency, balanced in the functional one, with realised and unrealised exchange gains.',
-        },
-        stock: {
-          title: 'FIFO stock and landed cost',
-          body: 'Lots costed first in, first out, with freight and duty spread across the goods they arrived with.',
-        },
-        sales: {
-          title: 'Sales that know their margin',
-          body: 'Invoice and cost of goods sold in one entry, so margin by product and by customer is never a guess.',
-        },
-        bank: {
-          title: 'Bank reconciliation',
-          body: 'Statements imported once and matched line by line, with fees booked straight from the line.',
-        },
-        tax: {
-          title: 'VAT and consumption tax',
-          body: 'Returns that carry an unused credit forward as a balance, not a number typed onto a form.',
-        },
-        statutory: {
-          title: 'Vietnam, done properly',
-          body: 'Mẫu B01 and B02 under Thông tư 200 and 133, and e-invoices numbered without gaps.',
+          body: 'Exchange gains and losses, realised and unrealised, worked out for you.',
         },
         documents: {
-          title: 'Documents on the entry',
-          body: 'The invoice, customs declaration and bill of lading, attached to the entry they support.',
+          title: 'Documents',
+          body: 'Attach the invoice, customs declaration or bill of lading to the entry it supports.',
         },
-        webhooks: {
-          title: 'Webhooks through an outbox',
-          body: 'Recorded in the same transaction as the entry, so no event ever announces a rollback.',
+        close: {
+          title: 'Month-end close',
+          body: 'Lock a finished month, so nothing can be posted into it afterwards.',
+        },
+        languages: {
+          title: 'Three languages',
+          body: 'English, Tiếng Việt and 日本語, translated down to the last label.',
+        },
+        search: {
+          title: 'Search everything',
+          body: 'Press ⌘K to jump to any account, entry or page.',
         },
         api: {
-          title: 'A typed HTTP API',
-          body: 'Idempotency keys, keyset pagination and a generated OpenAPI document for every route.',
+          title: 'API and webhooks',
+          body: 'Connect a shop or another system through the HTTP API, and get a webhook when an entry posts.',
         },
       },
     },
-    engineering: {
-      eyebrow: 'Proof by deletion',
-      title: 'Every promise is one deleted line from a failing test.',
-      lede: 'A claim that could be false is checked by removing the line that makes it true and watching the suite go red. Three of them:',
-      proofs: {
-        sort: {
-          change: 'Remove the sort that orders posting inserts',
-          result: 'Two concurrent transfers deadlock, and Postgres reports 40P01.',
+    trust: {
+      eyebrow: 'Numbers you can trust',
+      title: 'Wrong books can’t be saved.',
+      lede: 'Most accounting software checks its rules in the app. Obol also builds them into the database, so they still hold if the app has a bug or someone edits the data directly.',
+      items: {
+        balanced: {
+          title: 'Every entry balances',
+          body: 'Debits must equal credits before an entry is saved. One unit out, and it is refused.',
         },
-        skipLocked: {
-          change: 'Remove SKIP LOCKED from the webhook queue',
-          result: 'Four workers collapse into one, and the concurrency suite says so.',
+        history: {
+          title: 'History can’t be rewritten',
+          body: 'Posted entries are never edited or deleted. A mistake is corrected by a reversal, and both stay on the record.',
         },
-        bypassRls: {
-          change: 'Connect as a role that bypasses row-level security',
-          result: 'The health probe reports it before a single request is served.',
+        tenants: {
+          title: 'Each company sees only its own books',
+          body: 'The database itself keeps one company’s data out of another’s, even if a query forgets to filter.',
         },
       },
-      practicesLabel: 'Also in the box',
-      practices: {
-        concurrency: 'Optimistic concurrency',
-        pagination: 'Keyset pagination',
-        retries: 'Idempotent retries',
-        outbox: 'Transactional outbox',
-        metrics: 'Prometheus metrics',
-        traces: 'OpenTelemetry traces',
-        history: 'Append-only history',
-        tenancy: 'Row-level security',
-      },
+      cta: 'Try to break it yourself',
+    },
+    developers: {
+      eyebrow: 'For developers',
+      title: 'Open source. Run it yourself, or build on it.',
+      lede: 'MIT-licensed, built with Next.js and Postgres, and documented down to the design decisions.',
+      points: [
+        'A typed HTTP API with idempotency keys and a generated OpenAPI document',
+        'Webhooks sent through a transactional outbox, so none announces an entry that rolled back',
+        'More than 1,000 tests, run against a real Postgres database rather than mocks',
+      ],
+      docs: 'API reference',
+      source: 'Source on GitHub',
     },
     closing: {
-      title: 'Open your own books in one click.',
-      lede: 'A writable copy of the sample company — a quarter of sales, stock and VAT. Change anything. Break what you can.',
+      title: 'Try it with a real company’s books.',
+      lede: 'One click gives you a writable copy of the sample company — a quarter of sales, stock and VAT. Change anything you like.',
       readOnly: 'Or look around the read-only demo',
     },
     footer: {
-      tagline: 'Balanced by construction, refused by Postgres.',
+      tagline: 'Open-source accounting for businesses that trade goods.',
       licence: 'Open source under the MIT licence',
       source: 'Source on GitHub',
       api: 'API reference',
